@@ -389,11 +389,56 @@ if ($action == 'create') {
 		}
 	}
 
+	// Override mode: products that appear in at least one validated shipment (status=1)
+	// — tighter than all products but wider than the standard lot-restricted list
+	// Returns empty if the Expedition module is not installed (tables absent / query fails)
+	$sql_ovr  = "SELECT DISTINCT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
+	$sql_ovr .= " INNER JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.fk_product = p.rowid";
+	$sql_ovr .= " INNER JOIN ".MAIN_DB_PREFIX."expedition e ON e.rowid = ed.fk_expedition";
+	$sql_ovr .= " WHERE e.status = 1";
+	$sql_ovr .= " AND e.entity IN (".getEntity('expedition').")";
+	$sql_ovr .= " AND p.entity IN (".getEntity('product').")";
+	$sql_ovr .= " ORDER BY p.ref ASC";
+	$res_ovr = $db->query($sql_ovr);
+	$override_product_list = array();
+	if ($res_ovr) {
+		while ($row_ovr = $db->fetch_object($res_ovr)) {
+			$override_product_list[$row_ovr->rowid] = $row_ovr->ref.($row_ovr->label ? ' — '.$row_ovr->label : '');
+		}
+	}
+
+	// Manual mode: all products in the system — fallback for installs without
+	// Expedition module or serial/lot tracking. No data-source restrictions.
+	$sql_man  = "SELECT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
+	$sql_man .= " WHERE p.entity IN (".getEntity('product').")";
+	$sql_man .= " AND p.tosell = 1";
+	$sql_man .= " ORDER BY p.ref ASC";
+	$res_man = $db->query($sql_man);
+	$manual_product_list = array();
+	if ($res_man) {
+		while ($row_man = $db->fetch_object($res_man)) {
+			$manual_product_list[$row_man->rowid] = $row_man->ref.($row_man->label ? ' — '.$row_man->label : '');
+		}
+	}
+
+	// Determine initial mode — persists across a failed submit.
+	// Auto-selects the most restrictive mode that has data; falls back to manual.
+	$prev_mode    = GETPOST('warranty_mode', 'alpha');
+	$prev_product = (int) GETPOST('fk_product', 'int');
+	$valid_modes  = array('standard', 'override', 'manual');
+	if (!in_array($prev_mode, $valid_modes)) {
+		if (!empty($warranty_product_list))     { $prev_mode = 'standard'; }
+		elseif (!empty($override_product_list)) { $prev_mode = 'override'; }
+		else                                    { $prev_mode = 'manual'; }
+	}
+	$std_disabled = empty($warranty_product_list);
+	$ovr_disabled = empty($override_product_list);
+
 	print load_fiche_titre($langs->trans('NewWarranty'), '', 'bill');
 	print '<p><a href="'.$_SERVER['PHP_SELF'].'?action=create_from_shipment">'.img_picto('', 'shipment', 'class="paddingright"').$langs->trans('CreateWarrantyFromShipment').'</a></p>';
 
-	// Guard: if no products have unassigned serials, the form would be useless — show a notice instead
-	if (empty($warranty_product_list)) {
+	// Guard: no products at all in the system
+	if (empty($manual_product_list)) {
 		print '<div class="info">'.img_picto('', 'info', 'class="paddingright"').$langs->trans('NoProductsWithUnassignedSerials').'</div>';
 		llxFooter();
 		$db->close();
@@ -403,83 +448,175 @@ if ($action == 'create') {
 	print '<form action="'.$_SERVER['PHP_SELF'].'" method="POST">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
 	print '<input type="hidden" name="action" value="add">';
+	// 0 = standard, 1 = override, 2 = manual
+	$ovr_flag = ($prev_mode === 'override') ? '1' : (($prev_mode === 'manual') ? '2' : '0');
+	print '<input type="hidden" name="warranty_override" id="warranty_override_val" value="'.$ovr_flag.'">';
+
+	// Mode radio toggle
+	print '<div style="padding:8px 0 12px 0">';
+	print '<label style="margin-right:24px; cursor:pointer">';
+	print '<input type="radio" name="warranty_mode" value="standard"'.($prev_mode === 'standard' ? ' checked' : '').($std_disabled ? ' disabled' : '').'> ';
+	print dol_escape_htmltag($langs->trans('WarrantyModeStandard'));
+	print '</label>';
+	print '<label style="margin-right:24px; cursor:pointer">';
+	print '<input type="radio" name="warranty_mode" value="override"'.($prev_mode === 'override' ? ' checked' : '').($ovr_disabled ? ' disabled' : '').'> ';
+	print dol_escape_htmltag($langs->trans('WarrantyModeOverride'));
+	print '</label>';
+	print '<label style="cursor:pointer">';
+	print '<input type="radio" name="warranty_mode" value="manual"'.($prev_mode === 'manual' ? ' checked' : '').'> ';
+	print dol_escape_htmltag($langs->trans('WarrantyModeManual'));
+	print '</label>';
+	print '</div>';
 
 	print dol_get_fiche_head(array(), '', '', -1);
-
 	print '<table class="border centpercent tableforfieldcreate">';
 
-	// Customer
+	// Override / Manual warning banner
+	$show_warn = in_array($prev_mode, array('override', 'manual'));
+	print '<tr id="row_warn"'.(!$show_warn ? ' style="display:none"' : '').'>';
+	print '<td colspan="2"><div class="warning" id="warn_msg">'.img_picto('', 'warning_white', 'class="paddingright"');
+	print ($prev_mode === 'manual' ? $langs->trans('WarrantyManualWarning') : $langs->trans('WarrantyOverrideWarning'));
+	print '</div></td>';
+	print '</tr>';
+
+	// Customer (shared across all modes)
 	print '<tr><td class="fieldrequired">'.$langs->trans('Customer').'</td>';
 	print '<td>';
 	print $formcompany->select_company(GETPOST('fk_soc', 'int'), 'fk_soc', '', $langs->trans('SelectThird'), 0, 0, null, 0, 'minwidth300 maxwidth500 widthcentpercentminusxx');
 	print '</td></tr>';
 
-	// Product — restricted to products with at least one unassigned serial in product_lot
-	print '<tr><td class="fieldrequired">'.$langs->trans('Product').'</td>';
-	print '<td>';
-	print Form::selectarray('fk_product', $warranty_product_list, (int) GETPOST('fk_product', 'int'), 1, 0, 0, '', 0, 0, 0, '', 'flat minwidth300');
+	// Product — Standard row (products with unassigned serials in product_lot)
+	print '<tr id="row_std_product"'.($prev_mode !== 'standard' ? ' style="display:none"' : '').'>';
+	print '<td class="fieldrequired">'.$langs->trans('Product').'</td><td>';
+	if (!empty($warranty_product_list)) {
+		print Form::selectarray('fk_product', $warranty_product_list, $prev_product, 1, 0, 0, '', 0, 0, 0, '', 'flat minwidth300', 0, '', '', false, ($prev_mode !== 'standard'));
+	}
 	print '</td></tr>';
 
-	// Serial number — populated dynamically from product_lot based on selected product
-	print '<tr><td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td>';
-	print '<td>';
+	// Product — Override row (products with any validated shipment on record)
+	print '<tr id="row_ovr_product"'.($prev_mode !== 'override' ? ' style="display:none"' : '').'>';
+	print '<td class="fieldrequired">'.$langs->trans('Product').'</td><td>';
+	print '<select name="fk_product" id="fk_product_ovr" class="flat minwidth300"'.($prev_mode !== 'override' ? ' disabled' : '').'>';
+	print '<option value="">— '.$langs->trans('SelectProduct').' —</option>';
+	foreach ($override_product_list as $ovr_pid => $ovr_plabel) {
+		print '<option value="'.(int) $ovr_pid.'"'.($prev_product === (int) $ovr_pid ? ' selected' : '').'>'.dol_escape_htmltag($ovr_plabel).'</option>';
+	}
+	print '</select>';
+	print '</td></tr>';
+
+	// Product — Manual row (all active products — no module dependency)
+	print '<tr id="row_man_product"'.($prev_mode !== 'manual' ? ' style="display:none"' : '').'>';
+	print '<td class="fieldrequired">'.$langs->trans('Product').'</td><td>';
+	print '<select name="fk_product" id="fk_product_man" class="flat minwidth300"'.($prev_mode !== 'manual' ? ' disabled' : '').'>';
+	print '<option value="">— '.$langs->trans('SelectProduct').' —</option>';
+	foreach ($manual_product_list as $man_pid => $man_plabel) {
+		print '<option value="'.(int) $man_pid.'"'.($prev_product === (int) $man_pid ? ' selected' : '').'>'.dol_escape_htmltag($man_plabel).'</option>';
+	}
+	print '</select>';
+	print '</td></tr>';
+
+	// Serial — Standard row (select from product_lot)
+	print '<tr id="row_std_serial"'.($prev_mode !== 'standard' ? ' style="display:none"' : '').'>';
+	print '<td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td><td>';
 	print '<select name="serial_number" id="manual_serial_select" class="flat minwidth200" disabled>';
 	print '<option value="">'.$langs->trans('SelectProductFirst').'</option>';
 	print '</select>';
 	print '</td></tr>';
 
-	print '<script>(function(){
-	var smap = '.$serial_map_js.';
-	var noSelTxt  = '.json_encode($langs->trans('SelectProductFirst')).';
-	var noneTxt   = '.json_encode($langs->trans('NoSerialsAvailable')).';
-	var prevVal   = "'.dol_escape_js($prev_serial).'";
+	// Serial — Override / Manual row (shared free-text input)
+	$show_free_ser = in_array($prev_mode, array('override', 'manual'));
+	print '<tr id="row_free_serial"'.(!$show_free_ser ? ' style="display:none"' : '').'>';
+	print '<td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td><td>';
+	print '<input type="text" name="serial_number" id="serial_number_free"';
+	print ' class="flat minwidth200"';
+	print ' placeholder="'.dol_escape_htmltag($langs->trans('SerialNumberOverridePlaceholder')).'"';
+	print ' value="'.($show_free_ser ? dol_escape_htmltag($prev_serial) : '').'"';
+	print (!$show_free_ser ? ' disabled' : '').'>';
+	print '</td></tr>';
 
-	var prodSel = document.getElementById("fk_product");
-	var serSel  = document.getElementById("manual_serial_select");
+	$warn_ovr_txt = dol_escape_js($langs->trans('WarrantyOverrideWarning'));
+	$warn_man_txt = dol_escape_js($langs->trans('WarrantyManualWarning'));
+	print '<script>(function(){
+	var smap     = '.$serial_map_js.';
+	var noSelTxt = '.json_encode($langs->trans('SelectProductFirst')).';
+	var noneTxt  = '.json_encode($langs->trans('NoSerialsAvailable')).';
+	var selStr   = "— '.dol_escape_js($langs->trans('SelectSerial')).' —";
+	var prevSer  = "'.dol_escape_js($prev_serial).'";
+	var warnOvr  = "'.dol_escape_js($warn_ovr_txt).'";
+	var warnMan  = "'.dol_escape_js($warn_man_txt).'";
+
+	var stdProdSel  = document.getElementById("fk_product");
+	var stdSerSel   = document.getElementById("manual_serial_select");
+	var stdProdRow  = document.getElementById("row_std_product");
+	var stdSerRow   = document.getElementById("row_std_serial");
+	var ovrProdSel  = document.getElementById("fk_product_ovr");
+	var ovrProdRow  = document.getElementById("row_ovr_product");
+	var manProdSel  = document.getElementById("fk_product_man");
+	var manProdRow  = document.getElementById("row_man_product");
+	var freeSerInp  = document.getElementById("serial_number_free");
+	var freeSerRow  = document.getElementById("row_free_serial");
+	var warnRow     = document.getElementById("row_warn");
+	var warnMsg     = document.getElementById("warn_msg");
+	var ovrValInp   = document.getElementById("warranty_override_val");
 
 	function populateSerials() {
-		var pid = prodSel ? parseInt(prodSel.value, 10) : 0;
-		serSel.innerHTML = "";
+		var pid = stdProdSel ? parseInt(stdProdSel.value, 10) : 0;
+		stdSerSel.innerHTML = "";
 		if (!pid) {
-			var opt = document.createElement("option");
-			opt.value = "";
-			opt.textContent = noSelTxt;
-			serSel.appendChild(opt);
-			serSel.disabled = true;
-			return;
+			var o = document.createElement("option"); o.value = ""; o.textContent = noSelTxt;
+			stdSerSel.appendChild(o); stdSerSel.disabled = true; return;
 		}
 		var serials = (smap[pid] && smap[pid].length) ? smap[pid] : null;
 		if (!serials) {
-			var opt = document.createElement("option");
-			opt.value = "";
-			opt.textContent = noneTxt;
-			serSel.appendChild(opt);
-			serSel.disabled = true;
-			return;
+			var o = document.createElement("option"); o.value = ""; o.textContent = noneTxt;
+			stdSerSel.appendChild(o); stdSerSel.disabled = true; return;
 		}
-		var blank = document.createElement("option");
-		blank.value = "";
-		blank.textContent = "— '.dol_escape_js($langs->trans('SelectSerial')).' —";
-		serSel.appendChild(blank);
+		var blank = document.createElement("option"); blank.value = ""; blank.textContent = selStr;
+		stdSerSel.appendChild(blank);
 		serials.forEach(function(s) {
-			var opt = document.createElement("option");
-			opt.value = s;
-			opt.textContent = s;
-			serSel.appendChild(opt);
+			var o = document.createElement("option"); o.value = s; o.textContent = s;
+			stdSerSel.appendChild(o);
 		});
-		serSel.disabled = false;
-		if (prevVal) { serSel.value = prevVal; prevVal = ""; }
+		stdSerSel.disabled = false;
+		if (prevSer) { stdSerSel.value = prevSer; prevSer = ""; }
 	}
 
-	if (prodSel) {
-		// Support both native select and Select2/jQuery-enhanced dropdowns
-		prodSel.addEventListener("change", populateSerials);
-		if (typeof jQuery !== "undefined") {
-			jQuery(prodSel).on("change", populateSerials);
-		}
-		// If product already selected on load (e.g. after failed submit), populate immediately
-		if (prodSel.value) { populateSerials(); }
+	function setMode(mode) {
+		var isStd = (mode === "standard");
+		var isOvr = (mode === "override");
+		var isMan = (mode === "manual");
+		// Product rows
+		if (stdProdRow) stdProdRow.style.display = isStd ? "" : "none";
+		if (ovrProdRow) ovrProdRow.style.display = isOvr ? "" : "none";
+		if (manProdRow) manProdRow.style.display = isMan ? "" : "none";
+		// Serial rows
+		if (stdSerRow)  stdSerRow.style.display  = isStd ? "" : "none";
+		if (freeSerRow) freeSerRow.style.display  = (isOvr || isMan) ? "" : "none";
+		// Warning row
+		if (warnRow) warnRow.style.display = (isOvr || isMan) ? "" : "none";
+		if (warnMsg) warnMsg.innerHTML = (typeof Image !== "undefined" ? "" : "") + (isMan ? warnMan : warnOvr);
+		// Enable/disable for form submission (disabled fields do not submit)
+		if (stdProdSel) stdProdSel.disabled = !isStd;
+		if (ovrProdSel) ovrProdSel.disabled = !isOvr;
+		if (manProdSel) manProdSel.disabled = !isMan;
+		if (freeSerInp) freeSerInp.disabled = isStd;
+		if (isStd) { populateSerials(); }
+		else if (stdSerSel) { stdSerSel.disabled = true; }
+		// Update hidden flag
+		if (ovrValInp) ovrValInp.value = isOvr ? "1" : (isMan ? "2" : "0");
 	}
+
+	if (stdProdSel) {
+		stdProdSel.addEventListener("change", populateSerials);
+		if (typeof jQuery !== "undefined") { jQuery(stdProdSel).on("change", populateSerials); }
+	}
+	document.querySelectorAll("[name=warranty_mode]").forEach(function(r) {
+		r.addEventListener("change", function() { setMode(this.value); });
+	});
+
+	var initRadio = document.querySelector("[name=warranty_mode]:checked");
+	setMode(initRadio ? initRadio.value : "standard");
+	if (stdProdSel && stdProdSel.value) { populateSerials(); }
 })();</script>';
 
 	// Warranty type — load from DB
