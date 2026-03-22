@@ -888,6 +888,7 @@ if ($action == 'create') {
 	print '</table>';
 	print '</div>'; // fichehalfright
 	print '</div>'; // fichecenter
+	print '<div class="clearboth"></div>'; // clear floated half-columns before movement panel
 
 	// =====================================================================
 	// MOVEMENT PANEL — resolution-type-aware, directional
