@@ -314,8 +314,27 @@ if ($resql) {
 			print '<span class="opacitymedium">&mdash;</span>';
 		}
 		print '</td>';
-		print '<td class="center">'.((int) $obj->claim_count).'</td>';
-		print '<td></td>';
+		// Claims count — link to filtered SR list for this warranty
+		$claim_count = (int) $obj->claim_count;
+		$sr_list_url = DOL_URL_ROOT.'/custom/warrantysvc/list.php?fk_warranty='.$obj->rowid;
+		print '<td class="center">';
+		if ($claim_count > 0) {
+			print '<a href="'.$sr_list_url.'">'.$claim_count.'</a>';
+		} else {
+			print '<span class="opacitymedium">0</span>';
+		}
+		print '</td>';
+		// Quick-action: New Service Request for this warranty
+		print '<td class="center">';
+		if ($user->hasRight('warrantysvc', 'svcrequest', 'write') && $display_status !== 'voided') {
+			$new_sr_url = DOL_URL_ROOT.'/custom/warrantysvc/card.php?action=create'
+				.'&fk_warranty='.$obj->rowid
+				.'&fk_soc='.$obj->fk_soc
+				.'&serial_number='.urlencode($obj->serial_number)
+				.($obj->fk_product ? '&fk_product='.(int) $obj->fk_product : '');
+			print '<a href="'.$new_sr_url.'" title="'.dol_escape_htmltag($langs->trans('NewSvcRequest')).'">'.img_picto($langs->trans('NewSvcRequest'), 'add', 'class="size15"').'</a>';
+		}
+		print '</td>';
 		print '</tr>';
 
 		$i++;
