@@ -68,15 +68,24 @@ $limit     = $conf->liste_limit;
 $page      = GETPOSTISSET('pageplusone') ? (GETPOST('pageplusone') - 1) : max(0, GETPOST('page', 'int'));
 $offset    = $limit * $page;
 
+// Reusable SQL expression: effective expiry = stored date, or start_date + type duration if not stored.
+// This is the canonical end-date for all status logic, filters, and display.
+$eff_exp = "COALESCE(t.expiry_date, IF(t.start_date IS NOT NULL AND wt.default_coverage_days > 0,"
+	." DATE_ADD(t.start_date, INTERVAL wt.default_coverage_days DAY), NULL))";
+
 // Build query
 $sql  = "SELECT t.rowid, t.ref, t.fk_soc, t.fk_product, t.serial_number,";
 $sql .= " t.warranty_type, t.start_date, t.expiry_date, t.status,";
 $sql .= " t.claim_count, t.total_claimed_value,";
 $sql .= " s.nom as company_name,";
-$sql .= " p.ref as product_ref, p.label as product_label";
+$sql .= " p.ref as product_ref, p.label as product_label,";
+$sql .= " wt.default_coverage_days,";
+$sql .= " ".$eff_exp." AS effective_expiry";
 $sql .= " FROM ".MAIN_DB_PREFIX."svc_warranty as t";
 $sql .= " LEFT JOIN ".MAIN_DB_PREFIX."societe as s ON s.rowid = t.fk_soc";
 $sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product as p ON p.rowid = t.fk_product";
+$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."svc_warranty_type as wt ON wt.code = t.warranty_type";
+$sql .= "  AND wt.entity IN (".getEntity('svcwarrantytype').")";
 $sql .= " WHERE t.entity IN (".getEntity('svcwarranty').")";
 
 if ($search_ref) {
@@ -95,20 +104,19 @@ if ($search_wtype) {
 	$sql .= " AND t.warranty_type = '".$db->escape($search_wtype)."'";
 }
 if ($search_status && $search_status != '-1') {
-	// Expiry-based status filter
 	if ($search_status == 'active') {
-		$sql .= " AND t.status != 'voided' AND (t.expiry_date IS NULL OR t.expiry_date >= '".$db->idate(dol_now())."')";
+		$sql .= " AND t.status != 'voided' AND (".$eff_exp." IS NULL OR ".$eff_exp." >= '".$db->idate(dol_now())."')";
 	} elseif ($search_status == 'expired') {
-		$sql .= " AND t.status != 'voided' AND t.expiry_date < '".$db->idate(dol_now())."'";
+		$sql .= " AND t.status != 'voided' AND ".$eff_exp." < '".$db->idate(dol_now())."'";
 	} elseif ($search_status == 'voided') {
 		$sql .= " AND t.status = 'voided'";
 	}
 }
 if ($search_expiry_from) {
-	$sql .= " AND t.expiry_date >= '".$db->idate($search_expiry_from)."'";
+	$sql .= " AND ".$eff_exp." >= '".$db->idate($search_expiry_from)."'";
 }
 if ($search_expiry_to) {
-	$sql .= " AND t.expiry_date <= '".$db->idate($search_expiry_to)."'";
+	$sql .= " AND ".$eff_exp." <= '".$db->idate($search_expiry_to)."'";
 }
 
 $sql .= $db->order($sortfield, $sortorder);
@@ -256,10 +264,14 @@ if ($resql) {
 
 		$cardurl = DOL_URL_ROOT.'/custom/warrantysvc/warranty_card.php?id='.$obj->rowid;
 
+		// Use effective_expiry (stored date, or start_date + type duration) for all status logic
+		$expiry_ts          = $obj->effective_expiry ? $db->jdate($obj->effective_expiry) : null;
+		$expiry_is_calc     = (!$obj->expiry_date && $obj->effective_expiry);
+
 		// Compute live status for display
 		if ($obj->status == 'voided') {
 			$display_status = 'voided';
-		} elseif (!empty($obj->expiry_date) && $db->jdate($obj->expiry_date) < $now) {
+		} elseif ($expiry_ts && $expiry_ts < $now) {
 			$display_status = 'expired';
 		} else {
 			$display_status = 'active';
@@ -267,7 +279,6 @@ if ($resql) {
 
 		// Highlight expiring soon in yellow
 		$row_class = 'oddeven';
-		$expiry_ts = $db->jdate($obj->expiry_date);
 		if ($display_status == 'active' && $expiry_ts && $expiry_ts < dol_time_plus_duree($now, 30, 'd')) {
 			$row_class = 'oddeven highlight';
 		}
@@ -282,8 +293,12 @@ if ($resql) {
 		print '<td class="center">'.svcwarranty_status_badge($display_status).'</td>';
 		print '<td>'.dol_print_date($db->jdate($obj->start_date), 'day').'</td>';
 		print '<td>';
-		if ($obj->expiry_date) {
+		if ($expiry_ts) {
 			$expiry_label = dol_print_date($expiry_ts, 'day');
+			// Italicise calculated dates so users know it derives from the warranty type duration
+			if ($expiry_is_calc) {
+				$expiry_label = '<em title="'.dol_escape_htmltag($langs->trans('ExpiryDateCalculated')).'">'.$expiry_label.'</em>';
+			}
 			if ($display_status == 'expired') {
 				print '<span class="warning">'.$expiry_label.'</span>';
 			} elseif ($display_status == 'active' && $expiry_ts < dol_time_plus_duree($now, 30, 'd')) {

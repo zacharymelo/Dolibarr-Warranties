@@ -114,6 +114,7 @@ SelectWarrantyType = Select a warranty type...
 ErrorWarrantyTypeCodeLabelRequired = Code and label are required.
 StartDate = Start Date
 ExpiryDate = Expiry Date
+ExpiryDateCalculated = End date calculated from start date + warranty type duration
 CoverageDays = Coverage (days)
 CoverageTerms = Coverage Terms
 Exclusions = Exclusions
