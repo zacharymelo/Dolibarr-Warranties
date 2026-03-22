@@ -347,6 +347,31 @@ if ($action == 'create_from_shipment') {
 // CREATE FORM
 // ============================================================
 if ($action == 'create') {
+	// Build map of unassigned serials grouped by product_id for the JS picker
+	$sql_lot  = "SELECT pl.batch AS serial_number, pl.fk_product";
+	$sql_lot .= " FROM ".MAIN_DB_PREFIX."product_lot pl";
+	$sql_lot .= " WHERE pl.batch IS NOT NULL AND pl.batch != ''";
+	$sql_lot .= " AND pl.entity IN (".getEntity('product').")";
+	$sql_lot .= " AND pl.batch NOT IN (";
+	$sql_lot .= "   SELECT w.serial_number FROM ".MAIN_DB_PREFIX."svc_warranty w";
+	$sql_lot .= "   WHERE w.serial_number IS NOT NULL AND w.serial_number != ''";
+	$sql_lot .= "   AND w.entity IN (".getEntity('svcwarranty').")";
+	$sql_lot .= " )";
+	$sql_lot .= " ORDER BY pl.fk_product, pl.batch";
+	$res_lot = $db->query($sql_lot);
+	$serials_by_product = array();
+	if ($res_lot) {
+		while ($row_lot = $db->fetch_object($res_lot)) {
+			$pid = (int) $row_lot->fk_product;
+			if (!isset($serials_by_product[$pid])) {
+				$serials_by_product[$pid] = array();
+			}
+			$serials_by_product[$pid][] = $row_lot->serial_number;
+		}
+	}
+	$serial_map_js = json_encode($serials_by_product);
+	$prev_serial   = dol_escape_js(GETPOST('serial_number', 'alpha'));
+
 	print load_fiche_titre($langs->trans('NewWarranty'), '', 'bill');
 	print '<p><a href="'.$_SERVER['PHP_SELF'].'?action=create_from_shipment">'.img_picto('', 'shipment', 'class="paddingright"').$langs->trans('CreateWarrantyFromShipment').'</a></p>';
 
@@ -370,9 +395,67 @@ if ($action == 'create') {
 	$form->select_produits(GETPOST('fk_product', 'int'), 'fk_product', '', 0, 0, 1, 2, '', 0, array(), 0, 1, 0, 'minwidth300');
 	print '</td></tr>';
 
-	// Serial number
+	// Serial number — populated dynamically from product_lot based on selected product
 	print '<tr><td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td>';
-	print '<td><input type="text" name="serial_number" value="'.dol_escape_htmltag(GETPOST('serial_number', 'alpha')).'" class="flat minwidth200" placeholder="e.g. SN-20240100123"></td></tr>';
+	print '<td>';
+	print '<select name="serial_number" id="manual_serial_select" class="flat minwidth200" disabled>';
+	print '<option value="">'.$langs->trans('SelectProductFirst').'</option>';
+	print '</select>';
+	print '</td></tr>';
+
+	print '<script>(function(){
+	var smap = '.$serial_map_js.';
+	var noSelTxt  = '.json_encode($langs->trans('SelectProductFirst')).';
+	var noneTxt   = '.json_encode($langs->trans('NoSerialsAvailable')).';
+	var prevVal   = "'.dol_escape_js($prev_serial).'";
+
+	var prodSel = document.getElementById("fk_product");
+	var serSel  = document.getElementById("manual_serial_select");
+
+	function populateSerials() {
+		var pid = prodSel ? parseInt(prodSel.value, 10) : 0;
+		serSel.innerHTML = "";
+		if (!pid) {
+			var opt = document.createElement("option");
+			opt.value = "";
+			opt.textContent = noSelTxt;
+			serSel.appendChild(opt);
+			serSel.disabled = true;
+			return;
+		}
+		var serials = (smap[pid] && smap[pid].length) ? smap[pid] : null;
+		if (!serials) {
+			var opt = document.createElement("option");
+			opt.value = "";
+			opt.textContent = noneTxt;
+			serSel.appendChild(opt);
+			serSel.disabled = true;
+			return;
+		}
+		var blank = document.createElement("option");
+		blank.value = "";
+		blank.textContent = "— '.dol_escape_js($langs->trans('SelectSerial')).' —";
+		serSel.appendChild(blank);
+		serials.forEach(function(s) {
+			var opt = document.createElement("option");
+			opt.value = s;
+			opt.textContent = s;
+			serSel.appendChild(opt);
+		});
+		serSel.disabled = false;
+		if (prevVal) { serSel.value = prevVal; prevVal = ""; }
+	}
+
+	if (prodSel) {
+		// Support both native select and Select2/jQuery-enhanced dropdowns
+		prodSel.addEventListener("change", populateSerials);
+		if (typeof jQuery !== "undefined") {
+			jQuery(prodSel).on("change", populateSerials);
+		}
+		// If product already selected on load (e.g. after failed submit), populate immediately
+		if (prodSel.value) { populateSerials(); }
+	}
+})();</script>
 
 	// Warranty type — load from DB
 	$wtype_items   = SvcWarrantyType::fetchAllForForm($db);
