@@ -174,6 +174,8 @@ foreach (SvcWarrantyType::fetchAllForForm($db) as $wt) {
 	$wtype_labels[$wt->code] = $wt->label;
 }
 
+print '<style>.warranty-row-expired { background-color: rgba(220,53,69,0.07) !important; }</style>';
+
 // Quick filter presets
 print '<div class="divsearchfield">';
 print '<a class="btnTitle'.($preset == 'active' ? ' btnTitleSelected' : '').'" href="'.$_SERVER['PHP_SELF'].'?preset=active">'.$langs->trans('Active').'</a> &nbsp;';
@@ -277,9 +279,11 @@ if ($resql) {
 			$display_status = 'active';
 		}
 
-		// Highlight expiring soon in yellow
+		// Row highlighting: red tint for expired, yellow for expiring within 30 days
 		$row_class = 'oddeven';
-		if ($display_status == 'active' && $expiry_ts && $expiry_ts < dol_time_plus_duree($now, 30, 'd')) {
+		if ($display_status == 'expired') {
+			$row_class = 'oddeven warranty-row-expired';
+		} elseif ($display_status == 'active' && $expiry_ts && $expiry_ts < dol_time_plus_duree($now, 30, 'd')) {
 			$row_class = 'oddeven highlight';
 		}
 
