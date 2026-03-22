@@ -40,7 +40,7 @@ class modWarrantySvc extends DolibarrModules
 		// Module name (no spaces), used if translation string 'ModuleXXXName' not found
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
 		$this->description = "RMA (Return Merchandise Authorization) and Warranty Management for serialized equipment";
-		$this->version = '1.0.0';
+		$this->version = '1.2.2';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'technic';
 
@@ -264,6 +264,24 @@ class modWarrantySvc extends DolibarrModules
 			'position' => 210,
 			'enabled'  => 'isModEnabled("warrantysvc")',
 			'perms'    => '$user->hasRight("warrantysvc", "svcwarranty", "write")',
+			'target'   => '',
+			'user'     => 0,
+		);
+		$r++;
+
+		// Warranty Types management
+		$this->menu[$r] = array(
+			'fk_menu'  => 'fk_mainmenu=warrantysvc,fk_leftmenu=warrantysvc_warranty_list',
+			'type'     => 'left',
+			'titre'    => 'WarrantyTypes',
+			'prefix'   => img_picto('', 'setup', 'class="paddingright pictofixedwidth"'),
+			'mainmenu' => 'warrantysvc',
+			'leftmenu' => 'warrantysvc_warranty_types',
+			'url'      => '/warrantysvc/warranty_type_list.php',
+			'langs'    => 'warrantysvc@warrantysvc',
+			'position' => 220,
+			'enabled'  => 'isModEnabled("warrantysvc")',
+			'perms'    => '$user->hasRight("warrantysvc", "svcwarranty", "read")',
 			'target'   => '',
 			'user'     => 0,
 		);

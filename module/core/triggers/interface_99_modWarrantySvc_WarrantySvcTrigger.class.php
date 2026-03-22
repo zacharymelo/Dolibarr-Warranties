@@ -13,6 +13,7 @@
 
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonhookactions.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/CMailFile.class.php';
+require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarrantytype.class.php';
 
 
 /**
@@ -350,7 +351,7 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 	 *
 	 * For each expedition line with a serial/lot (llx_expeditiondet_batch),
 	 * check if a warranty already exists for that serial. If not, create one
-	 * using the default coverage from WARRANTYSVC_DEFAULT_COVERAGE_MONTHS (default 12).
+	 * using the default coverage from WARRANTYSVC_DEFAULT_COVERAGE_DAYS (default 12).
 	 *
 	 * @param  Expedition $object Validated shipment object
 	 * @param  User       $user   Actor
@@ -361,7 +362,7 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 	{
 		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarranty.class.php';
 
-		$coverage_months = getDolGlobalInt('WARRANTYSVC_DEFAULT_COVERAGE_MONTHS', 12);
+		$coverage_days = getDolGlobalInt('WARRANTYSVC_DEFAULT_COVERAGE_DAYS', 12);
 
 		// Fetch serialized lines for this shipment
 		$sql  = "SELECT edl.fk_expeditiondet, edl.fk_lot,";
@@ -391,10 +392,12 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 			$warranty->fk_product      = $line->fk_product;
 			$warranty->fk_soc          = $object->socid;
 			$warranty->fk_expedition   = $object->id;
-			$warranty->warranty_type   = 'standard';
+			// Use the first active warranty type (by position) as the default, falling back to 'standard'
+			$default_types = SvcWarrantyType::fetchAllForForm($this->db);
+			$warranty->warranty_type = $default_types ? $default_types[0]->code : 'standard';
 			$warranty->start_date      = dol_now();
-			$warranty->coverage_months = $coverage_months;
-			// expiry_date auto-computed in create() from coverage_months + start_date
+			$warranty->coverage_days = $coverage_days;
+			// expiry_date auto-computed in create() from coverage_days + start_date
 
 			$result = $warranty->create($user);
 			if ($result < 0) {

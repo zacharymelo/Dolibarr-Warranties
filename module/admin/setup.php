@@ -43,8 +43,9 @@ if ($action == 'update') {
 		'WARRANTYSVC_REPLACEMENT_STRATEGY',
 		'WARRANTYSVC_AUTO_WARRANTY_CHECK',
 		'WARRANTYSVC_AUTO_WARRANTY_ON_SHIPMENT',
-		'WARRANTYSVC_DEFAULT_COVERAGE_MONTHS',
+		'WARRANTYSVC_DEFAULT_COVERAGE_DAYS',
 		'WARRANTYSVC_NOTIFY_WARRANTY_CREATED',
+		'WARRANTYSVC_WARRANTY_REQUIRES_LOTS',
 	);
 
 	foreach ($settings as $key) {
@@ -171,11 +172,11 @@ print '</td></tr>';
 
 // Default warranty coverage months
 print '<tr class="oddeven">';
-print '<td>'.$langs->trans('DefaultCoverageMonths').'<br><span class="opacitymedium">'
-	.$langs->trans('DefaultCoverageMonthsDesc').'</span></td>';
+print '<td>'.$langs->trans('DefaultCoverageDays').'<br><span class="opacitymedium">'
+	.$langs->trans('DefaultCoverageDaysDesc').'</span></td>';
 print '<td>';
-print '<input type="number" name="WARRANTYSVC_DEFAULT_COVERAGE_MONTHS" value="'.((int) getDolGlobalInt('WARRANTYSVC_DEFAULT_COVERAGE_MONTHS', 12)).'" class="flat width75" min="1" max="120">';
-print ' '.$langs->trans('Months');
+print '<input type="number" name="WARRANTYSVC_DEFAULT_COVERAGE_DAYS" value="'.((int) getDolGlobalInt('WARRANTYSVC_DEFAULT_COVERAGE_DAYS', 365)).'" class="flat width75" min="1" max="3650">';
+print ' '.$langs->trans('Days');
 print '</td></tr>';
 
 // Notify customer when warranty created
@@ -185,6 +186,15 @@ print '<td>'.$langs->trans('NotifyWarrantyCreated').'<br><span class="opacitymed
 print '<td>';
 $chk3 = getDolGlobalString('WARRANTYSVC_NOTIFY_WARRANTY_CREATED') ? ' checked' : '';
 print '<input type="checkbox" name="WARRANTYSVC_NOTIFY_WARRANTY_CREATED" value="1"'.$chk3.'>';
+print '</td></tr>';
+
+// Restrict service requests to serialized/lot-tracked products only
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans('WarrantyRequiresLots').'<br><span class="opacitymedium">'
+	.$langs->trans('WarrantyRequiresLotsDesc').'</span></td>';
+print '<td>';
+$chk4 = getDolGlobalString('WARRANTYSVC_WARRANTY_REQUIRES_LOTS') ? ' checked' : '';
+print '<input type="checkbox" name="WARRANTYSVC_WARRANTY_REQUIRES_LOTS" value="1"'.$chk4.'>';
 print '</td></tr>';
 
 print '</table>';

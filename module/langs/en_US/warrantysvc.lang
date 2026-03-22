@@ -97,15 +97,24 @@ ReportedViaOnSite = On-Site
 ReportedViaOther = Other
 
 #
-# Warranty fields
+# Warranty type management
 #
 WarrantyType = Warranty Type
-WarrantyTypeManufacturer = Manufacturer Warranty
-WarrantyTypeExtended = Extended Warranty
-WarrantyTypeServiceContract = Service Contract
+WarrantyTypes = Warranty Types
+AddWarrantyType = Add Warranty Type
+WarrantyTypeAdded = Warranty type added.
+WarrantyTypeUpdated = Warranty type updated.
+WarrantyTypeDeleted = Warranty type deleted.
+WarrantyTypeLabel = e.g. Standard Warranty
+NoPredefinedType = No predefined type (manual)
+CoverageFromType = Coverage period set by warranty type
+DeleteWarrantyType = Delete Warranty Type
+ConfirmDeleteWarrantyType = Are you sure you want to delete this warranty type? Existing warranties using this type will retain their coverage but lose the type label.
+SelectWarrantyType = Select a warranty type...
+ErrorWarrantyTypeCodeLabelRequired = Code and label are required.
 StartDate = Start Date
 ExpiryDate = Expiry Date
-CoverageMonths = Coverage (months)
+CoverageDays = Coverage (days)
 CoverageTerms = Coverage Terms
 Exclusions = Exclusions
 ClaimCount = Claims Filed
@@ -315,8 +324,32 @@ AutoWarrantyCheck = Auto-check warranty on creation
 AutoWarrantyCheckDesc = Automatically look up warranty coverage when a service request is created.
 AutoWarrantyOnShipment = Auto-create warranty on shipment validation
 AutoWarrantyOnShipmentDesc = When a shipment is validated, automatically register a standard warranty for each serialized product line that does not already have one.
-DefaultCoverageMonths = Default warranty coverage (months)
-DefaultCoverageMonthsDesc = Standard coverage period used when auto-creating warranties from shipments.
+DefaultCoverageDays = Default warranty coverage (days)
+DefaultCoverageDaysDesc = Coverage period in days used when auto-creating warranties from validated shipments.
+Days = days
 NotifyWarrantyCreated = Email customer on warranty creation
 NotifyWarrantyCreatedDesc = Send an email notification to the customer when a new warranty record is created for their unit.
+WarrantyRequiresLots = Restrict service requests to serialized products
+WarrantyRequiresLotsDesc = When enabled, the product selector on service request forms will only show products that have serial number or lot tracking enabled in the Stocks module.
 NumberingModule = Reference Numbering Module
+
+# Movement tracker panel
+MovementTracker = Movement Tracker
+OutboundToCustomer = → Outbound to Customer
+ReturnFromCustomer = ← Return from Customer
+OnSiteIntervention = On-Site Intervention
+OnSiteVisit = On-Site Visit
+ShipComponents = Ship Components
+ShipReplacementUnit = Ship Replacement Unit
+LogReturnReceived = Log Return Received
+ReturnLogged = Return logged successfully.
+NotYetDispatched = Not yet dispatched
+NotYetScheduled = Not yet scheduled
+ReturnPending = Awaiting return
+ExpectedBy = Expected by
+ShipmentRef = Shipment
+ComponentLines = Component Lines
+ScheduleIntervention = Schedule Intervention
+Overdue = Overdue
+Confirm = Confirm
+ReplacementSerial = Replacement Serial #

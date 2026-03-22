@@ -17,6 +17,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarranty.class.php';
 require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcrequest.class.php';
+require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarrantytype.class.php';
 require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/lib/warrantysvc.lib.php';
 
 $langs->loadLangs(array('warrantysvc@warrantysvc', 'companies', 'products'));
@@ -54,7 +55,7 @@ if ($action == 'add' && $permwrite) {
 	$object->serial_number  = GETPOST('serial_number', 'alpha');
 	$object->warranty_type  = GETPOST('warranty_type', 'alpha');
 	$object->start_date     = dol_mktime(12, 0, 0, GETPOST('start_datemonth', 'int'), GETPOST('start_dateday', 'int'), GETPOST('start_dateyear', 'int'));
-	$object->coverage_months= GETPOST('coverage_months', 'int');
+	$object->coverage_days= GETPOST('coverage_days', 'int');
 	$object->coverage_terms = GETPOST('coverage_terms', 'restricthtml');
 	$object->exclusions     = GETPOST('exclusions', 'restricthtml');
 	$object->fk_commande    = GETPOST('fk_commande', 'int');
@@ -85,7 +86,7 @@ if ($action == 'update' && $permwrite) {
 	$object->serial_number  = GETPOST('serial_number', 'alpha');
 	$object->warranty_type  = GETPOST('warranty_type', 'alpha');
 	$object->start_date     = dol_mktime(12, 0, 0, GETPOST('start_datemonth', 'int'), GETPOST('start_dateday', 'int'), GETPOST('start_dateyear', 'int'));
-	$object->coverage_months= GETPOST('coverage_months', 'int');
+	$object->coverage_days= GETPOST('coverage_days', 'int');
 	$object->coverage_terms = GETPOST('coverage_terms', 'restricthtml');
 	$object->exclusions     = GETPOST('exclusions', 'restricthtml');
 	$object->fk_commande    = GETPOST('fk_commande', 'int');
@@ -96,8 +97,8 @@ if ($action == 'update' && $permwrite) {
 	$manual_expiry = dol_mktime(12, 0, 0, GETPOST('expiry_datemonth', 'int'), GETPOST('expiry_dateday', 'int'), GETPOST('expiry_dateyear', 'int'));
 	if ($manual_expiry) {
 		$object->expiry_date = $manual_expiry;
-	} elseif ($object->coverage_months && $object->start_date) {
-		$object->expiry_date = dol_time_plus_duree($object->start_date, $object->coverage_months, 'm');
+	} elseif ($object->coverage_days && $object->start_date) {
+		$object->expiry_date = dol_time_plus_duree($object->start_date, $object->coverage_days, 'd');
 	}
 
 	$result = $object->update($user);
@@ -162,24 +163,35 @@ if ($action == 'create') {
 	// Product
 	print '<tr><td class="fieldrequired">'.$langs->trans('Product').'</td>';
 	print '<td>';
-	print $form->select_produits(GETPOST('fk_product', 'int'), 'fk_product', '', 0, 0, 1, 2, '', 0, array(), 0, 1, 0, 'minwidth300');
+	$form->select_produits(GETPOST('fk_product', 'int'), 'fk_product', '', 0, 0, 1, 2, '', 0, array(), 0, 1, 0, 'minwidth300');
 	print '</td></tr>';
 
 	// Serial number
 	print '<tr><td class="fieldrequired">'.$langs->trans('SerialNumber').'</td>';
 	print '<td><input type="text" name="serial_number" value="'.dol_escape_htmltag(GETPOST('serial_number', 'alpha')).'" class="flat minwidth200"></td></tr>';
 
-	// Warranty type
-	$warranty_types = array(
-		''         => $langs->trans('SelectWarrantyType'),
-		'standard' => $langs->trans('WarrantyTypeStandard'),
-		'extended' => $langs->trans('WarrantyTypeExtended'),
-		'limited'  => $langs->trans('WarrantyTypeLimited'),
-		'service'  => $langs->trans('WarrantyTypeService'),
-	);
+	// Warranty type — load from DB
+	$wtype_items   = SvcWarrantyType::fetchAllForForm($db);
+	$wtype_options = array('' => '— '.$langs->trans('NoPredefinedType').' —');
+	$wtype_defaults_js = '{';
+	foreach ($wtype_items as $wt) {
+		$wtype_options[$wt->code] = dol_escape_htmltag($wt->label);
+		$wtype_defaults_js .= '"'.dol_escape_js($wt->code).'":'.((int) $wt->default_coverage_days).',';
+	}
+	$wtype_defaults_js = rtrim($wtype_defaults_js, ',').'}';
+
+	$selected_wtype    = GETPOST('warranty_type', 'alpha');
+	$initial_days      = GETPOST('coverage_days', 'int');
+	if (!$initial_days) {
+		$initial_days = 365;
+		foreach ($wtype_items as $wt) {
+			if ($wt->code === $selected_wtype) { $initial_days = (int) $wt->default_coverage_days; break; }
+		}
+	}
+
 	print '<tr><td>'.$langs->trans('WarrantyType').'</td>';
 	print '<td>';
-	print Form::selectarray('warranty_type', $warranty_types, GETPOST('warranty_type', 'alpha'), 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth200');
+	print Form::selectarray('warranty_type', $wtype_options, $selected_wtype, 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth200', 0, '', '', true);
 	print '</td></tr>';
 
 	// Start date
@@ -188,13 +200,42 @@ if ($action == 'create') {
 	print $form->selectDate(GETPOST('start_date', 'int') ? GETPOST('start_date', 'int') : dol_now(), 'start_date', 0, 0, 0, 'formcreate', 1, 1);
 	print '</td></tr>';
 
-	// Coverage months
-	print '<tr><td>'.$langs->trans('CoverageMonths').'</td>';
+	// Coverage months — disabled when a type is selected (auto-filled by JS)
+	$days_disabled = ($selected_wtype ? ' disabled style="opacity:0.5"' : '');
+	print '<tr><td>'.$langs->trans('CoverageDays').'</td>';
 	print '<td>';
-	print '<input type="number" name="coverage_months" value="'.dol_escape_htmltag(GETPOST('coverage_months', 'int') ? GETPOST('coverage_months', 'int') : '12').'" class="flat width75" min="1" max="120">';
-	print ' '.$langs->trans('Months');
-	print ' &nbsp;<span class="opacitymedium">'.$langs->trans('ExpiryAutoComputed').'</span>';
+	print '<input type="number" id="coverage_days" name="coverage_days" value="'.$initial_days.'" class="flat width75" min="1" max="3650"'.$days_disabled.'>';
+	print ' '.$langs->trans('Days');
+	print ' &nbsp;<span id="coverage_auto_hint" class="opacitymedium"'.($selected_wtype ? '' : ' style="display:none"').'>'.$langs->trans('CoverageFromType').'</span>';
+	print ' <span id="coverage_manual_hint" class="opacitymedium"'.($selected_wtype ? ' style="display:none"' : '').'>'.$langs->trans('ExpiryAutoComputed').'</span>';
 	print '</td></tr>';
+
+	// Inline JS for coverage auto-fill
+	print '<script>
+(function(){
+	var defaults = '.$wtype_defaults_js.';
+	var sel = document.getElementById("warranty_type");
+	var cm  = document.getElementById("coverage_days");
+	var autoHint   = document.getElementById("coverage_auto_hint");
+	var manualHint = document.getElementById("coverage_manual_hint");
+	function sync(){
+		var code = sel ? sel.value : "";
+		if(code && defaults[code] !== undefined){
+			cm.value    = defaults[code];
+			cm.disabled = true;
+			cm.style.opacity = "0.5";
+			if(autoHint)   autoHint.style.display   = "";
+			if(manualHint) manualHint.style.display = "none";
+		} else {
+			cm.disabled = false;
+			cm.style.opacity = "";
+			if(autoHint)   autoHint.style.display   = "none";
+			if(manualHint) manualHint.style.display = "";
+		}
+	}
+	if(sel){ sel.addEventListener("change", sync); }
+})();
+</script>';
 
 	// Manual expiry override
 	print '<tr><td>'.$langs->trans('ExpiryDateOverride').'</td>';
@@ -220,12 +261,7 @@ if ($action == 'create') {
 	// Origin order
 	print '<tr><td>'.$langs->trans('OriginOrder').'</td>';
 	print '<td>';
-	if (isModEnabled('commande')) {
-		require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
-		print $form->select_ordersupplier(GETPOST('fk_commande', 'int'), 'fk_commande', 0, 0);
-	} else {
-		print '<input type="number" name="fk_commande" value="" class="flat width100">';
-	}
+	print '<input type="number" name="fk_commande" value="'.((int) GETPOST('fk_commande', 'int')).'" class="flat width100">';
 	print '</td></tr>';
 
 	// Notes
@@ -322,7 +358,7 @@ print '</td></tr>';
 print '<tr><td>'.$langs->trans('Product').'</td>';
 print '<td>';
 if ($action == 'edit') {
-	print $form->select_produits($object->fk_product, 'fk_product', '', 0, 0, 1, 2, '', 0, array(), 0, 1, 0, 'minwidth200');
+	$form->select_produits($object->fk_product, 'fk_product', '', 0, 0, 1, 2, '', 0, array(), 0, 1, 0, 'minwidth200');
 } else {
 	$product = new Product($db);
 	if ($product->fetch($object->fk_product) > 0) {
@@ -345,16 +381,33 @@ print '</td></tr>';
 print '<tr><td>'.$langs->trans('WarrantyType').'</td>';
 print '<td>';
 if ($action == 'edit') {
-	$warranty_types = array(
-		''         => '',
-		'standard' => $langs->trans('WarrantyTypeStandard'),
-		'extended' => $langs->trans('WarrantyTypeExtended'),
-		'limited'  => $langs->trans('WarrantyTypeLimited'),
-		'service'  => $langs->trans('WarrantyTypeService'),
-	);
-	print Form::selectarray('warranty_type', $warranty_types, $object->warranty_type, 0, 0, 0, '', 0, 0, 0, '', 'flat');
+	$wtype_items_edit   = SvcWarrantyType::fetchAllForForm($db);
+	$wtype_options_edit = array('' => '— '.$langs->trans('NoPredefinedType').' —');
+	$wtype_defaults_edit_js = '{';
+	foreach ($wtype_items_edit as $wt) {
+		$wtype_options_edit[$wt->code] = dol_escape_htmltag($wt->label);
+		$wtype_defaults_edit_js .= '"'.dol_escape_js($wt->code).'":'.((int) $wt->default_coverage_days).',';
+	}
+	$wtype_defaults_edit_js = rtrim($wtype_defaults_edit_js, ',').'}';
+	print Form::selectarray('warranty_type', $wtype_options_edit, $object->warranty_type, 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth200', 0, '', '', true);
+	print '<script>
+(function(){
+	var defaults = '.$wtype_defaults_edit_js.';
+	var sel = document.getElementById("warranty_type");
+	var cm  = document.getElementById("coverage_days");
+	function sync(){
+		var code = sel ? sel.value : "";
+		if(code && defaults[code] !== undefined){
+			cm.value = defaults[code]; cm.disabled = true; cm.style.opacity = "0.5";
+		} else { cm.disabled = false; cm.style.opacity = ""; }
+	}
+	if(sel){ sel.addEventListener("change", sync); sync(); }
+})();
+</script>';
 } else {
-	print $object->warranty_type ? $langs->trans('WarrantyType'.ucfirst($object->warranty_type)) : '<span class="opacitymedium">&mdash;</span>';
+	print $object->warranty_type
+		? dol_escape_htmltag(SvcWarrantyType::getLabelByCode($db, $object->warranty_type))
+		: '<span class="opacitymedium">&mdash;</span>';
 }
 print '</td></tr>';
 
@@ -387,13 +440,15 @@ if ($action == 'edit') {
 print '</td></tr>';
 
 // Coverage months
-print '<tr><td>'.$langs->trans('CoverageMonths').'</td>';
+print '<tr><td>'.$langs->trans('CoverageDays').'</td>';
 print '<td>';
 if ($action == 'edit') {
-	print '<input type="number" name="coverage_months" value="'.((int) $object->coverage_months).'" class="flat width75" min="0" max="120">';
-	print ' '.$langs->trans('Months');
+	$edit_days_disabled = ($object->warranty_type ? ' disabled style="opacity:0.5"' : '');
+	print '<input type="number" id="coverage_days" name="coverage_days" value="'.((int) $object->coverage_days).'" class="flat width75" min="0" max="3650"'.$edit_days_disabled.'>';
+	print ' '.$langs->trans('Days');
+	print ' &nbsp;<span class="opacitymedium" id="coverage_type_hint"'.($object->warranty_type ? '' : ' style="display:none"').'>'.$langs->trans('CoverageFromType').'</span>';
 } else {
-	print $object->coverage_months ? ((int) $object->coverage_months).' '.$langs->trans('Months') : '<span class="opacitymedium">&mdash;</span>';
+	print $object->coverage_days ? ((int) $object->coverage_days).' '.$langs->trans('Days') : '<span class="opacitymedium">&mdash;</span>';
 }
 print '</td></tr>';
 

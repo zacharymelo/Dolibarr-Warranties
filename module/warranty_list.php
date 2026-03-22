@@ -17,6 +17,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formprojet.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarranty.class.php';
+require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarrantytype.class.php';
 require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/lib/warrantysvc.lib.php';
 
 $langs->loadLangs(array('warrantysvc@warrantysvc', 'companies', 'products'));
@@ -159,6 +160,12 @@ print_barre_liste(
 	1
 );
 
+// Build type label cache for display (avoids per-row DB queries)
+$wtype_labels = array();
+foreach (SvcWarrantyType::fetchAllForForm($db) as $wt) {
+	$wtype_labels[$wt->code] = $wt->label;
+}
+
 // Quick filter presets
 print '<div class="divsearchfield">';
 print '<a class="btnTitle'.($preset == 'active' ? ' btnTitleSelected' : '').'" href="'.$_SERVER['PHP_SELF'].'?preset=active">'.$langs->trans('Active').'</a> &nbsp;';
@@ -181,16 +188,13 @@ print '<td class="liste_titre"><input type="text" class="flat maxwidth100imp" na
 print '<td class="liste_titre"><input type="text" class="flat maxwidth100imp" name="search_product" value="'.dol_escape_htmltag($search_product).'"></td>';
 print '<td class="liste_titre"><input type="text" class="flat maxwidth75imp" name="search_serial" value="'.dol_escape_htmltag($search_serial).'"></td>';
 
-// Warranty type filter
-$warranty_types = array(
-	-1         => '',
-	'standard' => $langs->trans('WarrantyTypeStandard'),
-	'extended' => $langs->trans('WarrantyTypeExtended'),
-	'limited'  => $langs->trans('WarrantyTypeLimited'),
-	'service'  => $langs->trans('WarrantyTypeService'),
-);
+// Warranty type filter — DB-driven
+$wtype_filter = array(-1 => '');
+foreach (SvcWarrantyType::fetchAllForForm($db) as $wt) {
+	$wtype_filter[$wt->code] = $wt->label;
+}
 print '<td class="liste_titre">';
-print Form::selectarray('search_wtype', $warranty_types, $search_wtype, 0, 0, 0, '', 0, 0, 0, '', 'flat maxwidth100');
+print Form::selectarray('search_wtype', $wtype_filter, $search_wtype, 0, 0, 0, '', 0, 0, 0, '', 'flat maxwidth100');
 print '</td>';
 
 // Status filter
@@ -272,7 +276,8 @@ if ($resql) {
 		print '<td>'.dol_escape_htmltag($obj->company_name).'</td>';
 		print '<td>'.dol_escape_htmltag($obj->product_ref ? $obj->product_ref : '').'</td>';
 		print '<td>'.dol_escape_htmltag($obj->serial_number).'</td>';
-		print '<td>'.($obj->warranty_type ? $langs->trans('WarrantyType'.ucfirst($obj->warranty_type)) : '<span class="opacitymedium">&mdash;</span>').'</td>';
+		$wtype_label = $obj->warranty_type ? ($wtype_labels[$obj->warranty_type] ?? dol_escape_htmltag($obj->warranty_type)) : '';
+		print '<td>'.($wtype_label ? dol_escape_htmltag($wtype_label) : '<span class="opacitymedium">&mdash;</span>').'</td>';
 		print '<td class="center">'.svcwarranty_status_badge($display_status).'</td>';
 		print '<td>'.dol_print_date($db->jdate($obj->start_date), 'day').'</td>';
 		print '<td>';

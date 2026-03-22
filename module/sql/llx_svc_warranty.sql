@@ -9,7 +9,7 @@ CREATE TABLE llx_svc_warranty(
 	warranty_type          VARCHAR(50),
 	start_date             DATE          NOT NULL,
 	expiry_date            DATE,
-	coverage_months        INTEGER,
+	coverage_days        INTEGER,
 	coverage_terms         TEXT,
 	exclusions             TEXT,
 	status                 VARCHAR(20)   NOT NULL DEFAULT 'active',
