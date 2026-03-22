@@ -724,11 +724,10 @@ class SvcRequest extends CommonObject
 	/**
 	 * Create an outbound shipment (Expedition) from this RMA's component lines
 	 *
-	 * @param  int  $warehouse_id Warehouse to ship from
-	 * @param  User $user         User performing action
-	 * @return int                Expedition ID if OK, <0 if KO
+	 * @param  User $user User performing action
+	 * @return int        Expedition ID if OK, <0 if KO
 	 */
-	public function createOutboundShipment($warehouse_id, $user)
+	public function createOutboundShipment($user)
 	{
 		if (!isModEnabled('expedition')) {
 			$this->error = 'ModuleExpeditionNotEnabled';
