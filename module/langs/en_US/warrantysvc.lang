@@ -353,3 +353,17 @@ ScheduleIntervention = Schedule Intervention
 Overdue = Overdue
 Confirm = Confirm
 ReplacementSerial = Replacement Serial #
+
+#
+# Create warranty from shipment
+#
+NewWarrantyFromShipment = New Warranty from Shipment
+CreateWarrantyFromShipment = Create from existing shipment
+SwitchToManualWarranty = Enter details manually instead
+SelectShipmentStep = Step 1 — Select a validated shipment
+SelectShipment = Select a shipment...
+SelectSerial = Select a serial number...
+AutoFilledFromSerial = Auto-filled when a serial is selected
+NoUncoveredSerialsInShipment = All serialized units in this shipment already have warranty coverage.
+Load = Load
+WarrantyVoided = Warranty has been voided.

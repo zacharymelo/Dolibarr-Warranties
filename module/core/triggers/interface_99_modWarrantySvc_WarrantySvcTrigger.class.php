@@ -127,10 +127,10 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 				return 1;
 
 			// ------------------------------------------------------------------
-			// STRETCH #14: Shipment validated — auto-create warranty records
+			// Shipment validated — auto-create warranty records
 			// for each shipped serialized product line (gated by config flag)
 			// ------------------------------------------------------------------
-			case 'EXPEDITION_VALIDATE':
+			case 'SHIPPING_VALIDATE':
 				if (getDolGlobalInt('WARRANTYSVC_AUTO_WARRANTY_ON_SHIPMENT')) {
 					$this->_autoCreateWarrantiesFromShipment($object, $user, $langs);
 				}
@@ -362,21 +362,19 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 	{
 		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarranty.class.php';
 
-		$coverage_days = getDolGlobalInt('WARRANTYSVC_DEFAULT_COVERAGE_DAYS', 12);
+		$coverage_days = getDolGlobalInt('WARRANTYSVC_DEFAULT_COVERAGE_DAYS', 365);
 
 		// Fetch serialized lines for this shipment
-		$sql  = "SELECT edl.fk_expeditiondet, edl.fk_lot,";
-		$sql .= " pl.batch as serial_number,";
-		$sql .= " ed.fk_product";
+		// llx_expeditiondet_batch.batch is the serial/lot string directly
+		$sql  = "SELECT edl.batch as serial_number, ed.fk_product";
 		$sql .= " FROM ".MAIN_DB_PREFIX."expeditiondet_batch edl";
-		$sql .= " JOIN ".MAIN_DB_PREFIX."product_lot pl ON pl.rowid = edl.fk_lot";
 		$sql .= " JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.rowid = edl.fk_expeditiondet";
 		$sql .= " WHERE ed.fk_expedition = ".((int) $object->id);
-		$sql .= " AND pl.batch IS NOT NULL AND pl.batch != ''";
+		$sql .= " AND edl.batch IS NOT NULL AND edl.batch != ''";
 
 		$resql = $this->db->query($sql);
 		if (!$resql) {
-			dol_syslog('WarrantySvcTrigger: EXPEDITION_VALIDATE query failed: '.$this->db->lasterror(), LOG_WARNING);
+			dol_syslog('WarrantySvcTrigger: SHIPPING_VALIDATE query failed: '.$this->db->lasterror(), LOG_WARNING);
 			return;
 		}
 

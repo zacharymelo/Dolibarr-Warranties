@@ -141,10 +141,212 @@ $formcompany = new FormCompany($db);
 llxHeader('', $langs->trans('Warranty'), '');
 
 // ============================================================
+// CREATE FROM SHIPMENT FORM
+// ============================================================
+if ($action == 'create_from_shipment') {
+	require_once DOL_DOCUMENT_ROOT.'/expedition/class/expedition.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+
+	$fk_expedition_src = GETPOST('fk_expedition_src', 'int');
+
+	print load_fiche_titre($langs->trans('NewWarrantyFromShipment'), '', 'bill');
+	print '<p><a href="'.$_SERVER['PHP_SELF'].'?action=create">'.img_picto('', 'back', 'class="paddingright"').$langs->trans('SwitchToManualWarranty').'</a></p>';
+
+	// Build validated shipment list
+	$sql_exp  = "SELECT e.rowid, e.ref, s.nom as customer_name";
+	$sql_exp .= " FROM ".MAIN_DB_PREFIX."expedition e";
+	$sql_exp .= " LEFT JOIN ".MAIN_DB_PREFIX."societe s ON s.rowid = e.fk_soc";
+	$sql_exp .= " WHERE e.fk_statut >= 1";
+	$sql_exp .= " AND e.entity IN (".getEntity('expedition').")";
+	$sql_exp .= " ORDER BY e.rowid DESC LIMIT 500";
+	$res_exp  = $db->query($sql_exp);
+	$exp_options = array('' => '— '.$langs->trans('SelectShipment').' —');
+	if ($res_exp) {
+		while ($obj_exp = $db->fetch_object($res_exp)) {
+			$exp_options[$obj_exp->rowid] = $obj_exp->ref.($obj_exp->customer_name ? ' — '.$obj_exp->customer_name : '');
+		}
+	}
+
+	// Step 1 — shipment selector (GET reload)
+	print '<form method="GET" action="'.$_SERVER['PHP_SELF'].'">';
+	print '<input type="hidden" name="action" value="create_from_shipment">';
+	print '<table class="noborder centpercent">';
+	print '<tr class="liste_titre"><td colspan="2">'.$langs->trans('SelectShipmentStep').'</td></tr>';
+	print '<tr class="oddeven"><td class="fieldrequired titlefieldcreate">'.$langs->trans('Shipment').'</td>';
+	print '<td>';
+	print Form::selectarray('fk_expedition_src', $exp_options, $fk_expedition_src, 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth300');
+	print ' <input type="submit" class="button small" value="'.$langs->trans('Load').'">';
+	print '</td></tr>';
+	print '</table>';
+	print '</form>';
+
+	// Step 2 — warranty form (only once a shipment is selected)
+	if ($fk_expedition_src > 0) {
+		$expedition = new Expedition($db);
+		$presoc     = ($expedition->fetch($fk_expedition_src) > 0) ? (int) $expedition->socid : 0;
+
+		// Serials in this shipment that don't yet have a warranty
+		$sql_ser  = "SELECT edl.batch as serial_number, ed.fk_product,";
+		$sql_ser .= " p.ref as product_ref, p.label as product_label";
+		$sql_ser .= " FROM ".MAIN_DB_PREFIX."expeditiondet_batch edl";
+		$sql_ser .= " JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.rowid = edl.fk_expeditiondet";
+		$sql_ser .= " JOIN ".MAIN_DB_PREFIX."product p ON p.rowid = ed.fk_product";
+		$sql_ser .= " WHERE ed.fk_expedition = ".((int) $fk_expedition_src);
+		$sql_ser .= " AND edl.batch IS NOT NULL AND edl.batch != ''";
+		$sql_ser .= " AND edl.batch NOT IN (";
+		$sql_ser .= "   SELECT serial_number FROM ".MAIN_DB_PREFIX."svc_warranty";
+		$sql_ser .= "   WHERE serial_number IS NOT NULL AND serial_number != ''";
+		$sql_ser .= "   AND entity IN (".getEntity('svcwarranty').")";
+		$sql_ser .= " )";
+		$res_ser = $db->query($sql_ser);
+
+		$serial_options     = array('' => '— '.$langs->trans('SelectSerial').' —');
+		$serial_product_map = '{';
+		if ($res_ser) {
+			while ($obj_ser = $db->fetch_object($res_ser)) {
+				$opt_label = $obj_ser->serial_number.' — '.$obj_ser->product_ref.($obj_ser->product_label ? ' '.$obj_ser->product_label : '');
+				$serial_options[$obj_ser->serial_number] = $opt_label;
+				$serial_product_map .= '"'.dol_escape_js($obj_ser->serial_number).'":{'
+					.'"fk_product":'.((int) $obj_ser->fk_product).','
+					.'"label":"'.dol_escape_js($obj_ser->product_ref.($obj_ser->product_label ? ' — '.$obj_ser->product_label : '')).'"'
+					.'},';
+			}
+		}
+		$serial_product_map = rtrim($serial_product_map, ',').'}';
+
+		if (count($serial_options) <= 1) {
+			print '<div class="warning" style="margin-top:10px">'.$langs->trans('NoUncoveredSerialsInShipment').'</div>';
+		} else {
+			$wtype_items       = SvcWarrantyType::fetchAllForForm($db);
+			$wtype_options     = array('' => '— '.$langs->trans('NoPredefinedType').' —');
+			$wtype_defaults_js = '{';
+			foreach ($wtype_items as $wt) {
+				$wtype_options[$wt->code] = dol_escape_htmltag($wt->label);
+				$wtype_defaults_js .= '"'.dol_escape_js($wt->code).'":'.((int) $wt->default_coverage_days).',';
+			}
+			$wtype_defaults_js = rtrim($wtype_defaults_js, ',').'}';
+			$selected_wtype    = GETPOST('warranty_type', 'alpha');
+			$initial_days      = 365;
+			foreach ($wtype_items as $wt) {
+				if ($wt->code === $selected_wtype) { $initial_days = (int) $wt->default_coverage_days; break; }
+			}
+			$days_disabled = ($selected_wtype ? ' disabled style="opacity:0.5"' : '');
+
+			print '<br>';
+			print '<form action="'.$_SERVER['PHP_SELF'].'" method="POST">';
+			print '<input type="hidden" name="token" value="'.newToken().'">';
+			print '<input type="hidden" name="action" value="add">';
+			print '<input type="hidden" name="fk_soc" value="'.((int) $presoc).'">';
+			print '<input type="hidden" name="fk_expedition" value="'.((int) $fk_expedition_src).'">';
+			print '<input type="hidden" id="fk_product" name="fk_product" value="">';
+
+			print dol_get_fiche_head(array(), '', '', -1);
+			print '<table class="border centpercent tableforfieldcreate">';
+
+			// Customer — display only
+			$soc = new Societe($db);
+			print '<tr><td class="titlefieldcreate">'.$langs->trans('Customer').'</td>';
+			print '<td>';
+			if ($presoc && $soc->fetch($presoc) > 0) {
+				print $soc->getNomUrl(1);
+			}
+			print '</td></tr>';
+
+			// Serial number dropdown (only uncovered serials from this shipment)
+			print '<tr><td class="fieldrequired">'.$langs->trans('SerialNumber').'</td>';
+			print '<td>';
+			print Form::selectarray('serial_number', $serial_options, dol_escape_htmltag(GETPOST('serial_number', 'alpha')), 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth300', 0, '', '', true);
+			print '</td></tr>';
+
+			// Product — auto-filled by JS when serial is chosen
+			print '<tr><td>'.$langs->trans('Product').'</td>';
+			print '<td><span id="product_label" class="opacitymedium">'.$langs->trans('AutoFilledFromSerial').'</span></td></tr>';
+
+			// Warranty type
+			print '<tr><td>'.$langs->trans('WarrantyType').'</td>';
+			print '<td>';
+			print Form::selectarray('warranty_type', $wtype_options, $selected_wtype, 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth200', 0, '', '', true);
+			print '</td></tr>';
+
+			// Start date
+			print '<tr><td class="fieldrequired">'.$langs->trans('StartDate').'</td>';
+			print '<td>';
+			print $form->selectDate(dol_now(), 'start_date', 0, 0, 0, 'formship', 1, 1);
+			print '</td></tr>';
+
+			// Coverage days
+			print '<tr><td>'.$langs->trans('CoverageDays').'</td>';
+			print '<td>';
+			print '<input type="number" id="coverage_days" name="coverage_days" value="'.$initial_days.'" class="flat width75" min="1" max="3650"'.$days_disabled.'>';
+			print ' '.$langs->trans('Days');
+			print ' &nbsp;<span id="coverage_auto_hint" class="opacitymedium"'.($selected_wtype ? '' : ' style="display:none"').'>'.$langs->trans('CoverageFromType').'</span>';
+			print '</td></tr>';
+
+			// Notes
+			print '<tr><td>'.$langs->trans('NotePublic').'</td>';
+			print '<td><textarea name="note_public" class="flat" rows="3" style="width:90%"></textarea></td></tr>';
+
+			print '</table>';
+			print dol_get_fiche_end();
+
+			print '<div class="center">';
+			print '<input type="submit" id="btn_save_ship" class="button button-save" name="add" value="'.$langs->trans('Save').'" disabled>';
+			print ' &nbsp; ';
+			print '<a class="button button-cancel" href="'.$_SERVER['PHP_SELF'].'?action=create_from_shipment">'.$langs->trans('Cancel').'</a>';
+			print '</div>';
+
+			print '</form>';
+
+			print '<script>(function(){
+	var smap  = '.$serial_product_map.';
+	var wtdef = '.$wtype_defaults_js.';
+	var selSer  = document.querySelector("[name=serial_number]");
+	var selType = document.querySelector("[name=warranty_type]");
+	var inpProd = document.getElementById("fk_product");
+	var lblProd = document.getElementById("product_label");
+	var inpCov  = document.getElementById("coverage_days");
+	var hint    = document.getElementById("coverage_auto_hint");
+	var btn     = document.getElementById("btn_save_ship");
+	function syncSerial(){
+		var s = selSer ? selSer.value : "";
+		if(s && smap[s]){
+			if(inpProd) inpProd.value = smap[s].fk_product;
+			if(lblProd) lblProd.textContent = smap[s].label;
+			if(btn)     btn.disabled = false;
+		} else {
+			if(inpProd) inpProd.value = "";
+			if(lblProd) lblProd.textContent = "'.dol_escape_js($langs->trans('AutoFilledFromSerial')).'";
+			if(btn)     btn.disabled = true;
+		}
+	}
+	function syncType(){
+		var code = selType ? selType.value : "";
+		if(code && wtdef[code] !== undefined){
+			inpCov.value = wtdef[code]; inpCov.disabled = true; inpCov.style.opacity = "0.5";
+			if(hint) hint.style.display = "";
+		} else {
+			inpCov.disabled = false; inpCov.style.opacity = "";
+			if(hint) hint.style.display = "none";
+		}
+	}
+	if(selSer)  selSer.addEventListener("change", syncSerial);
+	if(selType) selType.addEventListener("change", syncType);
+	syncSerial(); syncType();
+})();</script>';
+		}
+	}
+
+	llxFooter();
+	$db->close();
+	exit;
+}
+
+// ============================================================
 // CREATE FORM
 // ============================================================
 if ($action == 'create') {
 	print load_fiche_titre($langs->trans('NewWarranty'), '', 'bill');
+	print '<p><a href="'.$_SERVER['PHP_SELF'].'?action=create_from_shipment">'.img_picto('', 'shipment', 'class="paddingright"').$langs->trans('CreateWarrantyFromShipment').'</a></p>';
 
 	print '<form action="'.$_SERVER['PHP_SELF'].'" method="POST">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';

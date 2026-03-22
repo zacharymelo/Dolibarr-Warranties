@@ -369,8 +369,10 @@ if ($action == 'create') {
 	// Project (if enabled)
 	if (isModEnabled('project')) {
 		print '<tr><td>'.$langs->trans('Project').'</td>';
+		print '<td>';
 		$formproject = new FormProjets($db);
-		print '<td>'.$formproject->select_projects(-1, '', 'fk_project', 0, 0, 1, 0, 0, 0, 0, '', 0, 0, 'minwidth300').'</td></tr>';
+		$formproject->select_projects(-1, '', 'fk_project', 0, 0, 1, 0, 0, 0, 0, '', 0, 0, 'minwidth300');
+		print '</td></tr>';
 	}
 
 	print '</table>';
