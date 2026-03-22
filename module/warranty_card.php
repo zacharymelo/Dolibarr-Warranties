@@ -353,15 +353,17 @@ if ($action == 'create_from_shipment') {
 // CREATE FORM
 // ============================================================
 if ($action == 'create') {
+	// Standard mode products/serials are loaded via AJAX scoped to the selected customer.
+	// Only override and manual modes need static product lists built server-side.
 	$prev_mode    = GETPOST('warranty_mode', 'alpha');
 	$prev_product = (int) GETPOST('fk_product', 'int');
 	$prev_serial  = GETPOST('serial_number', 'alpha');
-	$valid_modes  = array('standard', 'override');
+	$valid_modes  = array('standard', 'override', 'manual');
 	if (!in_array($prev_mode, $valid_modes)) {
 		$prev_mode = 'standard';
 	}
-	$std_disabled = false;
-	$ovr_disabled = false;
+	$std_disabled = false; // Always available — populated via AJAX after customer selection
+	$ovr_disabled = false; // Override is a manual escape hatch — always selectable
 
 	// Override mode: all products from any validated shipment (not customer-scoped)
 	$sql_ovr  = "SELECT DISTINCT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
@@ -379,78 +381,35 @@ if ($action == 'create') {
 		}
 	}
 
-	// Standard mode: server-side product + serial lists when customer/product are known from GET params.
-	// This avoids the Select2 timing problem where AJAX callbacks run after Select2 has initialised.
-	$std_products_server = array();
-	$std_serials_server  = array();
-	$std_preloaded       = false;
-	$prev_socid_early    = (int) GETPOST('fk_soc', 'int');
-	if ($prev_socid_early > 0 && $prev_mode === 'standard') {
-		// Same SQL as ajax/warranty_products.php
-		$sql_sp  = "SELECT DISTINCT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
-		$sql_sp .= " INNER JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.fk_product = p.rowid";
-		$sql_sp .= " INNER JOIN ".MAIN_DB_PREFIX."expedition e ON e.rowid = ed.fk_expedition";
-		$sql_sp .= " INNER JOIN ".MAIN_DB_PREFIX."expeditiondet_batch edb ON edb.fk_expeditiondet = ed.rowid";
-		$sql_sp .= " INNER JOIN ".MAIN_DB_PREFIX."product_lot pl ON pl.batch = edb.batch AND pl.fk_product = p.rowid";
-		$sql_sp .= " WHERE e.fk_soc = ".((int) $prev_socid_early);
-		$sql_sp .= " AND e.fk_statut >= 1";
-		$sql_sp .= " AND e.entity IN (".getEntity('expedition').")";
-		$sql_sp .= " AND p.entity IN (".getEntity('product').")";
-		$sql_sp .= " AND edb.batch IS NOT NULL AND edb.batch != ''";
-		$sql_sp .= " AND edb.batch NOT IN (";
-		$sql_sp .= "   SELECT w.serial_number FROM ".MAIN_DB_PREFIX."svc_warranty w";
-		$sql_sp .= "   WHERE w.serial_number IS NOT NULL AND w.serial_number != ''";
-		$sql_sp .= "   AND w.entity IN (".getEntity('svcwarranty').")";
-		$sql_sp .= " ) ORDER BY p.ref ASC";
-		$res_sp = $db->query($sql_sp);
-		if ($res_sp) {
-			while ($osp = $db->fetch_object($res_sp)) {
-				$std_products_server[] = array('rowid' => (int) $osp->rowid, 'label' => $osp->ref.($osp->label ? ' — '.$osp->label : ''));
-			}
+	// Manual mode: all active products — no module dependency
+	$sql_man  = "SELECT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
+	$sql_man .= " WHERE p.entity IN (".getEntity('product').")";
+	$sql_man .= " AND p.tosell = 1";
+	$sql_man .= " ORDER BY p.ref ASC";
+	$res_man = $db->query($sql_man);
+	$manual_product_list = array();
+	if ($res_man) {
+		while ($row_man = $db->fetch_object($res_man)) {
+			$manual_product_list[$row_man->rowid] = $row_man->ref.($row_man->label ? ' — '.$row_man->label : '');
 		}
-		if ($prev_product > 0) {
-			// Same SQL as ajax/warranty_serials.php
-			$sql_ss  = "SELECT edb.batch AS serial_number, e.rowid AS fk_expedition, e.ref AS expedition_ref,";
-			$sql_ss .= " ee.fk_source AS fk_commande, c.ref AS commande_ref";
-			$sql_ss .= " FROM ".MAIN_DB_PREFIX."expeditiondet_batch edb";
-			$sql_ss .= " INNER JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.rowid = edb.fk_expeditiondet";
-			$sql_ss .= " INNER JOIN ".MAIN_DB_PREFIX."expedition e ON e.rowid = ed.fk_expedition";
-			$sql_ss .= " LEFT JOIN ".MAIN_DB_PREFIX."element_element ee ON ee.fk_target = e.rowid AND ee.targettype = 'shipping' AND ee.sourcetype = 'commande'";
-			$sql_ss .= " LEFT JOIN ".MAIN_DB_PREFIX."commande c ON c.rowid = ee.fk_source";
-			$sql_ss .= " WHERE e.fk_soc = ".((int) $prev_socid_early);
-			$sql_ss .= " AND ed.fk_product = ".((int) $prev_product);
-			$sql_ss .= " AND e.fk_statut >= 1";
-			$sql_ss .= " AND e.entity IN (".getEntity('expedition').")";
-			$sql_ss .= " AND edb.batch IS NOT NULL AND edb.batch != ''";
-			$sql_ss .= " AND edb.batch NOT IN (";
-			$sql_ss .= "   SELECT w.serial_number FROM ".MAIN_DB_PREFIX."svc_warranty w";
-			$sql_ss .= "   WHERE w.serial_number IS NOT NULL AND w.serial_number != ''";
-			$sql_ss .= "   AND w.entity IN (".getEntity('svcwarranty').")";
-			$sql_ss .= " ) ORDER BY e.rowid DESC, edb.batch ASC";
-			$res_ss = $db->query($sql_ss);
-			if ($res_ss) {
-				while ($oss = $db->fetch_object($res_ss)) {
-					$std_serials_server[] = array(
-						'serial'         => $oss->serial_number,
-						'fk_expedition'  => (int) $oss->fk_expedition,
-						'expedition_ref' => (string) $oss->expedition_ref,
-						'fk_commande'    => $oss->fk_commande ? (int) $oss->fk_commande : 0,
-						'commande_ref'   => (string) $oss->commande_ref,
-					);
-				}
-			}
-		}
-		$std_preloaded = true;
 	}
 
 	print load_fiche_titre($langs->trans('NewWarranty'), '', 'bill');
 	print '<p><a href="'.$_SERVER['PHP_SELF'].'?action=create_from_shipment">'.img_picto('', 'shipment', 'class="paddingright"').$langs->trans('CreateWarrantyFromShipment').'</a></p>';
 
+	// Guard: no products at all in the system
+	if (empty($manual_product_list)) {
+		print '<div class="info">'.img_picto('', 'info', 'class="paddingright"').$langs->trans('NoProductsWithUnassignedSerials').'</div>';
+		llxFooter();
+		$db->close();
+		exit;
+	}
+
 	print '<form action="'.$_SERVER['PHP_SELF'].'" method="POST">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
 	print '<input type="hidden" name="action" value="add">';
-	// 0 = standard, 1 = override
-	$ovr_flag = ($prev_mode === 'override') ? '1' : '0';
+	// 0 = standard, 1 = override, 2 = manual
+	$ovr_flag = ($prev_mode === 'override') ? '1' : (($prev_mode === 'manual') ? '2' : '0');
 	print '<input type="hidden" name="warranty_override" id="warranty_override_val" value="'.$ovr_flag.'">';
 
 	// Mode radio toggle
@@ -459,41 +418,38 @@ if ($action == 'create') {
 	print '<input type="radio" name="warranty_mode" value="standard"'.($prev_mode === 'standard' ? ' checked' : '').($std_disabled ? ' disabled' : '').'> ';
 	print dol_escape_htmltag($langs->trans('WarrantyModeStandard'));
 	print '</label>';
-	print '<label style="cursor:pointer">';
+	print '<label style="margin-right:24px; cursor:pointer">';
 	print '<input type="radio" name="warranty_mode" value="override"'.($prev_mode === 'override' ? ' checked' : '').($ovr_disabled ? ' disabled' : '').'> ';
 	print dol_escape_htmltag($langs->trans('WarrantyModeOverride'));
+	print '</label>';
+	print '<label style="cursor:pointer">';
+	print '<input type="radio" name="warranty_mode" value="manual"'.($prev_mode === 'manual' ? ' checked' : '').'> ';
+	print dol_escape_htmltag($langs->trans('WarrantyModeManual'));
 	print '</label>';
 	print '</div>';
 
 	print dol_get_fiche_head(array(), '', '', -1);
 	print '<table class="border centpercent tableforfieldcreate">';
 
-	// Override warning banner
-	print '<tr id="row_warn"'.($prev_mode !== 'override' ? ' style="display:none"' : '').'>';
+	// Override / Manual warning banner
+	$show_warn = in_array($prev_mode, array('override', 'manual'));
+	print '<tr id="row_warn"'.(!$show_warn ? ' style="display:none"' : '').'>';
 	print '<td colspan="2"><div class="warning" id="warn_msg">'.img_picto('', 'warning_white', 'class="paddingright"');
-	print $langs->trans('WarrantyOverrideWarning');
+	print ($prev_mode === 'manual' ? $langs->trans('WarrantyManualWarning') : $langs->trans('WarrantyOverrideWarning'));
 	print '</div></td>';
 	print '</tr>';
 
 	// Customer (shared across all modes)
 	print '<tr><td class="fieldrequired">'.$langs->trans('Customer').'</td>';
 	print '<td>';
-	print $formcompany->select_company(GETPOST('fk_soc', 'int'), 'fk_soc', '(s.client:IN:1,3)', $langs->trans('SelectThird'), 0, 0, null, 0, 'minwidth300 maxwidth500 widthcentpercentminusxx');
+	print $formcompany->select_company(GETPOST('fk_soc', 'int'), 'fk_soc', '(s.client:IN:2,3)', $langs->trans('SelectThird'), 0, 0, null, 0, 'minwidth300 maxwidth500 widthcentpercentminusxx');
 	print '</td></tr>';
 
-	// Product — Standard row (server-side when customer known, otherwise AJAX after customer selection)
+	// Product — Standard row (populated via AJAX after customer is selected)
 	print '<tr id="row_std_product"'.($prev_mode !== 'standard' ? ' style="display:none"' : '').'>';
 	print '<td class="fieldrequired">'.$langs->trans('Product').'</td><td>';
-	if ($std_preloaded) {
-		print '<select name="fk_product" id="fk_product_std" class="minwidth300"'.(!count($std_products_server) ? ' disabled' : '').'>';
-		print '<option value="-1">— '.dol_escape_htmltag($langs->trans('SelectProduct')).' —</option>';
-		foreach ($std_products_server as $sp) {
-			print '<option value="'.(int) $sp['rowid'].'"'.($sp['rowid'] === $prev_product ? ' selected' : '').'>'.dol_escape_htmltag($sp['label']).'</option>';
-		}
-	} else {
-		print '<select name="fk_product" id="fk_product_std" class="minwidth300" disabled>';
-		print '<option value="-1">'.dol_escape_htmltag($langs->trans('SelectCustomerFirst')).'</option>';
-	}
+	print '<select name="fk_product" id="fk_product_std" class="flat minwidth300" disabled>';
+	print '<option value="-1">'.dol_escape_htmltag($langs->trans('SelectCustomerFirst')).'</option>';
 	print '</select>';
 	print '</td></tr>';
 
@@ -508,31 +464,27 @@ if ($action == 'create') {
 	print '</select>';
 	print '</td></tr>';
 
-	// Serial — Standard row (server-side when product known, otherwise AJAX after product selection)
-	print '<tr id="row_std_serial"'.($prev_mode !== 'standard' ? ' style="display:none"' : '').'>';
-	print '<td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td><td>';
-	if ($std_preloaded && $prev_product > 0) {
-		print '<select name="serial_number" id="manual_serial_select" class="minwidth200"'.(!count($std_serials_server) ? ' disabled' : '').'>';
-		print '<option value="">— '.dol_escape_htmltag($langs->trans('SelectSerial')).' —</option>';
-		foreach ($std_serials_server as $ss) {
-			print '<option value="'.dol_escape_htmltag($ss['serial']).'"';
-			print ' data-fk-commande="'.(int) $ss['fk_commande'].'"';
-			print ' data-fk-expedition="'.(int) $ss['fk_expedition'].'"';
-			print ' data-commande-ref="'.dol_escape_htmltag($ss['commande_ref']).'"';
-			print ' data-expedition-ref="'.dol_escape_htmltag($ss['expedition_ref']).'"';
-			print ($ss['serial'] === $prev_serial ? ' selected' : '');
-			print '>'.dol_escape_htmltag($ss['serial']).'</option>';
-		}
-		print '</select>';
-	} else {
-		print '<select name="serial_number" id="manual_serial_select" class="minwidth200" disabled>';
-		print '<option value="">'.$langs->trans('SelectProductFirst').'</option>';
-		print '</select>';
+	// Product — Manual row (all active products — no module dependency)
+	print '<tr id="row_man_product"'.($prev_mode !== 'manual' ? ' style="display:none"' : '').'>';
+	print '<td class="fieldrequired">'.$langs->trans('Product').'</td><td>';
+	print '<select name="fk_product" id="fk_product_man" class="flat minwidth300"'.($prev_mode !== 'manual' ? ' disabled' : '').'>';
+	print '<option value="">— '.$langs->trans('SelectProduct').' —</option>';
+	foreach ($manual_product_list as $man_pid => $man_plabel) {
+		print '<option value="'.(int) $man_pid.'"'.($prev_product === (int) $man_pid ? ' selected' : '').'>'.dol_escape_htmltag($man_plabel).'</option>';
 	}
+	print '</select>';
 	print '</td></tr>';
 
-	// Serial — Override row (free-text input)
-	$show_free_ser = ($prev_mode === 'override');
+	// Serial — Standard row (select from product_lot)
+	print '<tr id="row_std_serial"'.($prev_mode !== 'standard' ? ' style="display:none"' : '').'>';
+	print '<td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td><td>';
+	print '<select name="serial_number" id="manual_serial_select" class="flat minwidth200" disabled>';
+	print '<option value="">'.$langs->trans('SelectProductFirst').'</option>';
+	print '</select>';
+	print '</td></tr>';
+
+	// Serial — Override / Manual row (shared free-text input)
+	$show_free_ser = in_array($prev_mode, array('override', 'manual'));
 	print '<tr id="row_free_serial"'.(!$show_free_ser ? ' style="display:none"' : '').'>';
 	print '<td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td><td>';
 	print '<input type="text" name="serial_number" id="serial_number_free"';
@@ -542,11 +494,8 @@ if ($action == 'create') {
 	print (!$show_free_ser ? ' disabled' : '').'>';
 	print '</td></tr>';
 
-	// Hidden FK fields must be rendered before the script block so getElementById finds them at load time
-	print '<input type="hidden" name="fk_commande" id="fk_commande_val" value="'.((int) GETPOST('fk_commande', 'int')).'">';
-	print '<input type="hidden" name="fk_expedition" id="fk_expedition_val" value="'.((int) GETPOST('fk_expedition', 'int')).'">';
-
 	$warn_ovr_txt  = dol_escape_js($langs->trans('WarrantyOverrideWarning'));
+	$warn_man_txt  = dol_escape_js($langs->trans('WarrantyManualWarning'));
 	$ajax_base     = dol_escape_js(DOL_URL_ROOT.'/custom/warrantysvc/ajax/');
 	$prev_socid    = (int) GETPOST('fk_soc', 'int');
 	$std_prev_prod = ($prev_mode === 'standard') ? $prev_product : 0;
@@ -559,6 +508,7 @@ var selSerTxt  = "— '.dol_escape_js($langs->trans('SelectSerial')).' —";
 var noSerTxt   = "'.dol_escape_js($langs->trans('NoSerialsAvailable')).'";
 var autoOrdTxt = "'.dol_escape_js($langs->trans('AutoFilledFromSerial')).'";
 var warnOvr    = "'.$warn_ovr_txt.'";
+var warnMan    = "'.$warn_man_txt.'";
 var prevProduct = '.(int) $std_prev_prod.';
 var prevSerial  = "'.$std_prev_ser.'";
 
@@ -568,6 +518,8 @@ var stdProdRow = document.getElementById("row_std_product");
 var stdSerRow  = document.getElementById("row_std_serial");
 var ovrProdSel = document.getElementById("fk_product_ovr");
 var ovrProdRow = document.getElementById("row_ovr_product");
+var manProdSel = document.getElementById("fk_product_man");
+var manProdRow = document.getElementById("row_man_product");
 var freeSerInp = document.getElementById("serial_number_free");
 var freeSerRow = document.getElementById("row_free_serial");
 var warnRow    = document.getElementById("row_warn");
@@ -637,13 +589,14 @@ function loadWarrantySerials(socid, pid) {
 			serials.forEach(function(s){
 				var o = document.createElement("option");
 				o.value = s.serial; o.textContent = s.serial;
-				o.dataset.fkCommande    = s.fk_commande   || 0;
-				o.dataset.fkExpedition  = s.fk_expedition || 0;
-				o.dataset.commandeRef   = s.commande_ref  || "";
+				o.dataset.fkCommande   = s.fk_commande   || 0;
+				o.dataset.fkExpedition = s.fk_expedition || 0;
+				o.dataset.commandeRef  = s.commande_ref  || "";
 				o.dataset.expeditionRef = s.expedition_ref || "";
 				stdSerSel.appendChild(o);
 			});
 			stdSerSel.disabled = false;
+			if (prevSerial) { stdSerSel.value = prevSerial; prevSerial = ""; }
 			syncOrder();
 		})
 		.catch(function(){ resetSerials(); });
@@ -671,6 +624,12 @@ function loadWarrantyProducts(socid) {
 				stdProdSel.appendChild(o);
 			});
 			stdProdSel.disabled = (products.length === 0);
+			if (prevProduct > 0) {
+				stdProdSel.value = prevProduct;
+				prevProduct = 0;
+				var selectedPid = parseInt(stdProdSel.value, 10);
+				if (selectedPid > 0) { loadWarrantySerials(socid, selectedPid); return; }
+			}
 			resetSerials();
 		})
 		.catch(function(){ stdProdSel.disabled = false; });
@@ -679,31 +638,33 @@ function loadWarrantyProducts(socid) {
 function setMode(mode) {
 	var isStd = (mode === "standard");
 	var isOvr = (mode === "override");
+	var isMan = (mode === "manual");
 	// Product rows
 	if (stdProdRow) stdProdRow.style.display = isStd ? "" : "none";
 	if (ovrProdRow) ovrProdRow.style.display = isOvr ? "" : "none";
+	if (manProdRow) manProdRow.style.display = isMan ? "" : "none";
 	// Serial rows
 	if (stdSerRow)  stdSerRow.style.display  = isStd ? "" : "none";
-	if (freeSerRow) freeSerRow.style.display  = isOvr ? "" : "none";
+	if (freeSerRow) freeSerRow.style.display  = (isOvr || isMan) ? "" : "none";
 	// Warning row
-	if (warnRow) warnRow.style.display = isOvr ? "" : "none";
-	if (warnMsg) warnMsg.innerHTML = warnOvr;
+	if (warnRow) warnRow.style.display = (isOvr || isMan) ? "" : "none";
+	if (warnMsg) warnMsg.innerHTML = isMan ? warnMan : warnOvr;
 	// Origin order rows
 	if (ordStdRow) ordStdRow.style.display = isStd ? "" : "none";
-	if (ordManRow) ordManRow.style.display = isOvr ? "" : "none";
+	if (ordManRow) ordManRow.style.display = (isOvr || isMan) ? "" : "none";
 	// Enable/disable (disabled fields do not submit)
 	if (!isStd && stdProdSel) stdProdSel.disabled = true;
 	if (!isStd && stdSerSel)  stdSerSel.disabled = true;
 	if (ovrProdSel) ovrProdSel.disabled = !isOvr;
+	if (manProdSel) manProdSel.disabled = !isMan;
 	if (freeSerInp) freeSerInp.disabled = isStd;
 	if (ordManInp)  ordManInp.disabled  = isStd;
 	// Hidden flag
-	if (ovrValInp) ovrValInp.value = isOvr ? "1" : "0";
-	// Entering standard: load products via AJAX only if select is not already populated server-side
+	if (ovrValInp) ovrValInp.value = isOvr ? "1" : (isMan ? "2" : "0");
+	// Entering standard: clear order if no serial selected
 	if (isStd) {
 		var socid = getCurrentSocid();
-		var alreadyLoaded = stdProdSel && stdProdSel.options.length > 1 && stdProdSel.options[0].value == "-1";
-		if (socid > 0 && stdProdSel && !alreadyLoaded) {
+		if (socid > 0 && stdProdSel && (!stdProdSel.options.length || stdProdSel.options[0].value == "-1")) {
 			loadWarrantyProducts(socid);
 		}
 	}
@@ -747,16 +708,10 @@ document.querySelectorAll("[name=warranty_mode]").forEach(function(r) {
 // Init
 var initRadio = document.querySelector("[name=warranty_mode]:checked");
 var initMode  = initRadio ? initRadio.value : "standard";
-var stdServerPreloaded = '.($std_preloaded && $prev_product > 0 ? 'true' : 'false').';
 setMode(initMode);
 if (initMode === "standard") {
-	if (stdServerPreloaded) {
-		// Selects rendered server-side — sync order from pre-selected serial
-		syncOrder();
-	} else {
-		var initSocid = '.(int) $prev_socid_early.';
-		if (initSocid > 0) loadWarrantyProducts(initSocid);
-	}
+	var initSocid = '.(int) $prev_socid.';
+	if (initSocid > 0) loadWarrantyProducts(initSocid);
 }
 })();</script>';
 
@@ -859,8 +814,12 @@ if (initMode === "standard") {
 	$doleditor2->Create();
 	print '</td></tr>';
 
-	// Origin order — Standard: auto-detect display; Override: manual entry
-	$show_ord_manual = ($prev_mode === 'override');
+	// Hidden FK fields — auto-filled by JS in Standard mode; fk_commande_ovr_input syncs in Override/Manual
+	print '<input type="hidden" name="fk_commande" id="fk_commande_val" value="'.((int) GETPOST('fk_commande', 'int')).'">';
+	print '<input type="hidden" name="fk_expedition" id="fk_expedition_val" value="'.((int) GETPOST('fk_expedition', 'int')).'">';
+
+	// Origin order — Standard: auto-detect display; Override/Manual: manual entry
+	$show_ord_manual = in_array($prev_mode, array('override', 'manual'));
 	print '<tr><td>'.$form->textwithpicto($langs->trans('OriginOrder'), $langs->trans('TooltipOriginOrder')).'</td>';
 	print '<td>';
 	print '<span id="origin_order_std_row"'.($show_ord_manual ? ' style="display:none"' : '').'>';
@@ -950,7 +909,7 @@ print '<table class="border centpercent tableforfield">';
 print '<tr><td class="titlefield">'.$langs->trans('Customer').'</td>';
 print '<td>';
 if ($action == 'edit') {
-	print $formcompany->select_company($object->fk_soc, 'fk_soc', '(s.client:IN:1,3)', '', 0, 0, null, 0, 'minwidth200 maxwidth400');
+	print $formcompany->select_company($object->fk_soc, 'fk_soc', '(s.client:IN:2,3)', '', 0, 0, null, 0, 'minwidth200 maxwidth400');
 } else {
 	$soc = new Societe($db);
 	if ($soc->fetch($object->fk_soc) > 0) {
