@@ -504,7 +504,7 @@ if ($action == 'create') {
 	// Customer (shared across all modes)
 	print '<tr><td class="fieldrequired">'.$langs->trans('Customer').'</td>';
 	print '<td>';
-	print $formcompany->select_company(GETPOST('fk_soc', 'int'), 'fk_soc', '(s.client:IN:2,3)', $langs->trans('SelectThird'), 0, 0, null, 0, 'minwidth300 maxwidth500 widthcentpercentminusxx');
+	print $formcompany->select_company(GETPOST('fk_soc', 'int'), 'fk_soc', '(s.client:IN:1,3)', $langs->trans('SelectThird'), 0, 0, null, 0, 'minwidth300 maxwidth500 widthcentpercentminusxx');
 	print '</td></tr>';
 
 	// Product — Standard row (server-side when customer known, otherwise AJAX after customer selection)
@@ -1006,7 +1006,7 @@ print '<table class="border centpercent tableforfield">';
 print '<tr><td class="titlefield">'.$langs->trans('Customer').'</td>';
 print '<td>';
 if ($action == 'edit') {
-	print $formcompany->select_company($object->fk_soc, 'fk_soc', '(s.client:IN:2,3)', '', 0, 0, null, 0, 'minwidth200 maxwidth400');
+	print $formcompany->select_company($object->fk_soc, 'fk_soc', '(s.client:IN:1,3)', '', 0, 0, null, 0, 'minwidth200 maxwidth400');
 } else {
 	$soc = new Societe($db);
 	if ($soc->fetch($object->fk_soc) > 0) {
