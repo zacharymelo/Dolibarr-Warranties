@@ -202,6 +202,62 @@ ResolutionNotes = Resolution Notes
 Details = Details
 Notes = Notes
 Documents = Documents
+Troubleshoot = Troubleshoot
+
+#
+# Troubleshooting workflow
+#
+TroubleshootSaved = Troubleshoot findings saved.
+TroubleshootSummary = Summary
+TroubleshootOutcome = Outcome
+SelectOutcome = Select outcome...
+TroubleshootOutcome_resolved = Issue resolved during call — no action needed
+TroubleshootOutcome_no_fault = No fault found — machine operating correctly
+TroubleshootOutcome_escalate = Escalate to senior technician
+TroubleshootOutcome_parts_needed = Parts needed — follow up with component shipment
+TroubleshootOutcome_intervention = On-site service required
+Done = Done
+DiagnosticStep = Diagnostic Step
+Finding = Finding
+FindingOptional = Optional note
+PreviousTroubleshootSessions = Previous Troubleshoot Sessions
+SaveFindings = Save Findings
+
+# Checklist steps — Safety
+ChecklistSafetyPowerOff = Confirm unit is powered off before inspection
+ChecklistSafetyPowerOffDesc = Ask customer to power off and unplug before remote guidance begins.
+ChecklistSafetyExterior = Inspect exterior for damage
+ChecklistSafetyExteriorDesc = Cracks, dents, burn marks, or moisture ingress.
+
+# Checklist steps — Power
+ChecklistPowerSupply = Verify power supply and outlet
+ChecklistPowerSupplyDesc = Confirm correct voltage, working outlet, and undamaged cord.
+ChecklistPowerStartup = Power on — observe startup behavior
+ChecklistPowerStartupDesc = Note any error lights, unusual sounds, or failure to start.
+
+# Checklist steps — Oxygen compressor specific
+ChecklistCompIntakeFilter = Inspect intake filter
+ChecklistCompIntakeFilterDesc = Remove and inspect for clogging or saturation. Replace if dirty.
+ChecklistCompOutputPressure = Measure output pressure (PSI)
+ChecklistCompOutputPressureDesc = Should read within spec. Note actual reading.
+ChecklistCompFlowRate = Verify flow rate (LPM)
+ChecklistCompFlowRateDesc = Measure LPM at output port. Compare to product spec sheet.
+ChecklistCompMoistureTrap = Check moisture trap / desiccant
+ChecklistCompMoistureTrapDesc = Inspect color indicator or saturation level. Replace if exhausted.
+ChecklistCompOutletPurity = Test outlet oxygen purity
+ChecklistCompOutletPurityDesc = Use analyzer if available. Normal is 90–96% O2.
+ChecklistCompVibrationNoise = Listen for abnormal vibration or noise
+ChecklistCompVibrationNoiseDesc = Rattling, grinding, or high-pitched squealing may indicate piston or valve wear.
+ChecklistCompHeatTemp = Check unit temperature after 10-minute run
+ChecklistCompHeatTempDesc = Excessive heat on cabinet top or sides may indicate blocked vents or failing components.
+
+# Checklist steps — General
+ChecklistCustomerSteps = Review customer-reported steps to reproduce
+ChecklistCustomerStepsDesc = Ask customer to describe exactly when the issue occurs.
+ChecklistReproduce = Attempt to reproduce the issue
+ChecklistReproduceDesc = Walk through the reported scenario step by step.
+ChecklistFirmware = Verify firmware / software version
+ChecklistFirmwareDesc = Check if unit is on current firmware. Note version.
 
 #
 # Email notifications — trigger-based

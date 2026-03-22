@@ -38,6 +38,12 @@ function warrantysvc_prepare_head($object)
 	$head[$h][2] = 'note';
 	$h++;
 
+	// Troubleshoot tab
+	$head[$h][0] = DOL_URL_ROOT.'/custom/warrantysvc/troubleshoot.php?id='.$object->id;
+	$head[$h][1] = $langs->trans('Troubleshoot');
+	$head[$h][2] = 'troubleshoot';
+	$h++;
+
 	// Documents tab
 	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 	require_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
