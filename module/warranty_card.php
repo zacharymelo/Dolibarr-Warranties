@@ -448,7 +448,7 @@ if ($action == 'create') {
 	// Product — Standard row (populated via AJAX after customer is selected)
 	print '<tr id="row_std_product"'.($prev_mode !== 'standard' ? ' style="display:none"' : '').'>';
 	print '<td class="fieldrequired">'.$langs->trans('Product').'</td><td>';
-	print '<select name="fk_product" id="fk_product_std" class="flat minwidth300" disabled>';
+	print '<select name="fk_product" id="fk_product_std" class="minwidth300" disabled>';
 	print '<option value="-1">'.dol_escape_htmltag($langs->trans('SelectCustomerFirst')).'</option>';
 	print '</select>';
 	print '</td></tr>';
@@ -456,7 +456,7 @@ if ($action == 'create') {
 	// Product — Override row (products with any validated shipment on record)
 	print '<tr id="row_ovr_product"'.($prev_mode !== 'override' ? ' style="display:none"' : '').'>';
 	print '<td class="fieldrequired">'.$langs->trans('Product').'</td><td>';
-	print '<select name="fk_product" id="fk_product_ovr" class="flat minwidth300"'.($prev_mode !== 'override' ? ' disabled' : '').'>';
+	print '<select name="fk_product" id="fk_product_ovr" class="minwidth300"'.($prev_mode !== 'override' ? ' disabled' : '').'>';
 	print '<option value="">— '.$langs->trans('SelectProduct').' —</option>';
 	foreach ($override_product_list as $ovr_pid => $ovr_plabel) {
 		print '<option value="'.(int) $ovr_pid.'"'.($prev_product === (int) $ovr_pid ? ' selected' : '').'>'.dol_escape_htmltag($ovr_plabel).'</option>';
@@ -478,7 +478,7 @@ if ($action == 'create') {
 	// Serial — Standard row (select from product_lot)
 	print '<tr id="row_std_serial"'.($prev_mode !== 'standard' ? ' style="display:none"' : '').'>';
 	print '<td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td><td>';
-	print '<select name="serial_number" id="manual_serial_select" class="flat minwidth200" disabled>';
+	print '<select name="serial_number" id="manual_serial_select" class="minwidth200" disabled>';
 	print '<option value="">'.$langs->trans('SelectProductFirst').'</option>';
 	print '</select>';
 	print '</td></tr>';
