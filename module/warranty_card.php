@@ -485,13 +485,13 @@ if ($action == 'create') {
 	print '<tr id="row_std_product"'.($prev_mode !== 'standard' ? ' style="display:none"' : '').'>';
 	print '<td class="fieldrequired">'.$langs->trans('Product').'</td><td>';
 	if ($std_preloaded) {
-		print '<select name="fk_product" id="fk_product_std" class="flat minwidth300"'.(!count($std_products_server) ? ' disabled' : '').'>';
+		print '<select name="fk_product" id="fk_product_std" class="minwidth300"'.(!count($std_products_server) ? ' disabled' : '').'>';
 		print '<option value="-1">— '.dol_escape_htmltag($langs->trans('SelectProduct')).' —</option>';
 		foreach ($std_products_server as $sp) {
 			print '<option value="'.(int) $sp['rowid'].'"'.($sp['rowid'] === $prev_product ? ' selected' : '').'>'.dol_escape_htmltag($sp['label']).'</option>';
 		}
 	} else {
-		print '<select name="fk_product" id="fk_product_std" class="flat minwidth300" disabled>';
+		print '<select name="fk_product" id="fk_product_std" class="minwidth300" disabled>';
 		print '<option value="-1">'.dol_escape_htmltag($langs->trans('SelectCustomerFirst')).'</option>';
 	}
 	print '</select>';
@@ -512,7 +512,7 @@ if ($action == 'create') {
 	print '<tr id="row_std_serial"'.($prev_mode !== 'standard' ? ' style="display:none"' : '').'>';
 	print '<td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td><td>';
 	if ($std_preloaded && $prev_product > 0) {
-		print '<select name="serial_number" id="manual_serial_select" class="flat minwidth200"'.(!count($std_serials_server) ? ' disabled' : '').'>';
+		print '<select name="serial_number" id="manual_serial_select" class="minwidth200"'.(!count($std_serials_server) ? ' disabled' : '').'>';
 		print '<option value="">— '.dol_escape_htmltag($langs->trans('SelectSerial')).' —</option>';
 		foreach ($std_serials_server as $ss) {
 			print '<option value="'.dol_escape_htmltag($ss['serial']).'"';
@@ -525,7 +525,7 @@ if ($action == 'create') {
 		}
 		print '</select>';
 	} else {
-		print '<select name="serial_number" id="manual_serial_select" class="flat minwidth200" disabled>';
+		print '<select name="serial_number" id="manual_serial_select" class="minwidth200" disabled>';
 		print '<option value="">'.$langs->trans('SelectProductFirst').'</option>';
 		print '</select>';
 	}
@@ -616,12 +616,6 @@ function resetSerials() {
 	clearOrder();
 }
 
-function notifySelect2(el) {
-	if (typeof jQuery !== "undefined" && jQuery.fn.select2) {
-		jQuery(el).trigger("change.select2");
-	}
-}
-
 function loadWarrantySerials(socid, pid) {
 	if (!stdSerSel) return;
 	pid = parseInt(pid, 10);
@@ -630,14 +624,13 @@ function loadWarrantySerials(socid, pid) {
 	stdSerSel.disabled = true;
 	var loadOpt = document.createElement("option"); loadOpt.value = ""; loadOpt.textContent = "Loading...";
 	stdSerSel.appendChild(loadOpt);
-	notifySelect2(stdSerSel);
 	fetch(ajaxBase + "warranty_serials.php?socid=" + socid + "&fk_product=" + pid)
 		.then(function(r){ return r.json(); })
 		.then(function(serials){
 			stdSerSel.innerHTML = "";
 			if (!serials.length) {
 				var o = document.createElement("option"); o.value = ""; o.textContent = noSerTxt;
-				stdSerSel.appendChild(o); stdSerSel.disabled = true; notifySelect2(stdSerSel); clearOrder(); return;
+				stdSerSel.appendChild(o); stdSerSel.disabled = true; clearOrder(); return;
 			}
 			var blank = document.createElement("option"); blank.value = ""; blank.textContent = selSerTxt;
 			stdSerSel.appendChild(blank);
@@ -651,7 +644,6 @@ function loadWarrantySerials(socid, pid) {
 				stdSerSel.appendChild(o);
 			});
 			stdSerSel.disabled = false;
-			notifySelect2(stdSerSel);
 			syncOrder();
 		})
 		.catch(function(){ resetSerials(); });
@@ -664,11 +656,10 @@ function loadWarrantyProducts(socid) {
 	stdProdSel.disabled = true;
 	if (!socid || socid <= 0) {
 		var o = document.createElement("option"); o.value = "-1"; o.textContent = selCustTxt;
-		stdProdSel.appendChild(o); notifySelect2(stdProdSel); resetSerials(); return;
+		stdProdSel.appendChild(o); resetSerials(); return;
 	}
 	var loadOpt = document.createElement("option"); loadOpt.value = "-1"; loadOpt.textContent = "Loading...";
 	stdProdSel.appendChild(loadOpt);
-	notifySelect2(stdProdSel);
 	fetch(ajaxBase + "warranty_products.php?socid=" + socid)
 		.then(function(r){ return r.json(); })
 		.then(function(products){
@@ -680,7 +671,6 @@ function loadWarrantyProducts(socid) {
 				stdProdSel.appendChild(o);
 			});
 			stdProdSel.disabled = (products.length === 0);
-			notifySelect2(stdProdSel);
 			resetSerials();
 		})
 		.catch(function(){ stdProdSel.disabled = false; });
@@ -761,9 +751,7 @@ var stdServerPreloaded = '.($std_preloaded && $prev_product > 0 ? 'true' : 'fals
 setMode(initMode);
 if (initMode === "standard") {
 	if (stdServerPreloaded) {
-		// Selects rendered server-side — notify Select2 and sync order from pre-selected serial
-		notifySelect2(stdProdSel);
-		notifySelect2(stdSerSel);
+		// Selects rendered server-side — sync order from pre-selected serial
 		syncOrder();
 	} else {
 		var initSocid = '.(int) $prev_socid_early.';
