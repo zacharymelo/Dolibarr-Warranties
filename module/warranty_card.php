@@ -542,6 +542,10 @@ if ($action == 'create') {
 	print (!$show_free_ser ? ' disabled' : '').'>';
 	print '</td></tr>';
 
+	// Hidden FK fields must be rendered before the script block so getElementById finds them at load time
+	print '<input type="hidden" name="fk_commande" id="fk_commande_val" value="'.((int) GETPOST('fk_commande', 'int')).'">';
+	print '<input type="hidden" name="fk_expedition" id="fk_expedition_val" value="'.((int) GETPOST('fk_expedition', 'int')).'">';
+
 	$warn_ovr_txt  = dol_escape_js($langs->trans('WarrantyOverrideWarning'));
 	$ajax_base     = dol_escape_js(DOL_URL_ROOT.'/custom/warrantysvc/ajax/');
 	$prev_socid    = (int) GETPOST('fk_soc', 'int');
@@ -867,12 +871,8 @@ if (initMode === "standard") {
 	$doleditor2->Create();
 	print '</td></tr>';
 
-	// Hidden FK fields — auto-filled by JS in Standard mode; fk_commande_ovr_input syncs in Override/Manual
-	print '<input type="hidden" name="fk_commande" id="fk_commande_val" value="'.((int) GETPOST('fk_commande', 'int')).'">';
-	print '<input type="hidden" name="fk_expedition" id="fk_expedition_val" value="'.((int) GETPOST('fk_expedition', 'int')).'">';
-
-	// Origin order — Standard: auto-detect display; Override/Manual: manual entry
-	$show_ord_manual = in_array($prev_mode, array('override', 'manual'));
+	// Origin order — Standard: auto-detect display; Override: manual entry
+	$show_ord_manual = ($prev_mode === 'override');
 	print '<tr><td>'.$form->textwithpicto($langs->trans('OriginOrder'), $langs->trans('TooltipOriginOrder')).'</td>';
 	print '<td>';
 	print '<span id="origin_order_std_row"'.($show_ord_manual ? ' style="display:none"' : '').'>';
