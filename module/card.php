@@ -1072,8 +1072,10 @@ if ($action == 'create') {
 		print '</div>';
 	}
 
+	print dol_get_fiche_end();
+
 	// =====================================================================
-	// ACTION BUTTONS — filtered by resolution_type + status
+	// ACTION BUTTONS — outside the fiche card per Dolibarr standard layout
 	// =====================================================================
 	print '<div class="tabsAction">';
 
@@ -1202,8 +1204,6 @@ if ($action == 'create') {
 		print '</table>';
 		print '</div>';
 	}
-
-	print dol_get_fiche_end();
 }
 
 llxFooter();
