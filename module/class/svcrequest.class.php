@@ -738,8 +738,6 @@ class SvcRequest extends CommonObject
 
 		$shipment = new Expedition($this->db);
 		$shipment->socid      = $this->fk_soc;
-		$shipment->origin     = 'warrantysvc';
-		$shipment->origin_id  = $this->id;
 		$shipment->fk_project = $this->fk_project;
 		$shipment->note_private = 'RMA '.$this->ref;
 
