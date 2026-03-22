@@ -1,0 +1,217 @@
+# Copyright (C) 2026 DPG Supply
+#
+# This file is a data file with sentences to translate into English (en_US).
+
+#
+# Module
+#
+WarrantySvc = Warranty & Service Management
+WarrantySvcDescription = Manage service requests, warranties, and RMA workflows for serialized equipment.
+
+#
+# Menu
+#
+WarrantySvcMenu = Warranty & Service
+SvcRequests = Service Requests
+ServiceRequests = Service Requests
+NewSvcRequest = New Service Request
+Warranties = Warranties
+NewWarranty = New Warranty
+
+#
+# Object labels
+#
+SvcRequest = Service Request
+SvcRequests = Service Requests
+SvcWarranty = Warranty
+SvcWarranties = Warranties
+ServiceLog = Service Log
+
+#
+# Status labels
+#
+Draft = Draft
+Validated = Validated
+InProgress = In Progress
+AwaitingReturn = Awaiting Return
+Resolved = Resolved
+Closed = Closed
+Cancelled = Cancelled
+
+#
+# Resolution types
+#
+ResolutionType = Resolution Type
+ResolutionTypeSelect = Select resolution type...
+ResolutionComponent = Component Shipment
+ResolutionComponentDesc = Ship a part to the customer. No return required.
+ResolutionComponentReturn = Component Shipment + Return
+ResolutionComponentReturnDesc = Ship a part and request the old part be returned for analysis.
+ResolutionSwapCross = Full Unit Swap — Cross Ship
+ResolutionSwapCrossDesc = Send a refurbished replacement now; customer returns faulty unit after.
+ResolutionSwapWait = Full Unit Swap — Wait for Return
+ResolutionSwapWaitDesc = Customer ships faulty unit first; we send replacement after receipt.
+ResolutionIntervention = On-Site Service
+ResolutionInterventionDesc = Technician visits the customer site. Optionally creates an Intervention.
+ResolutionGuidance = Guidance Only
+ResolutionGuidanceDesc = Provide troubleshooting steps or documentation. No physical action.
+ResolutionInformational = Informational
+ResolutionInformationalDesc = Customer call with no fault found. Machine operating as intended. Logged for audit.
+
+#
+# Field labels
+#
+SerialNumber = Serial Number
+SerialIn = Returning Serial
+SerialOut = Replacement Serial
+IssueDescription = Issue Description
+IssueDate = Issue Date
+ReportedVia = Reported Via
+CustomerSite = Customer Site / Location
+ResolutionNotes = Resolution Notes
+WarrantyStatus = Warranty Status
+Billable = Billable
+OutboundCarrier = Outbound Carrier
+OutboundTracking = Outbound Tracking
+DateShipped = Date Shipped
+ReturnCarrier = Return Carrier
+ReturnTracking = Return Tracking
+DateReturnExpected = Return Expected By
+DateReturnReceived = Return Received
+ReturnReminderCount = Reminders Sent
+WarehouseSource = Replacement From Warehouse
+WarehouseReturn = Return To Warehouse
+AssignedTo = Assigned To
+ConditionScore = Condition Score
+ConditionStatus = Condition
+ServiceHours = Service Hours
+ServiceCount = Times Serviced
+LastServiceDate = Last Service Date
+
+#
+# Reported via options
+#
+ReportedViaPhone = Phone
+ReportedViaEmail = Email
+ReportedViaOnSite = On-Site
+ReportedViaOther = Other
+
+#
+# Warranty fields
+#
+WarrantyType = Warranty Type
+WarrantyTypeManufacturer = Manufacturer Warranty
+WarrantyTypeExtended = Extended Warranty
+WarrantyTypeServiceContract = Service Contract
+StartDate = Start Date
+ExpiryDate = Expiry Date
+CoverageMonths = Coverage (months)
+CoverageTerms = Coverage Terms
+Exclusions = Exclusions
+ClaimCount = Claims Filed
+TotalClaimedValue = Total Claimed Value
+
+#
+# Warranty status badges
+#
+Active = Active
+Expired = Expired
+Voided = Voided
+NoCoverage = No Coverage
+
+#
+# Condition status labels
+#
+ConditionGood = Good
+ConditionFair = Fair
+ConditionPoor = Poor
+ConditionScrap = Scrap / Write-Off
+
+#
+# Replacement selection strategies
+#
+StrategyFIFO = FIFO (oldest refurb stock first)
+StrategyLeastServiced = Least Serviced (lowest service count)
+StrategyBestCondition = Best Condition (lowest condition score)
+StrategyManual = Manual Selection
+
+#
+# Action buttons
+#
+ValidateSvcRequest = Validate
+SetInProgress = Set In Progress
+SendReplacement = Send Replacement
+ReceiveReturn = Receive Return
+CreateIntervention = Create Intervention
+MarkResolved = Mark Resolved
+CloseSvcRequest = Close
+ReopenSvcRequest = Re-open
+CancelSvcRequest = Cancel
+SendReminder = Send Return Reminder
+InvoiceNonReturn = Invoice for Non-Return
+VoidWarranty = Void Warranty
+
+#
+# Section headings
+#
+SectionResolution = Resolution
+SectionComponents = Components / Parts
+SectionWarranty = Warranty Coverage
+SectionShipping = Outbound Shipment
+SectionReturn = Return Tracking
+SectionLinkedObjects = Linked Objects
+
+#
+# Info/status banners
+#
+WarrantyCoveredBanner = This service request is covered under active warranty.
+WarrantyExpiredBanner = Warranty has expired. This request is billable.
+WarrantyNoneBanner = No warranty on file for this serial number. This request is billable.
+NoSerialSelected = No serial number selected — warranty cannot be checked.
+
+#
+# PDF document labels
+#
+SvcRequestSlip = Service Request Authorization
+ReturnInstructions = Return Instructions
+ReturnShipTo = Please return the unit to:
+EstimatedResolution = Estimated Resolution
+
+#
+# Tabs
+#
+Details = Details
+Notes = Notes
+Documents = Documents
+
+#
+# Error messages (must start with Error)
+#
+ErrorSvcRequestNotInDraftStatus = This service request is not in draft status.
+ErrorSvcRequestNotInValidatedStatus = This service request must be validated before proceeding.
+ErrorSvcRequestCannotClose = This service request cannot be closed from its current status.
+ErrorSvcRequestAlreadyClosedOrCancelled = This service request is already closed or cancelled.
+ErrorNoSerialForSwap = A serial number must be set before creating a unit swap shipment.
+ErrorNoWarehouseSelected = Please select a warehouse before creating a shipment.
+ErrorInterventionModuleDisabled = The Interventions module is not enabled.
+ErrorExpeditionModuleDisabled = The Shipments module is not enabled.
+ErrorFactureModuleDisabled = The Invoicing module is not enabled.
+ErrorWarrantySerialRequired = A serial number is required to create a warranty record.
+
+#
+# Admin / Setup page
+#
+Setup = Setup
+SetupSaved = Settings saved.
+SelectWarehouse = Select a warehouse
+WarehouseRefurbDesc = Warehouse where refurbished units available for swap are stored.
+WarehouseReturnDesc = Warehouse where returned / in-repair units are received.
+ReturnGraceDays = Return reminder delay
+ReturnGraceDaysDesc = Days after the expected return date before the first reminder email is sent.
+ReturnInvoiceDays = Auto-invoice after
+ReturnInvoiceDaysDesc = Days after the expected return date before an invoice is automatically generated for unreturned units.
+ReplacementStrategy = Default replacement selection strategy
+ReplacementStrategyDesc = How the system suggests a serial number when creating a unit swap.
+AutoWarrantyCheck = Auto-check warranty on creation
+AutoWarrantyCheckDesc = Automatically look up warranty coverage when a service request is created.
+NumberingModule = Reference Numbering Module

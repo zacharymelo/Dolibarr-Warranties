@@ -1,0 +1,236 @@
+<?php
+/* Copyright (C) 2026 DPG Supply */
+
+/**
+ * \file    admin/setup.php
+ * \ingroup warrantysvc
+ * \brief   Module configuration page
+ */
+
+// Load Dolibarr environment
+$res = 0;
+if (!$res && file_exists("../main.inc.php")) {
+	$res = @include "../main.inc.php";
+}
+if (!$res && file_exists("../../main.inc.php")) {
+	$res = @include "../../main.inc.php";
+}
+if (!$res && file_exists("../../../main.inc.php")) {
+	$res = @include "../../../main.inc.php";
+}
+if (!$res) {
+	die("Include of main fails");
+}
+
+require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/product/stock/class/entrepot.class.php';
+
+$langs->loadLangs(array('admin', 'warrantysvc@warrantysvc'));
+
+if (!$user->admin) {
+	accessforbidden();
+}
+
+$action = GETPOST('action', 'aZ09');
+
+// Save settings
+if ($action == 'update') {
+	$settings = array(
+		'WARRANTYSVC_WAREHOUSE_REFURB',
+		'WARRANTYSVC_WAREHOUSE_RETURN',
+		'WARRANTYSVC_RETURN_GRACE_DAYS',
+		'WARRANTYSVC_RETURN_INVOICE_DAYS',
+		'WARRANTYSVC_REPLACEMENT_STRATEGY',
+		'WARRANTYSVC_AUTO_WARRANTY_CHECK',
+	);
+
+	foreach ($settings as $key) {
+		$val = GETPOST($key, 'alpha');
+		dolibarr_set_const($db, $key, $val, 'chaine', 0, '', $conf->entity);
+	}
+
+	setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
+}
+
+// Load warehouses for selectors
+$entrepot = new Entrepot($db);
+$warehouses = $entrepot->list_array();
+
+/*
+ * View
+ */
+
+$wikihelp = '';
+llxHeader('', $langs->trans('WarrantySvc').' - '.$langs->trans('Setup'), $wikihelp);
+
+$linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1">'
+	.$langs->trans('BackToModuleList').'</a>';
+
+print load_fiche_titre($langs->trans('WarrantySvc').' - '.$langs->trans('Setup'), $linkback, 'technic');
+
+print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'">';
+print '<input type="hidden" name="token" value="'.newToken().'">';
+print '<input type="hidden" name="action" value="update">';
+
+print dol_get_fiche_head(array(), '', '', -1);
+
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre">';
+print '<td>'.$langs->trans('Parameter').'</td>';
+print '<td>'.$langs->trans('Value').'</td>';
+print '</tr>';
+
+// Refurbished stock warehouse
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans('WarehouseSource').'<br><span class="opacitymedium">'
+	.$langs->trans('WarehouseRefurbDesc').'</span></td>';
+print '<td>';
+print '<select name="WARRANTYSVC_WAREHOUSE_REFURB" class="flat minwidth300">';
+print '<option value="">--- '.$langs->trans('SelectWarehouse').' ---</option>';
+foreach ($warehouses as $id => $label) {
+	$sel = (getDolGlobalString('WARRANTYSVC_WAREHOUSE_REFURB') == $id) ? ' selected' : '';
+	print '<option value="'.$id.'"'.$sel.'>'.dol_escape_htmltag($label).'</option>';
+}
+print '</select>';
+print '</td></tr>';
+
+// RMA return / repair warehouse
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans('WarehouseReturn').'<br><span class="opacitymedium">'
+	.$langs->trans('WarehouseReturnDesc').'</span></td>';
+print '<td>';
+print '<select name="WARRANTYSVC_WAREHOUSE_RETURN" class="flat minwidth300">';
+print '<option value="">--- '.$langs->trans('SelectWarehouse').' ---</option>';
+foreach ($warehouses as $id => $label) {
+	$sel = (getDolGlobalString('WARRANTYSVC_WAREHOUSE_RETURN') == $id) ? ' selected' : '';
+	print '<option value="'.$id.'"'.$sel.'>'.dol_escape_htmltag($label).'</option>';
+}
+print '</select>';
+print '</td></tr>';
+
+// Return grace period (days before first reminder)
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans('ReturnGraceDays').'<br><span class="opacitymedium">'
+	.$langs->trans('ReturnGraceDaysDesc').'</span></td>';
+print '<td>';
+print '<input type="number" name="WARRANTYSVC_RETURN_GRACE_DAYS" class="flat" min="1" max="90"'
+	.' value="'.dol_escape_htmltag(getDolGlobalString('WARRANTYSVC_RETURN_GRACE_DAYS', '7')).'">';
+print ' '.$langs->trans('days');
+print '</td></tr>';
+
+// Days before auto-invoice for non-return
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans('ReturnInvoiceDays').'<br><span class="opacitymedium">'
+	.$langs->trans('ReturnInvoiceDaysDesc').'</span></td>';
+print '<td>';
+print '<input type="number" name="WARRANTYSVC_RETURN_INVOICE_DAYS" class="flat" min="1" max="180"'
+	.' value="'.dol_escape_htmltag(getDolGlobalString('WARRANTYSVC_RETURN_INVOICE_DAYS', '30')).'">';
+print ' '.$langs->trans('days');
+print '</td></tr>';
+
+// Replacement unit selection strategy
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans('ReplacementStrategy').'<br><span class="opacitymedium">'
+	.$langs->trans('ReplacementStrategyDesc').'</span></td>';
+print '<td>';
+$current_strategy = getDolGlobalString('WARRANTYSVC_REPLACEMENT_STRATEGY', 'fifo');
+$strategies = array(
+	'fifo'           => $langs->trans('StrategyFIFO'),
+	'least_serviced' => $langs->trans('StrategyLeastServiced'),
+	'best_condition' => $langs->trans('StrategyBestCondition'),
+	'manual'         => $langs->trans('StrategyManual'),
+);
+print '<select name="WARRANTYSVC_REPLACEMENT_STRATEGY" class="flat minwidth300">';
+foreach ($strategies as $key => $label) {
+	$sel = ($current_strategy == $key) ? ' selected' : '';
+	print '<option value="'.$key.'"'.$sel.'>'.dol_escape_htmltag($label).'</option>';
+}
+print '</select>';
+print '</td></tr>';
+
+// Auto warranty check on SvcRequest creation
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans('AutoWarrantyCheck').'<br><span class="opacitymedium">'
+	.$langs->trans('AutoWarrantyCheckDesc').'</span></td>';
+print '<td>';
+$chk = getDolGlobalString('WARRANTYSVC_AUTO_WARRANTY_CHECK', '1') ? ' checked' : '';
+print '<input type="checkbox" name="WARRANTYSVC_AUTO_WARRANTY_CHECK" value="1"'.$chk.'>';
+print '</td></tr>';
+
+print '</table>';
+
+print dol_get_fiche_end();
+
+print '<div class="center">';
+print '<input type="submit" class="button button-save" value="'.$langs->trans('Save').'">';
+print '</div>';
+
+print '</form>';
+
+// Numbering model selector (native Dolibarr UI)
+print '<br>';
+print load_fiche_titre($langs->trans('NumberingModule'), '', '');
+
+$setupsql = "SELECT count(*) as nb FROM ".MAIN_DB_PREFIX."svc_request";
+$resql    = $db->query($setupsql);
+if (!$resql) {
+	// table may not exist yet — skip numbering model display until module activated
+} else {
+	require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/core/modules/warrantysvc/modules_warrantysvc.php';
+
+	$dir     = DOL_DOCUMENT_ROOT.'/custom/warrantysvc/core/modules/warrantysvc/';
+	$type    = 'warrantysvc';
+
+	print '<table class="noborder centpercent">';
+	print '<tr class="liste_titre">';
+	print '<td>'.$langs->trans('Name').'</td>';
+	print '<td>'.$langs->trans('Description').'</td>';
+	print '<td class="center">'.$langs->trans('Status').'</td>';
+	print '<td class="center">'.$langs->trans('Example').'</td>';
+	print '</tr>';
+
+	$handle = opendir($dir);
+	if ($handle) {
+		while (($file = readdir($handle)) !== false) {
+			if (substr($file, 0, 4) != 'mod_' || substr($file, -4) != '.php') {
+				continue;
+			}
+			require_once $dir.$file;
+			$classname = substr($file, 0, -4);
+			if (!class_exists($classname)) {
+				continue;
+			}
+			$mod = new $classname();
+			$current = getDolGlobalString('WARRANTYSVC_ADDON', 'mod_warrantysvc_standard');
+			$active  = ($current == $classname);
+
+			print '<tr class="oddeven"><td>'.$mod->name.'</td>';
+			print '<td>'.$mod->info($langs).'</td>';
+			print '<td class="center">';
+			if ($active) {
+				print img_picto($langs->trans('Activated'), 'switch_on');
+			} else {
+				print '<a href="'.$_SERVER['PHP_SELF'].'?action=setmod&token='.newToken().'&value='.$classname.'">';
+				print img_picto($langs->trans('Disabled'), 'switch_off');
+				print '</a>';
+			}
+			print '</td>';
+			print '<td class="center"><code>'.$mod->getExample().'</code></td>';
+			print '</tr>';
+		}
+		closedir($handle);
+	}
+	print '</table>';
+}
+
+// Handle setmod action
+if ($action == 'setmod') {
+	$value = GETPOST('value', 'alpha');
+	dolibarr_set_const($db, 'WARRANTYSVC_ADDON', $value, 'chaine', 0, '', $conf->entity);
+	setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
+	header('Location: '.$_SERVER['PHP_SELF']);
+	exit;
+}
+
+llxFooter();
+$db->close();

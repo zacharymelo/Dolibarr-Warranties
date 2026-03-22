@@ -1,0 +1,591 @@
+<?php
+/* Copyright (C) 2026 DPG Supply */
+
+/**
+ * \file    warranty_card.php
+ * \ingroup warrantysvc
+ * \brief   Warranty create / view / edit card
+ */
+
+$res = 0;
+if (!$res && file_exists("../main.inc.php"))       { $res = @include "../main.inc.php"; }
+if (!$res && file_exists("../../main.inc.php"))    { $res = @include "../../main.inc.php"; }
+if (!$res && file_exists("../../../main.inc.php")) { $res = @include "../../../main.inc.php"; }
+if (!$res) { die("Include of main fails"); }
+
+require_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarranty.class.php';
+require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcrequest.class.php';
+require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/lib/warrantysvc.lib.php';
+
+$langs->loadLangs(array('warrantysvc@warrantysvc', 'companies', 'products'));
+
+$id     = GETPOST('id', 'int');
+$ref    = GETPOST('ref', 'alpha');
+$action = GETPOST('action', 'aZ09');
+$cancel = GETPOST('cancel', 'alpha');
+
+$object = new SvcWarranty($db);
+
+if ($id > 0 || $ref) {
+	$result = $object->fetch($id, $ref);
+	if ($result <= 0) {
+		dol_print_error($db, $object->error);
+		exit;
+	}
+}
+
+$permread   = $user->hasRight('warrantysvc', 'svcwarranty', 'read');
+$permwrite  = $user->hasRight('warrantysvc', 'svcwarranty', 'write');
+$permdelete = $user->hasRight('warrantysvc', 'svcwarranty', 'delete');
+
+if (!$permread) { accessforbidden(); }
+
+/*
+ * Actions
+ */
+if ($cancel) { $action = ''; }
+
+// ---- CREATE ----
+if ($action == 'add' && $permwrite) {
+	$object->fk_soc         = GETPOST('fk_soc', 'int');
+	$object->fk_product     = GETPOST('fk_product', 'int');
+	$object->serial_number  = GETPOST('serial_number', 'alpha');
+	$object->warranty_type  = GETPOST('warranty_type', 'alpha');
+	$object->start_date     = dol_mktime(12, 0, 0, GETPOST('start_datemonth', 'int'), GETPOST('start_dateday', 'int'), GETPOST('start_dateyear', 'int'));
+	$object->coverage_months= GETPOST('coverage_months', 'int');
+	$object->coverage_terms = GETPOST('coverage_terms', 'restricthtml');
+	$object->exclusions     = GETPOST('exclusions', 'restricthtml');
+	$object->fk_commande    = GETPOST('fk_commande', 'int');
+	$object->fk_expedition  = GETPOST('fk_expedition', 'int');
+	$object->note_public    = GETPOST('note_public', 'restricthtml');
+	$object->note_private   = GETPOST('note_private', 'restricthtml');
+
+	// Manual expiry overrides computed one
+	$manual_expiry = dol_mktime(12, 0, 0, GETPOST('expiry_datemonth', 'int'), GETPOST('expiry_dateday', 'int'), GETPOST('expiry_dateyear', 'int'));
+	if ($manual_expiry) {
+		$object->expiry_date = $manual_expiry;
+	}
+
+	$result = $object->create($user);
+	if ($result > 0) {
+		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$result);
+		exit;
+	} else {
+		setEventMessages($object->error, $object->errors, 'errors');
+		$action = 'create';
+	}
+}
+
+// ---- UPDATE ----
+if ($action == 'update' && $permwrite) {
+	$object->fk_soc         = GETPOST('fk_soc', 'int');
+	$object->fk_product     = GETPOST('fk_product', 'int');
+	$object->serial_number  = GETPOST('serial_number', 'alpha');
+	$object->warranty_type  = GETPOST('warranty_type', 'alpha');
+	$object->start_date     = dol_mktime(12, 0, 0, GETPOST('start_datemonth', 'int'), GETPOST('start_dateday', 'int'), GETPOST('start_dateyear', 'int'));
+	$object->coverage_months= GETPOST('coverage_months', 'int');
+	$object->coverage_terms = GETPOST('coverage_terms', 'restricthtml');
+	$object->exclusions     = GETPOST('exclusions', 'restricthtml');
+	$object->fk_commande    = GETPOST('fk_commande', 'int');
+	$object->fk_expedition  = GETPOST('fk_expedition', 'int');
+	$object->note_public    = GETPOST('note_public', 'restricthtml');
+	$object->note_private   = GETPOST('note_private', 'restricthtml');
+
+	$manual_expiry = dol_mktime(12, 0, 0, GETPOST('expiry_datemonth', 'int'), GETPOST('expiry_dateday', 'int'), GETPOST('expiry_dateyear', 'int'));
+	if ($manual_expiry) {
+		$object->expiry_date = $manual_expiry;
+	} elseif ($object->coverage_months && $object->start_date) {
+		$object->expiry_date = dol_time_plus_duree($object->start_date, $object->coverage_months, 'm');
+	}
+
+	$result = $object->update($user);
+	if ($result > 0) {
+		setEventMessages($langs->trans('RecordSaved'), null, 'mesgs');
+		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+		exit;
+	} else {
+		setEventMessages($object->error, $object->errors, 'errors');
+		$action = 'edit';
+	}
+}
+
+// ---- VOID ----
+if ($action == 'confirm_void' && GETPOST('confirm', 'alpha') == 'yes' && $permwrite) {
+	$object->status = SvcWarranty::STATUS_VOIDED;
+	$object->update($user);
+	setEventMessages($langs->trans('WarrantyVoided'), null, 'mesgs');
+	header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+	exit;
+}
+
+// ---- DELETE ----
+if ($action == 'confirm_delete' && GETPOST('confirm', 'alpha') == 'yes' && $permdelete) {
+	$result = $object->delete($user);
+	if ($result > 0) {
+		header('Location: '.DOL_URL_ROOT.'/custom/warrantysvc/warranty_list.php');
+		exit;
+	} else {
+		setEventMessages($object->error, $object->errors, 'errors');
+	}
+}
+
+$form        = new Form($db);
+$formcompany = new FormCompany($db);
+
+/*
+ * View
+ */
+llxHeader('', $langs->trans('Warranty'), '');
+
+// ============================================================
+// CREATE FORM
+// ============================================================
+if ($action == 'create') {
+	print load_fiche_titre($langs->trans('NewWarranty'), '', 'bill');
+
+	print '<form action="'.$_SERVER['PHP_SELF'].'" method="POST">';
+	print '<input type="hidden" name="token" value="'.newToken().'">';
+	print '<input type="hidden" name="action" value="add">';
+
+	print dol_get_fiche_head(array(), '', '', -1);
+
+	print '<table class="border centpercent tableforfieldcreate">';
+
+	// Customer
+	print '<tr><td class="fieldrequired">'.$langs->trans('Customer').'</td>';
+	print '<td>';
+	print $formcompany->select_company(GETPOST('fk_soc', 'int'), 'fk_soc', '', $langs->trans('SelectThird'), 0, 0, null, 0, 'minwidth300 maxwidth500 widthcentpercentminusxx');
+	print '</td></tr>';
+
+	// Product
+	print '<tr><td class="fieldrequired">'.$langs->trans('Product').'</td>';
+	print '<td>';
+	print $form->select_produits(GETPOST('fk_product', 'int'), 'fk_product', '', 0, 0, 1, 2, '', 0, array(), 0, 1, 0, 'minwidth300');
+	print '</td></tr>';
+
+	// Serial number
+	print '<tr><td class="fieldrequired">'.$langs->trans('SerialNumber').'</td>';
+	print '<td><input type="text" name="serial_number" value="'.dol_escape_htmltag(GETPOST('serial_number', 'alpha')).'" class="flat minwidth200"></td></tr>';
+
+	// Warranty type
+	$warranty_types = array(
+		''         => $langs->trans('SelectWarrantyType'),
+		'standard' => $langs->trans('WarrantyTypeStandard'),
+		'extended' => $langs->trans('WarrantyTypeExtended'),
+		'limited'  => $langs->trans('WarrantyTypeLimited'),
+		'service'  => $langs->trans('WarrantyTypeService'),
+	);
+	print '<tr><td>'.$langs->trans('WarrantyType').'</td>';
+	print '<td>';
+	print Form::selectarray('warranty_type', $warranty_types, GETPOST('warranty_type', 'alpha'), 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth200');
+	print '</td></tr>';
+
+	// Start date
+	print '<tr><td class="fieldrequired">'.$langs->trans('StartDate').'</td>';
+	print '<td>';
+	print $form->selectDate(GETPOST('start_date', 'int') ? GETPOST('start_date', 'int') : dol_now(), 'start_date', 0, 0, 0, 'formcreate', 1, 1);
+	print '</td></tr>';
+
+	// Coverage months
+	print '<tr><td>'.$langs->trans('CoverageMonths').'</td>';
+	print '<td>';
+	print '<input type="number" name="coverage_months" value="'.dol_escape_htmltag(GETPOST('coverage_months', 'int') ? GETPOST('coverage_months', 'int') : '12').'" class="flat width75" min="1" max="120">';
+	print ' '.$langs->trans('Months');
+	print ' &nbsp;<span class="opacitymedium">'.$langs->trans('ExpiryAutoComputed').'</span>';
+	print '</td></tr>';
+
+	// Manual expiry override
+	print '<tr><td>'.$langs->trans('ExpiryDateOverride').'</td>';
+	print '<td>';
+	print $form->selectDate('', 'expiry_date', 0, 0, 1, 'formcreate', 1, 0);
+	print '</td></tr>';
+
+	// Coverage terms
+	print '<tr><td class="tdtop">'.$langs->trans('CoverageTerms').'</td>';
+	print '<td>';
+	require_once DOL_DOCUMENT_ROOT.'/core/class/doleditor.class.php';
+	$doleditor = new DolEditor('coverage_terms', GETPOST('coverage_terms', 'restricthtml'), '', 100, 'dolibarr_notes', '', false, true, getDolGlobalInt('FCKEDITOR_ENABLE_DETAILS'), ROWS_4, '90%');
+	$doleditor->Create();
+	print '</td></tr>';
+
+	// Exclusions
+	print '<tr><td class="tdtop">'.$langs->trans('Exclusions').'</td>';
+	print '<td>';
+	$doleditor2 = new DolEditor('exclusions', GETPOST('exclusions', 'restricthtml'), '', 100, 'dolibarr_notes', '', false, true, getDolGlobalInt('FCKEDITOR_ENABLE_DETAILS'), ROWS_3, '90%');
+	$doleditor2->Create();
+	print '</td></tr>';
+
+	// Origin order
+	print '<tr><td>'.$langs->trans('OriginOrder').'</td>';
+	print '<td>';
+	if (isModEnabled('commande')) {
+		require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
+		print $form->select_ordersupplier(GETPOST('fk_commande', 'int'), 'fk_commande', 0, 0);
+	} else {
+		print '<input type="number" name="fk_commande" value="" class="flat width100">';
+	}
+	print '</td></tr>';
+
+	// Notes
+	print '<tr><td>'.$langs->trans('NotePublic').'</td>';
+	print '<td><textarea name="note_public" class="flat" rows="3" style="width:90%">'.dol_escape_htmltag(GETPOST('note_public', 'restricthtml'), 1).'</textarea></td></tr>';
+
+	print '</table>';
+
+	print dol_get_fiche_end();
+
+	print '<div class="center">';
+	print '<input type="submit" class="button button-save" name="add" value="'.$langs->trans('Save').'">';
+	print ' &nbsp; ';
+	print '<input type="submit" class="button button-cancel" name="cancel" value="'.$langs->trans('Cancel').'">';
+	print '</div>';
+
+	print '</form>';
+
+	llxFooter();
+	$db->close();
+	exit;
+}
+
+// ============================================================
+// VIEW / EDIT
+// ============================================================
+if (empty($object->id)) {
+	dol_print_error($db, 'Object not found');
+	exit;
+}
+
+$head = svcwarranty_prepare_head($object);
+
+// Determine live status
+$now           = dol_now();
+$display_status = $object->status;
+if ($object->status != SvcWarranty::STATUS_VOIDED) {
+	if (!empty($object->expiry_date) && $object->expiry_date < $now) {
+		$display_status = SvcWarranty::STATUS_EXPIRED;
+	} else {
+		$display_status = SvcWarranty::STATUS_ACTIVE;
+	}
+}
+
+// --- Confirm dialogs ---
+if ($action == 'void') {
+	print $form->formconfirm(
+		$_SERVER['PHP_SELF'].'?id='.$object->id,
+		$langs->trans('VoidWarranty'),
+		$langs->trans('ConfirmVoidWarranty'),
+		'confirm_void',
+		'',
+		0,
+		1
+	);
+}
+
+if ($action == 'delete') {
+	print $form->formconfirm(
+		$_SERVER['PHP_SELF'].'?id='.$object->id,
+		$langs->trans('DeleteWarranty'),
+		$langs->trans('ConfirmDeleteWarranty'),
+		'confirm_delete',
+		'',
+		0,
+		1
+	);
+}
+
+print dol_get_fiche_head($head, 'card', $langs->trans('Warranty'), -1, 'bill');
+
+$linkback = '<a href="'.DOL_URL_ROOT.'/custom/warrantysvc/warranty_list.php">'.$langs->trans('BackToList').'</a>';
+
+dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', svcwarranty_status_badge($display_status));
+
+print '<div class="fichecenter">';
+print '<div class="fichehalfleft">';
+print '<table class="border centpercent tableforfield">';
+
+// Customer
+print '<tr><td class="titlefield">'.$langs->trans('Customer').'</td>';
+print '<td>';
+if ($action == 'edit') {
+	print $formcompany->select_company($object->fk_soc, 'fk_soc', '', '', 0, 0, null, 0, 'minwidth200 maxwidth400');
+} else {
+	$soc = new Societe($db);
+	if ($soc->fetch($object->fk_soc) > 0) {
+		print $soc->getNomUrl(1);
+	}
+}
+print '</td></tr>';
+
+// Product
+print '<tr><td>'.$langs->trans('Product').'</td>';
+print '<td>';
+if ($action == 'edit') {
+	print $form->select_produits($object->fk_product, 'fk_product', '', 0, 0, 1, 2, '', 0, array(), 0, 1, 0, 'minwidth200');
+} else {
+	$product = new Product($db);
+	if ($product->fetch($object->fk_product) > 0) {
+		print $product->getNomUrl(1);
+	}
+}
+print '</td></tr>';
+
+// Serial number
+print '<tr><td>'.$langs->trans('SerialNumber').'</td>';
+print '<td>';
+if ($action == 'edit') {
+	print '<input type="text" name="serial_number" value="'.dol_escape_htmltag($object->serial_number).'" class="flat minwidth200">';
+} else {
+	print dol_escape_htmltag($object->serial_number);
+}
+print '</td></tr>';
+
+// Warranty type
+print '<tr><td>'.$langs->trans('WarrantyType').'</td>';
+print '<td>';
+if ($action == 'edit') {
+	$warranty_types = array(
+		''         => '',
+		'standard' => $langs->trans('WarrantyTypeStandard'),
+		'extended' => $langs->trans('WarrantyTypeExtended'),
+		'limited'  => $langs->trans('WarrantyTypeLimited'),
+		'service'  => $langs->trans('WarrantyTypeService'),
+	);
+	print Form::selectarray('warranty_type', $warranty_types, $object->warranty_type, 0, 0, 0, '', 0, 0, 0, '', 'flat');
+} else {
+	print $object->warranty_type ? $langs->trans('WarrantyType'.ucfirst($object->warranty_type)) : '<span class="opacitymedium">&mdash;</span>';
+}
+print '</td></tr>';
+
+// Status
+print '<tr><td>'.$langs->trans('Status').'</td>';
+print '<td>'.svcwarranty_status_badge($display_status).'</td></tr>';
+
+// Claim summary
+print '<tr><td>'.$langs->trans('Claims').'</td>';
+print '<td>'.((int) $object->claim_count);
+if ($object->total_claimed_value > 0) {
+	print ' &mdash; '.price($object->total_claimed_value, 0, $langs, 1, -1, -1, $conf->currency);
+}
+print '</td></tr>';
+
+print '</table>';
+print '</div>'; // fichehalfleft
+
+print '<div class="fichehalfright">';
+print '<table class="border centpercent tableforfield">';
+
+// Start date
+print '<tr><td class="titlefield">'.$langs->trans('StartDate').'</td>';
+print '<td>';
+if ($action == 'edit') {
+	print $form->selectDate($object->start_date, 'start_date', 0, 0, 0, 'cardform', 1, 1);
+} else {
+	print dol_print_date($object->start_date, 'day');
+}
+print '</td></tr>';
+
+// Coverage months
+print '<tr><td>'.$langs->trans('CoverageMonths').'</td>';
+print '<td>';
+if ($action == 'edit') {
+	print '<input type="number" name="coverage_months" value="'.((int) $object->coverage_months).'" class="flat width75" min="0" max="120">';
+	print ' '.$langs->trans('Months');
+} else {
+	print $object->coverage_months ? ((int) $object->coverage_months).' '.$langs->trans('Months') : '<span class="opacitymedium">&mdash;</span>';
+}
+print '</td></tr>';
+
+// Expiry date
+print '<tr><td>'.$langs->trans('ExpiryDate').'</td>';
+print '<td>';
+if ($action == 'edit') {
+	print $form->selectDate($object->expiry_date, 'expiry_date', 0, 0, 1, 'cardform', 1, 0);
+	print ' <span class="opacitymedium">'.$langs->trans('ExpiryAutoComputed').'</span>';
+} else {
+	if ($object->expiry_date) {
+		$expiry_ts = $object->expiry_date;
+		if ($display_status == 'expired') {
+			print '<span class="warning">'.dol_print_date($expiry_ts, 'day').'</span>';
+		} elseif ($display_status == 'active' && $expiry_ts < dol_time_plus_duree($now, 30, 'd')) {
+			print '<span class="opacitymediumhigh">'.dol_print_date($expiry_ts, 'day').'</span>';
+			print ' &nbsp;<span class="badge badge-status4">'.$langs->trans('ExpiringSoon').'</span>';
+		} else {
+			print dol_print_date($expiry_ts, 'day');
+		}
+	} else {
+		print '<span class="opacitymedium">&mdash;</span>';
+	}
+}
+print '</td></tr>';
+
+// Origin order
+if ($object->fk_commande || $action == 'edit') {
+	print '<tr><td>'.$langs->trans('OriginOrder').'</td>';
+	print '<td>';
+	if ($action == 'edit') {
+		print '<input type="number" name="fk_commande" value="'.((int) $object->fk_commande).'" class="flat width100">';
+	} elseif ($object->fk_commande) {
+		if (isModEnabled('commande')) {
+			require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
+			$commande = new Commande($db);
+			if ($commande->fetch($object->fk_commande) > 0) {
+				print $commande->getNomUrl(1);
+			}
+		} else {
+			print $object->fk_commande;
+		}
+	}
+	print '</td></tr>';
+}
+
+// Origin shipment
+if ($object->fk_expedition || $action == 'edit') {
+	print '<tr><td>'.$langs->trans('OriginShipment').'</td>';
+	print '<td>';
+	if ($action == 'edit') {
+		print '<input type="number" name="fk_expedition" value="'.((int) $object->fk_expedition).'" class="flat width100">';
+	} elseif ($object->fk_expedition) {
+		if (isModEnabled('expedition')) {
+			require_once DOL_DOCUMENT_ROOT.'/expedition/class/expedition.class.php';
+			$expd = new Expedition($db);
+			if ($expd->fetch($object->fk_expedition) > 0) {
+				print $expd->getNomUrl(1);
+			}
+		} else {
+			print $object->fk_expedition;
+		}
+	}
+	print '</td></tr>';
+}
+
+print '</table>';
+print '</div>'; // fichehalfright
+print '</div>'; // fichecenter
+
+// Coverage terms & exclusions
+print '<div class="clearboth"></div>';
+print '<div class="fichecenter">';
+
+print '<div class="fichehalfleft">';
+print '<div class="underbanner clearboth"></div>';
+print '<table class="border centpercent tableforfield">';
+print '<tr><td class="titlefield tdtop">'.$langs->trans('CoverageTerms').'</td>';
+print '<td>';
+if ($action == 'edit') {
+	require_once DOL_DOCUMENT_ROOT.'/core/class/doleditor.class.php';
+	$doleditor = new DolEditor('coverage_terms', $object->coverage_terms, '', 120, 'dolibarr_notes', '', false, true, getDolGlobalInt('FCKEDITOR_ENABLE_DETAILS'), ROWS_4, '95%');
+	$doleditor->Create();
+} else {
+	print dol_htmlentitiesbr($object->coverage_terms);
+}
+print '</td></tr>';
+print '</table>';
+print '</div>';
+
+print '<div class="fichehalfright">';
+print '<table class="border centpercent tableforfield">';
+print '<tr><td class="titlefield tdtop">'.$langs->trans('Exclusions').'</td>';
+print '<td>';
+if ($action == 'edit') {
+	require_once DOL_DOCUMENT_ROOT.'/core/class/doleditor.class.php';
+	$doleditor3 = new DolEditor('exclusions', $object->exclusions, '', 120, 'dolibarr_notes', '', false, true, getDolGlobalInt('FCKEDITOR_ENABLE_DETAILS'), ROWS_4, '95%');
+	$doleditor3->Create();
+} else {
+	print dol_htmlentitiesbr($object->exclusions);
+}
+print '</td></tr>';
+print '</table>';
+print '</div>';
+
+print '</div>'; // fichecenter
+print '<div class="clearboth"></div>';
+
+print dol_get_fiche_end();
+
+// ---- Action buttons ----
+if ($action == 'edit') {
+	print '<form action="'.$_SERVER['PHP_SELF'].'" method="POST">';
+	print '<input type="hidden" name="token" value="'.newToken().'">';
+	print '<input type="hidden" name="action" value="update">';
+	print '<input type="hidden" name="id" value="'.$object->id.'">';
+	print '<div class="center">';
+	print '<input type="submit" class="button button-save" name="save" value="'.$langs->trans('Save').'">';
+	print ' &nbsp; ';
+	print '<input type="submit" class="button button-cancel" name="cancel" value="'.$langs->trans('Cancel').'">';
+	print '</div>';
+	print '</form>';
+} else {
+	// View mode buttons
+	print "\n".'<div class="tabsAction">'."\n";
+
+	if ($permwrite && $display_status != SvcWarranty::STATUS_VOIDED) {
+		print dolGetButtonAction('', $langs->trans('Modify'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=edit&token='.newToken(), '');
+	}
+	if ($permwrite && $display_status != SvcWarranty::STATUS_VOIDED) {
+		print dolGetButtonAction('', $langs->trans('VoidWarranty'), 'danger', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=void&token='.newToken(), '');
+	}
+	if ($permdelete) {
+		print dolGetButtonAction('', $langs->trans('Delete'), 'delete', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=delete&token='.newToken(), '');
+	}
+
+	print '</div>';
+}
+
+// ============================================================
+// CLAIM HISTORY — SvcRequests filed against this warranty
+// ============================================================
+print '<div class="div-table-responsive-no-min">';
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre">';
+print '<td colspan="5">'.$langs->trans('ClaimHistory').'</td>';
+print '</tr>';
+print '<tr class="liste_titre">';
+print '<td>'.$langs->trans('Ref').'</td>';
+print '<td>'.$langs->trans('IssueDate').'</td>';
+print '<td>'.$langs->trans('ResolutionType').'</td>';
+print '<td class="center">'.$langs->trans('Status').'</td>';
+print '<td>'.$langs->trans('AssignedTo').'</td>';
+print '</tr>';
+
+$sqlclaims  = "SELECT r.rowid, r.ref, r.issue_date, r.resolution_type, r.status, r.fk_user_assigned";
+$sqlclaims .= " FROM ".MAIN_DB_PREFIX."svc_request as r";
+$sqlclaims .= " WHERE r.serial_number = '".$db->escape($object->serial_number)."'";
+$sqlclaims .= " AND r.entity IN (".getEntity('svcrequest').")";
+$sqlclaims .= " ORDER BY r.issue_date DESC";
+
+$resqlclaims = $db->query($sqlclaims);
+if ($resqlclaims) {
+	$numclaims = $db->num_rows($resqlclaims);
+	if ($numclaims == 0) {
+		print '<tr class="oddeven"><td colspan="5"><span class="opacitymedium">'.$langs->trans('NoClaims').'</span></td></tr>';
+	}
+	$i = 0;
+	while ($i < $numclaims) {
+		$claim = $db->fetch_object($resqlclaims);
+		print '<tr class="oddeven">';
+		print '<td><a href="'.DOL_URL_ROOT.'/custom/warrantysvc/card.php?id='.$claim->rowid.'">'.dol_escape_htmltag($claim->ref).'</a></td>';
+		print '<td>'.dol_print_date($db->jdate($claim->issue_date), 'day').'</td>';
+		print '<td>'.svcrequest_resolution_label($claim->resolution_type).'</td>';
+		print '<td class="center">'.svcrequest_status_badge($claim->status).'</td>';
+		if ($claim->fk_user_assigned) {
+			$u = new User($db);
+			$u->fetch($claim->fk_user_assigned);
+			print '<td>'.dol_escape_htmltag($u->getFullName($langs)).'</td>';
+		} else {
+			print '<td><span class="opacitymedium">&mdash;</span></td>';
+		}
+		print '</tr>';
+		$i++;
+	}
+	$db->free($resqlclaims);
+} else {
+	print '<tr><td colspan="5">'.$db->lasterror().'</td></tr>';
+}
+
+print '</table>';
+print '</div>';
+
+llxFooter();
+$db->close();
