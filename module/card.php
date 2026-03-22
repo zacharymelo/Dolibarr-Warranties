@@ -75,6 +75,18 @@ if ($action == 'add' && $permwrite) {
 	$object->fk_user_assigned  = GETPOST('fk_user_assigned', 'int');
 	$object->resolution_type   = GETPOST('resolution_type', 'alpha');
 
+	// Manual warranty pairing
+	$fk_warranty_posted = GETPOST('fk_warranty', 'int');
+	if ($fk_warranty_posted > 0) {
+		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarranty.class.php';
+		$w = new SvcWarranty($db);
+		if ($w->fetch($fk_warranty_posted) > 0) {
+			$object->fk_warranty     = $w->id;
+			$object->warranty_status = $w->status;
+			$object->billable        = ($w->status == 'active') ? 0 : 1;
+		}
+	}
+
 	$result = $object->create($user);
 	if ($result > 0) {
 		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$result);
@@ -281,20 +293,26 @@ if ($action == 'confirm_delete' && $permdelete) {
 $form = new Form($db);
 $formcompany = new FormCompany($db);
 
-// Build filtered product list once if the serial/lot restriction setting is on
-$filtered_product_list = null;
+// Build filtered product list: show products that have at least one warranty record.
+// When the serial/lot restriction setting is also on, further restrict to tobatch > 0.
+// Falls back to null (full Ajax select) only if no warranties exist yet.
+$filtered_product_list = array();
+$sql_fp  = "SELECT DISTINCT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
+$sql_fp .= " INNER JOIN ".MAIN_DB_PREFIX."svc_warranty w ON w.fk_product = p.rowid";
+$sql_fp .= " AND w.entity IN (".getEntity('svcwarranty').")";
+$sql_fp .= " WHERE p.entity IN (".getEntity('product').")";
 if (getDolGlobalString('WARRANTYSVC_WARRANTY_REQUIRES_LOTS')) {
-	$sql_fp = "SELECT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
-	$sql_fp .= " WHERE p.status = 1 AND p.tobatch > 0";
-	$sql_fp .= " AND p.entity IN (".getEntity('product').")";
-	$sql_fp .= " ORDER BY p.ref ASC";
-	$res_fp = $db->query($sql_fp);
-	$filtered_product_list = array();
-	if ($res_fp) {
-		while ($obj_fp = $db->fetch_object($res_fp)) {
-			$filtered_product_list[$obj_fp->rowid] = $obj_fp->ref.($obj_fp->label ? ' — '.$obj_fp->label : '');
-		}
+	$sql_fp .= " AND p.tobatch > 0";
+}
+$sql_fp .= " ORDER BY p.ref ASC";
+$res_fp = $db->query($sql_fp);
+if ($res_fp) {
+	while ($obj_fp = $db->fetch_object($res_fp)) {
+		$filtered_product_list[$obj_fp->rowid] = $obj_fp->ref.($obj_fp->label ? ' — '.$obj_fp->label : '');
 	}
+}
+if (empty($filtered_product_list)) {
+	$filtered_product_list = null; // no warranties on record yet — fall back to full product select
 }
 
 llxHeader('', ($id ? $object->ref : $langs->trans('NewSvcRequest')), '');
@@ -323,13 +341,33 @@ if ($action == 'create') {
 	if (!is_null($filtered_product_list)) {
 		print Form::selectarray('fk_product', $filtered_product_list, '', 1, 0, 0, '', 0, 0, 0, '', 'flat minwidth300');
 	} else {
-		$form->select_produits(0, 'fk_product', '', 0, 0, 1, 2, '', 0, array(), 0, '1', 0, 'minwidth300');
+		$form->select_produits(0, 'fk_product', '', 0, 0, -1, 0, '', 1, 0, 'minwidth300');
 	}
 	print '</td></tr>';
 
 	// Serial number
 	print '<tr><td>'.$langs->trans('SerialNumber').'</td>';
 	print '<td><input type="text" name="serial_number" class="minwidth200" autocomplete="off">';
+	print '</td></tr>';
+
+	// Warranty (optional manual pairing)
+	print '<tr><td>'.$langs->trans('SvcWarranty').'</td>';
+	print '<td>';
+	$sql_w = "SELECT rowid, ref, serial_number, status FROM ".MAIN_DB_PREFIX."svc_warranty";
+	$sql_w .= " WHERE entity = ".((int) $conf->entity)." ORDER BY ref ASC";
+	$res_w = $db->query($sql_w);
+	$warranty_opts = array('' => '');
+	if ($res_w) {
+		while ($ow = $db->fetch_object($res_w)) {
+			$label = $ow->ref;
+			if ($ow->serial_number) {
+				$label .= ' — '.$ow->serial_number;
+			}
+			$label .= ' ('.$ow->status.')';
+			$warranty_opts[$ow->rowid] = $label;
+		}
+	}
+	print Form::selectarray('fk_warranty', $warranty_opts, GETPOST('fk_warranty', 'int'), 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
 	print '</td></tr>';
 
 	// Resolution type — chosen at intake so the workflow is immediately clear
@@ -445,7 +483,7 @@ if ($action == 'create') {
 		if (!is_null($filtered_product_list)) {
 			print Form::selectarray('fk_product', $filtered_product_list, $object->fk_product, 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth200');
 		} else {
-			$form->select_produits($object->fk_product, 'fk_product', '', 0, 0, 1, 2, '', 0, array(), 0, '1', 0, 'minwidth200');
+			$form->select_produits($object->fk_product, 'fk_product', '', 0, 0, -1, 0, '', 1, 0, 'minwidth200');
 		}
 	} else {
 		require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
