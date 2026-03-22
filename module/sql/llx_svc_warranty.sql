@@ -1,0 +1,27 @@
+-- Copyright (C) 2026 DPG Supply
+CREATE TABLE llx_svc_warranty(
+	rowid                  INTEGER AUTO_INCREMENT PRIMARY KEY,
+	ref                    VARCHAR(30),
+	entity                 INTEGER       NOT NULL DEFAULT 1,
+	fk_product             INTEGER       NOT NULL,
+	serial_number          VARCHAR(128)  NOT NULL,
+	fk_soc                 INTEGER       NOT NULL,
+	warranty_type          VARCHAR(50),
+	start_date             DATE          NOT NULL,
+	expiry_date            DATE,
+	coverage_months        INTEGER,
+	coverage_terms         TEXT,
+	exclusions             TEXT,
+	status                 VARCHAR(20)   NOT NULL DEFAULT 'active',
+	fk_contract            INTEGER,
+	fk_commande            INTEGER,
+	fk_expedition          INTEGER,
+	claim_count            INTEGER       DEFAULT 0,
+	total_claimed_value    DECIMAL(24,8) DEFAULT 0,
+	date_creation          DATETIME      NOT NULL,
+	tms                    TIMESTAMP,
+	fk_user_creat          INTEGER,
+	import_key             VARCHAR(14),
+	note_private           TEXT,
+	note_public            TEXT
+) ENGINE=innodb;

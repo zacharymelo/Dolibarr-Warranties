@@ -1,0 +1,5 @@
+# Docker volumes
+*.log
+
+# macOS
+.DS_Store

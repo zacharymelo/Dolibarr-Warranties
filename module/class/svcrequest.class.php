@@ -1,0 +1,1045 @@
+<?php
+/* Copyright (C) 2026 DPG Supply
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ */
+
+/**
+ * \file    class/svcrequest.class.php
+ * \ingroup warrantysvc
+ * \brief   Class for RMA case management
+ */
+
+require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
+
+/**
+ * Class to manage RMA cases
+ */
+class SvcRequest extends CommonObject
+{
+	/** @var string Trigger prefix */
+	public $TRIGGER_PREFIX = 'WARRANTYSVC';
+
+	/** @var string Element name */
+	public $element = 'warrantysvc';
+
+	/** @var string Table name (without prefix) */
+	public $table_element = 'svc_request';
+
+	/** @var string Table line name */
+	public $table_element_line = 'svc_request_line';
+
+	/** @var string Class name for lines */
+	public $class_element_line = 'SvcRequestLine';
+
+	/** @var string Icon */
+	public $picto = 'technic';
+
+	/** @var string Ref field name in table */
+	protected $table_ref_field = 'ref';
+
+	// Status constants
+	const STATUS_DRAFT         = 0;
+	const STATUS_VALIDATED     = 1;
+	const STATUS_IN_PROGRESS   = 2;
+	const STATUS_AWAIT_RETURN  = 3;
+	const STATUS_RESOLVED      = 4;
+	const STATUS_CLOSED        = 5;
+	const STATUS_CANCELLED     = 9;
+
+	// Resolution type constants
+	const RESOLUTION_COMPONENT         = 'component';
+	const RESOLUTION_COMPONENT_RETURN  = 'component_return';
+	const RESOLUTION_SWAP_CROSS        = 'swap_cross';
+	const RESOLUTION_SWAP_WAIT         = 'swap_wait';
+	const RESOLUTION_INTERVENTION      = 'intervention';
+	const RESOLUTION_GUIDANCE          = 'guidance';
+
+	/** @var array Field definitions for ORM */
+	public $fields = array(
+		'rowid'                => array('type' => 'integer',      'label' => 'TechnicalID',      'enabled' => 1, 'visible' => -1, 'notnull' => 1, 'position' => 10),
+		'ref'                  => array('type' => 'varchar(30)',   'label' => 'Ref',              'enabled' => 1, 'visible' => 1,  'notnull' => 1, 'showoncombobox' => 1, 'position' => 20),
+		'entity'               => array('type' => 'integer',      'label' => 'Entity',           'enabled' => 1, 'visible' => -2, 'notnull' => 1, 'position' => 25),
+		'fk_soc'               => array('type' => 'integer:Societe:societe/class/societe.class.php', 'label' => 'ThirdParty', 'enabled' => 1, 'visible' => 1, 'notnull' => 1, 'position' => 30),
+		'fk_product'           => array('type' => 'integer:Product:product/class/product.class.php', 'label' => 'Product',    'enabled' => 1, 'visible' => 1, 'notnull' => 1, 'position' => 35),
+		'serial_number'        => array('type' => 'varchar(128)', 'label' => 'SerialNumber',     'enabled' => 1, 'visible' => 1,  'position' => 40),
+		'fk_contact'           => array('type' => 'integer:Contact:contact/class/contact.class.php', 'label' => 'Contact', 'enabled' => 1, 'visible' => -1, 'position' => 45),
+		'customer_site'        => array('type' => 'varchar(255)', 'label' => 'CustomerSite',     'enabled' => 1, 'visible' => -1, 'position' => 50),
+		'fk_project'           => array('type' => 'integer:Project:projet/class/project.class.php:1:(fk_statut:=:1)', 'label' => 'Project', 'enabled' => 'isModEnabled("project")', 'visible' => -1, 'position' => 55),
+		'fk_commande'          => array('type' => 'integer:Commande:commande/class/commande.class.php', 'label' => 'Order', 'enabled' => 'isModEnabled("order")', 'visible' => -1, 'position' => 60),
+		'fk_expedition_origin' => array('type' => 'integer',      'label' => 'OriginShipment',   'enabled' => 1, 'visible' => -1, 'position' => 65),
+		'fk_lot'               => array('type' => 'integer',      'label' => 'Lot',              'enabled' => 1, 'visible' => -1, 'position' => 70),
+		'issue_description'    => array('type' => 'text',         'label' => 'IssueDescription', 'enabled' => 1, 'visible' => 1,  'position' => 80),
+		'issue_date'           => array('type' => 'datetime',     'label' => 'IssueDate',        'enabled' => 1, 'visible' => 1,  'position' => 85),
+		'reported_via'         => array('type' => 'varchar(50)',  'label' => 'ReportedVia',      'enabled' => 1, 'visible' => -1, 'position' => 90),
+		'fk_pbxcall'           => array('type' => 'integer',      'label' => 'PBXCall',          'enabled' => 1, 'visible' => -1, 'position' => 95),
+		'resolution_type'      => array('type' => 'varchar(50)',  'label' => 'ResolutionType',   'enabled' => 1, 'visible' => 1,  'position' => 100),
+		'resolution_notes'     => array('type' => 'text',         'label' => 'ResolutionNotes',  'enabled' => 1, 'visible' => -1, 'position' => 105),
+		'fk_warranty'          => array('type' => 'integer',      'label' => 'Warranty',         'enabled' => 1, 'visible' => -1, 'position' => 110),
+		'warranty_status'      => array('type' => 'varchar(20)',  'label' => 'WarrantyStatus',   'enabled' => 1, 'visible' => 1,  'position' => 115),
+		'billable'             => array('type' => 'integer',      'label' => 'Billable',         'enabled' => 1, 'visible' => 1,  'position' => 120),
+		'fk_facture'           => array('type' => 'integer',      'label' => 'Invoice',          'enabled' => 1, 'visible' => -1, 'position' => 125),
+		'serial_in'            => array('type' => 'varchar(128)', 'label' => 'SerialIn',         'enabled' => 1, 'visible' => 1,  'position' => 130),
+		'serial_out'           => array('type' => 'varchar(128)', 'label' => 'SerialOut',        'enabled' => 1, 'visible' => 1,  'position' => 135),
+		'fk_warehouse_source'  => array('type' => 'integer',      'label' => 'WarehouseSource',  'enabled' => 1, 'visible' => -1, 'position' => 140),
+		'fk_warehouse_return'  => array('type' => 'integer',      'label' => 'WarehouseReturn',  'enabled' => 1, 'visible' => -1, 'position' => 145),
+		'outbound_carrier'     => array('type' => 'varchar(100)', 'label' => 'OutboundCarrier',  'enabled' => 1, 'visible' => -1, 'position' => 150),
+		'outbound_tracking'    => array('type' => 'varchar(100)', 'label' => 'OutboundTracking', 'enabled' => 1, 'visible' => -1, 'position' => 155),
+		'date_shipped'         => array('type' => 'datetime',     'label' => 'DateShipped',      'enabled' => 1, 'visible' => -1, 'position' => 160),
+		'fk_shipment'          => array('type' => 'integer',      'label' => 'Shipment',         'enabled' => 1, 'visible' => -1, 'position' => 165),
+		'return_carrier'       => array('type' => 'varchar(100)', 'label' => 'ReturnCarrier',    'enabled' => 1, 'visible' => -1, 'position' => 170),
+		'return_tracking'      => array('type' => 'varchar(100)', 'label' => 'ReturnTracking',   'enabled' => 1, 'visible' => -1, 'position' => 175),
+		'date_return_expected' => array('type' => 'date',         'label' => 'DateReturnExpected', 'enabled' => 1, 'visible' => -1, 'position' => 180),
+		'date_return_received' => array('type' => 'datetime',     'label' => 'DateReturnReceived', 'enabled' => 1, 'visible' => -1, 'position' => 185),
+		'return_reminder_count'=> array('type' => 'integer',      'label' => 'ReturnReminderCount','enabled' => 1,'visible' => -1, 'position' => 190),
+		'fk_reception'         => array('type' => 'integer',      'label' => 'Reception',        'enabled' => 1, 'visible' => -1, 'position' => 195),
+		'fk_intervention'      => array('type' => 'integer',      'label' => 'Intervention',     'enabled' => 1, 'visible' => -1, 'position' => 200),
+		'fk_user_assigned'     => array('type' => 'integer:User:user/class/user.class.php', 'label' => 'AssignedTo', 'enabled' => 1, 'visible' => 1, 'position' => 205),
+		'status'               => array('type' => 'integer',      'label' => 'Status',           'enabled' => 1, 'visible' => 1,  'notnull' => 1, 'position' => 500),
+		'date_creation'        => array('type' => 'datetime',     'label' => 'DateCreation',     'enabled' => 1, 'visible' => -1, 'position' => 510),
+		'date_validation'      => array('type' => 'datetime',     'label' => 'DateValidation',   'enabled' => 1, 'visible' => -1, 'position' => 515),
+		'date_closed'          => array('type' => 'datetime',     'label' => 'DateClosed',       'enabled' => 1, 'visible' => -1, 'position' => 520),
+		'tms'                  => array('type' => 'timestamp',    'label' => 'DateModification', 'enabled' => 1, 'visible' => -1, 'position' => 530),
+		'fk_user_creat'        => array('type' => 'integer:User:user/class/user.class.php', 'label' => 'UserCreation', 'enabled' => 1, 'visible' => -2, 'position' => 540),
+		'fk_user_valid'        => array('type' => 'integer:User:user/class/user.class.php', 'label' => 'UserValidation', 'enabled' => 1, 'visible' => -1, 'position' => 545),
+		'fk_user_close'        => array('type' => 'integer:User:user/class/user.class.php', 'label' => 'UserClose', 'enabled' => 1, 'visible' => -1, 'position' => 550),
+		'import_key'           => array('type' => 'varchar(14)',  'label' => 'ImportId',         'enabled' => 1, 'visible' => -2, 'position' => 555),
+		'model_pdf'            => array('type' => 'varchar(255)', 'label' => 'PDFTemplate',      'enabled' => 1, 'visible' => 0,  'position' => 560),
+		'note_private'         => array('type' => 'html',         'label' => 'NotePrivate',      'enabled' => 1, 'visible' => 0,  'position' => 570),
+		'note_public'          => array('type' => 'html',         'label' => 'NotePublic',       'enabled' => 1, 'visible' => 0,  'position' => 575),
+	);
+
+	// Public properties mapped from DB columns
+	public $ref;
+	public $entity;
+	public $fk_soc;
+	public $socid; // alias for compatibility
+	public $fk_product;
+	public $serial_number;
+	public $fk_contact;
+	public $customer_site;
+	public $fk_project;
+	public $fk_commande;
+	public $fk_expedition_origin;
+	public $fk_lot;
+	public $issue_description;
+	public $issue_date;
+	public $reported_via;
+	public $fk_pbxcall;
+	public $resolution_type;
+	public $resolution_notes;
+	public $fk_warranty;
+	public $warranty_status;
+	public $billable;
+	public $fk_facture;
+	public $serial_in;
+	public $serial_out;
+	public $fk_warehouse_source;
+	public $fk_warehouse_return;
+	public $outbound_carrier;
+	public $outbound_tracking;
+	public $date_shipped;
+	public $fk_shipment;
+	public $return_carrier;
+	public $return_tracking;
+	public $date_return_expected;
+	public $date_return_received;
+	public $return_reminder_count = 0;
+	public $fk_reception;
+	public $fk_intervention;
+	public $fk_user_assigned;
+	public $status = self::STATUS_DRAFT;
+	public $date_creation;
+	public $date_validation;
+	public $date_closed;
+	public $fk_user_creat;
+	public $fk_user_valid;
+	public $fk_user_close;
+	public $import_key;
+	public $model_pdf;
+	public $note_private;
+	public $note_public;
+
+	/** @var SvcRequestLine[] lines */
+	public $lines = array();
+
+	/**
+	 * Constructor
+	 *
+	 * @param DoliDB $db Database handler
+	 */
+	public function __construct($db)
+	{
+		$this->db = $db;
+	}
+
+	/**
+	 * Create RMA case in database
+	 *
+	 * @param  User $user      User creating the record
+	 * @param  int  $notrigger 0=launch triggers, 1=disable
+	 * @return int             >0 if OK, <0 if KO
+	 */
+	public function create($user, $notrigger = 0)
+	{
+		global $conf;
+
+		$error = 0;
+
+		$this->db->begin();
+
+		// Generate ref
+		if (empty($this->ref) || $this->ref == '(PROV)') {
+			$this->ref = $this->getNextNumRef();
+		}
+
+		$now = dol_now();
+		$this->date_creation = $now;
+		$this->fk_user_creat = $user->id;
+		if (empty($this->status)) {
+			$this->status = self::STATUS_DRAFT;
+		}
+		if (empty($this->issue_date)) {
+			$this->issue_date = $now;
+		}
+
+		// fk_soc alias
+		if (!empty($this->socid) && empty($this->fk_soc)) {
+			$this->fk_soc = $this->socid;
+		}
+
+		$sql = "INSERT INTO ".MAIN_DB_PREFIX."svc_request (";
+		$sql .= " ref, entity, fk_soc, fk_product, serial_number, fk_contact, customer_site,";
+		$sql .= " fk_project, fk_commande, fk_expedition_origin, fk_lot,";
+		$sql .= " issue_description, issue_date, reported_via, fk_pbxcall,";
+		$sql .= " resolution_type, resolution_notes,";
+		$sql .= " fk_warranty, warranty_status, billable,";
+		$sql .= " serial_in, serial_out, fk_warehouse_source, fk_warehouse_return,";
+		$sql .= " fk_user_assigned, status,";
+		$sql .= " date_creation, fk_user_creat,";
+		$sql .= " model_pdf, note_private, note_public";
+		$sql .= ") VALUES (";
+		$sql .= " '".$this->db->escape($this->ref)."'";
+		$sql .= ", ".((int) $conf->entity);
+		$sql .= ", ".((int) $this->fk_soc);
+		$sql .= ", ".((int) $this->fk_product);
+		$sql .= ", ".($this->serial_number ? "'".$this->db->escape($this->serial_number)."'" : "NULL");
+		$sql .= ", ".($this->fk_contact > 0 ? ((int) $this->fk_contact) : "NULL");
+		$sql .= ", ".($this->customer_site ? "'".$this->db->escape($this->customer_site)."'" : "NULL");
+		$sql .= ", ".($this->fk_project > 0 ? ((int) $this->fk_project) : "NULL");
+		$sql .= ", ".($this->fk_commande > 0 ? ((int) $this->fk_commande) : "NULL");
+		$sql .= ", ".($this->fk_expedition_origin > 0 ? ((int) $this->fk_expedition_origin) : "NULL");
+		$sql .= ", ".($this->fk_lot > 0 ? ((int) $this->fk_lot) : "NULL");
+		$sql .= ", ".($this->issue_description ? "'".$this->db->escape($this->issue_description)."'" : "NULL");
+		$sql .= ", '".$this->db->idate($this->issue_date)."'";
+		$sql .= ", ".($this->reported_via ? "'".$this->db->escape($this->reported_via)."'" : "NULL");
+		$sql .= ", ".($this->fk_pbxcall > 0 ? ((int) $this->fk_pbxcall) : "NULL");
+		$sql .= ", ".($this->resolution_type ? "'".$this->db->escape($this->resolution_type)."'" : "NULL");
+		$sql .= ", ".($this->resolution_notes ? "'".$this->db->escape($this->resolution_notes)."'" : "NULL");
+		$sql .= ", ".($this->fk_warranty > 0 ? ((int) $this->fk_warranty) : "NULL");
+		$sql .= ", '".$this->db->escape($this->warranty_status ? $this->warranty_status : 'none')."'";
+		$sql .= ", ".((int) $this->billable);
+		$sql .= ", ".($this->serial_in ? "'".$this->db->escape($this->serial_in)."'" : "NULL");
+		$sql .= ", ".($this->serial_out ? "'".$this->db->escape($this->serial_out)."'" : "NULL");
+		$sql .= ", ".($this->fk_warehouse_source > 0 ? ((int) $this->fk_warehouse_source) : "NULL");
+		$sql .= ", ".($this->fk_warehouse_return > 0 ? ((int) $this->fk_warehouse_return) : "NULL");
+		$sql .= ", ".($this->fk_user_assigned > 0 ? ((int) $this->fk_user_assigned) : "NULL");
+		$sql .= ", ".((int) $this->status);
+		$sql .= ", '".$this->db->idate($this->date_creation)."'";
+		$sql .= ", ".((int) $this->fk_user_creat);
+		$sql .= ", ".($this->model_pdf ? "'".$this->db->escape($this->model_pdf)."'" : "NULL");
+		$sql .= ", ".($this->note_private ? "'".$this->db->escape($this->note_private)."'" : "NULL");
+		$sql .= ", ".($this->note_public ? "'".$this->db->escape($this->note_public)."'" : "NULL");
+		$sql .= ")";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$error++;
+			$this->errors[] = $this->db->lasterror();
+		}
+
+		if (!$error) {
+			$this->id = $this->db->last_insert_id(MAIN_DB_PREFIX.'svc_request');
+
+			if (!$notrigger) {
+				$result = $this->call_trigger('WARRANTYSVC_CREATE', $user);
+				if ($result < 0) {
+					$error++;
+				}
+			}
+		}
+
+		if ($error) {
+			$this->db->rollback();
+			return -1;
+		}
+
+		$this->db->commit();
+		return $this->id;
+	}
+
+	/**
+	 * Load RMA case from database
+	 *
+	 * @param  int    $id   ID
+	 * @param  string $ref  Ref
+	 * @return int          >0 if OK, 0 if not found, <0 if KO
+	 */
+	public function fetch($id, $ref = '')
+	{
+		global $conf;
+
+		$sql = "SELECT t.rowid, t.ref, t.entity, t.fk_soc, t.fk_product, t.serial_number,";
+		$sql .= " t.fk_contact, t.customer_site, t.fk_project, t.fk_commande,";
+		$sql .= " t.fk_expedition_origin, t.fk_lot,";
+		$sql .= " t.issue_description, t.issue_date, t.reported_via, t.fk_pbxcall,";
+		$sql .= " t.resolution_type, t.resolution_notes,";
+		$sql .= " t.fk_warranty, t.warranty_status, t.billable, t.fk_facture,";
+		$sql .= " t.serial_in, t.serial_out, t.fk_warehouse_source, t.fk_warehouse_return,";
+		$sql .= " t.outbound_carrier, t.outbound_tracking, t.date_shipped, t.fk_shipment,";
+		$sql .= " t.return_carrier, t.return_tracking, t.date_return_expected, t.date_return_received,";
+		$sql .= " t.return_reminder_count, t.fk_reception, t.fk_intervention,";
+		$sql .= " t.fk_user_assigned, t.status,";
+		$sql .= " t.date_creation, t.date_validation, t.date_closed, t.tms,";
+		$sql .= " t.fk_user_creat, t.fk_user_valid, t.fk_user_close,";
+		$sql .= " t.import_key, t.model_pdf, t.last_main_doc,";
+		$sql .= " t.note_private, t.note_public";
+		$sql .= " FROM ".MAIN_DB_PREFIX."svc_request as t";
+		if ($id) {
+			$sql .= " WHERE t.rowid = ".((int) $id);
+		} elseif ($ref) {
+			$sql .= " WHERE t.ref = '".$this->db->escape($ref)."' AND t.entity = ".$conf->entity;
+		} else {
+			return -1;
+		}
+
+		$resql = $this->db->query($sql);
+		if ($resql) {
+			$obj = $this->db->fetch_object($resql);
+			if ($obj) {
+				$this->id                   = $obj->rowid;
+				$this->ref                  = $obj->ref;
+				$this->entity               = $obj->entity;
+				$this->fk_soc               = $obj->fk_soc;
+				$this->socid                = $obj->fk_soc;
+				$this->fk_product           = $obj->fk_product;
+				$this->serial_number        = $obj->serial_number;
+				$this->fk_contact           = $obj->fk_contact;
+				$this->customer_site        = $obj->customer_site;
+				$this->fk_project           = $obj->fk_project;
+				$this->fk_commande          = $obj->fk_commande;
+				$this->fk_expedition_origin = $obj->fk_expedition_origin;
+				$this->fk_lot               = $obj->fk_lot;
+				$this->issue_description    = $obj->issue_description;
+				$this->issue_date           = $this->db->jdate($obj->issue_date);
+				$this->reported_via         = $obj->reported_via;
+				$this->fk_pbxcall           = $obj->fk_pbxcall;
+				$this->resolution_type      = $obj->resolution_type;
+				$this->resolution_notes     = $obj->resolution_notes;
+				$this->fk_warranty          = $obj->fk_warranty;
+				$this->warranty_status      = $obj->warranty_status;
+				$this->billable             = $obj->billable;
+				$this->fk_facture           = $obj->fk_facture;
+				$this->serial_in            = $obj->serial_in;
+				$this->serial_out           = $obj->serial_out;
+				$this->fk_warehouse_source  = $obj->fk_warehouse_source;
+				$this->fk_warehouse_return  = $obj->fk_warehouse_return;
+				$this->outbound_carrier     = $obj->outbound_carrier;
+				$this->outbound_tracking    = $obj->outbound_tracking;
+				$this->date_shipped         = $this->db->jdate($obj->date_shipped);
+				$this->fk_shipment          = $obj->fk_shipment;
+				$this->return_carrier       = $obj->return_carrier;
+				$this->return_tracking      = $obj->return_tracking;
+				$this->date_return_expected = $this->db->jdate($obj->date_return_expected);
+				$this->date_return_received = $this->db->jdate($obj->date_return_received);
+				$this->return_reminder_count = $obj->return_reminder_count;
+				$this->fk_reception         = $obj->fk_reception;
+				$this->fk_intervention      = $obj->fk_intervention;
+				$this->fk_user_assigned     = $obj->fk_user_assigned;
+				$this->status               = $obj->status;
+				$this->date_creation        = $this->db->jdate($obj->date_creation);
+				$this->date_validation      = $this->db->jdate($obj->date_validation);
+				$this->date_closed          = $this->db->jdate($obj->date_closed);
+				$this->tms                  = $this->db->jdate($obj->tms);
+				$this->fk_user_creat        = $obj->fk_user_creat;
+				$this->fk_user_valid        = $obj->fk_user_valid;
+				$this->fk_user_close        = $obj->fk_user_close;
+				$this->import_key           = $obj->import_key;
+				$this->model_pdf            = $obj->model_pdf;
+				$this->last_main_doc        = $obj->last_main_doc;
+				$this->note_private         = $obj->note_private;
+				$this->note_public          = $obj->note_public;
+
+				// Fetch lines
+				$this->fetchLines();
+
+				return 1;
+			}
+			return 0;
+		}
+
+		$this->error = $this->db->lasterror();
+		return -1;
+	}
+
+	/**
+	 * Fetch lines for this RMA case
+	 *
+	 * @return int >0 if OK, <0 if KO
+	 */
+	public function fetchLines()
+	{
+		$this->lines = array();
+
+		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcrequestline.class.php';
+
+		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."svc_request_line";
+		$sql .= " WHERE fk_svc_request = ".((int) $this->id);
+		$sql .= " ORDER BY rang ASC, rowid ASC";
+
+		$resql = $this->db->query($sql);
+		if ($resql) {
+			while ($obj = $this->db->fetch_object($resql)) {
+				$line = new SvcRequestLine($this->db);
+				$line->fetch($obj->rowid);
+				$this->lines[] = $line;
+			}
+			return 1;
+		}
+
+		$this->error = $this->db->lasterror();
+		return -1;
+	}
+
+	/**
+	 * Update RMA case in database
+	 *
+	 * @param  User $user      User performing update
+	 * @param  int  $notrigger 0=launch triggers, 1=disable
+	 * @return int             >0 if OK, <0 if KO
+	 */
+	public function update($user, $notrigger = 0)
+	{
+		$error = 0;
+
+		$this->db->begin();
+
+		if (!empty($this->socid) && empty($this->fk_soc)) {
+			$this->fk_soc = $this->socid;
+		}
+
+		$sql = "UPDATE ".MAIN_DB_PREFIX."svc_request SET";
+		$sql .= " fk_soc = ".((int) $this->fk_soc);
+		$sql .= ", fk_product = ".((int) $this->fk_product);
+		$sql .= ", serial_number = ".($this->serial_number ? "'".$this->db->escape($this->serial_number)."'" : "NULL");
+		$sql .= ", fk_contact = ".($this->fk_contact > 0 ? ((int) $this->fk_contact) : "NULL");
+		$sql .= ", customer_site = ".($this->customer_site ? "'".$this->db->escape($this->customer_site)."'" : "NULL");
+		$sql .= ", fk_project = ".($this->fk_project > 0 ? ((int) $this->fk_project) : "NULL");
+		$sql .= ", fk_commande = ".($this->fk_commande > 0 ? ((int) $this->fk_commande) : "NULL");
+		$sql .= ", fk_expedition_origin = ".($this->fk_expedition_origin > 0 ? ((int) $this->fk_expedition_origin) : "NULL");
+		$sql .= ", fk_lot = ".($this->fk_lot > 0 ? ((int) $this->fk_lot) : "NULL");
+		$sql .= ", issue_description = ".($this->issue_description ? "'".$this->db->escape($this->issue_description)."'" : "NULL");
+		$sql .= ", issue_date = ".($this->issue_date ? "'".$this->db->idate($this->issue_date)."'" : "NULL");
+		$sql .= ", reported_via = ".($this->reported_via ? "'".$this->db->escape($this->reported_via)."'" : "NULL");
+		$sql .= ", fk_pbxcall = ".($this->fk_pbxcall > 0 ? ((int) $this->fk_pbxcall) : "NULL");
+		$sql .= ", resolution_type = ".($this->resolution_type ? "'".$this->db->escape($this->resolution_type)."'" : "NULL");
+		$sql .= ", resolution_notes = ".($this->resolution_notes ? "'".$this->db->escape($this->resolution_notes)."'" : "NULL");
+		$sql .= ", fk_warranty = ".($this->fk_warranty > 0 ? ((int) $this->fk_warranty) : "NULL");
+		$sql .= ", warranty_status = '".$this->db->escape($this->warranty_status ? $this->warranty_status : 'none')."'";
+		$sql .= ", billable = ".((int) $this->billable);
+		$sql .= ", fk_facture = ".($this->fk_facture > 0 ? ((int) $this->fk_facture) : "NULL");
+		$sql .= ", serial_in = ".($this->serial_in ? "'".$this->db->escape($this->serial_in)."'" : "NULL");
+		$sql .= ", serial_out = ".($this->serial_out ? "'".$this->db->escape($this->serial_out)."'" : "NULL");
+		$sql .= ", fk_warehouse_source = ".($this->fk_warehouse_source > 0 ? ((int) $this->fk_warehouse_source) : "NULL");
+		$sql .= ", fk_warehouse_return = ".($this->fk_warehouse_return > 0 ? ((int) $this->fk_warehouse_return) : "NULL");
+		$sql .= ", outbound_carrier = ".($this->outbound_carrier ? "'".$this->db->escape($this->outbound_carrier)."'" : "NULL");
+		$sql .= ", outbound_tracking = ".($this->outbound_tracking ? "'".$this->db->escape($this->outbound_tracking)."'" : "NULL");
+		$sql .= ", date_shipped = ".($this->date_shipped ? "'".$this->db->idate($this->date_shipped)."'" : "NULL");
+		$sql .= ", fk_shipment = ".($this->fk_shipment > 0 ? ((int) $this->fk_shipment) : "NULL");
+		$sql .= ", return_carrier = ".($this->return_carrier ? "'".$this->db->escape($this->return_carrier)."'" : "NULL");
+		$sql .= ", return_tracking = ".($this->return_tracking ? "'".$this->db->escape($this->return_tracking)."'" : "NULL");
+		$sql .= ", date_return_expected = ".($this->date_return_expected ? "'".$this->db->idate($this->date_return_expected)."'" : "NULL");
+		$sql .= ", date_return_received = ".($this->date_return_received ? "'".$this->db->idate($this->date_return_received)."'" : "NULL");
+		$sql .= ", return_reminder_count = ".((int) $this->return_reminder_count);
+		$sql .= ", fk_reception = ".($this->fk_reception > 0 ? ((int) $this->fk_reception) : "NULL");
+		$sql .= ", fk_intervention = ".($this->fk_intervention > 0 ? ((int) $this->fk_intervention) : "NULL");
+		$sql .= ", fk_user_assigned = ".($this->fk_user_assigned > 0 ? ((int) $this->fk_user_assigned) : "NULL");
+		$sql .= ", status = ".((int) $this->status);
+		$sql .= ", model_pdf = ".($this->model_pdf ? "'".$this->db->escape($this->model_pdf)."'" : "NULL");
+		$sql .= ", note_private = ".($this->note_private ? "'".$this->db->escape($this->note_private)."'" : "NULL");
+		$sql .= ", note_public = ".($this->note_public ? "'".$this->db->escape($this->note_public)."'" : "NULL");
+		$sql .= " WHERE rowid = ".((int) $this->id);
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$error++;
+			$this->errors[] = $this->db->lasterror();
+		}
+
+		if (!$error && !$notrigger) {
+			$result = $this->call_trigger('WARRANTYSVC_MODIFY', $user);
+			if ($result < 0) {
+				$error++;
+			}
+		}
+
+		if ($error) {
+			$this->db->rollback();
+			return -1;
+		}
+
+		$this->db->commit();
+		return 1;
+	}
+
+	/**
+	 * Delete RMA case
+	 *
+	 * @param  User $user      User deleting
+	 * @param  int  $notrigger 0=launch triggers, 1=disable
+	 * @return int             >0 if OK, <0 if KO
+	 */
+	public function delete($user, $notrigger = 0)
+	{
+		$error = 0;
+
+		$this->db->begin();
+
+		if (!$notrigger) {
+			$result = $this->call_trigger('WARRANTYSVC_DELETE', $user);
+			if ($result < 0) {
+				$error++;
+			}
+		}
+
+		if (!$error) {
+			// Delete lines first
+			$sql = "DELETE FROM ".MAIN_DB_PREFIX."svc_request_line WHERE fk_svc_request = ".((int) $this->id);
+			if (!$this->db->query($sql)) {
+				$error++;
+				$this->errors[] = $this->db->lasterror();
+			}
+		}
+
+		if (!$error) {
+			$sql = "DELETE FROM ".MAIN_DB_PREFIX."svc_request WHERE rowid = ".((int) $this->id);
+			if (!$this->db->query($sql)) {
+				$error++;
+				$this->errors[] = $this->db->lasterror();
+			}
+		}
+
+		if ($error) {
+			$this->db->rollback();
+			return -1;
+		}
+
+		$this->db->commit();
+		return 1;
+	}
+
+	/**
+	 * Validate the RMA case (move to STATUS_VALIDATED)
+	 *
+	 * @param  User $user      User validating
+	 * @param  int  $notrigger 0=launch triggers, 1=disable
+	 * @return int             >0 if OK, <0 if KO
+	 */
+	public function validate($user, $notrigger = 0)
+	{
+		if ($this->status != self::STATUS_DRAFT) {
+			$this->error = 'SvcRequestNotInDraftStatus';
+			return -1;
+		}
+
+		$this->status          = self::STATUS_VALIDATED;
+		$this->date_validation = dol_now();
+		$this->fk_user_valid   = $user->id;
+
+		// Auto-check warranty status
+		$this->checkWarrantyStatus();
+
+		$result = $this->update($user, $notrigger);
+		if ($result < 0) {
+			return $result;
+		}
+
+		if (!$notrigger) {
+			$this->call_trigger('WARRANTYSVC_VALIDATE', $user);
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Set RMA to In Progress
+	 *
+	 * @param  User $user User performing action
+	 * @return int        >0 if OK, <0 if KO
+	 */
+	public function setInProgress($user)
+	{
+		if ($this->status != self::STATUS_VALIDATED) {
+			$this->error = 'SvcRequestNotInValidatedStatus';
+			return -1;
+		}
+
+		$this->status = self::STATUS_IN_PROGRESS;
+		return $this->update($user);
+	}
+
+	/**
+	 * Mark as awaiting return (for swap_cross / swap_wait resolutions)
+	 *
+	 * @param  User $user User performing action
+	 * @return int        >0 if OK, <0 if KO
+	 */
+	public function setAwaitingReturn($user)
+	{
+		$this->status = self::STATUS_AWAIT_RETURN;
+		return $this->update($user);
+	}
+
+	/**
+	 * Mark as resolved
+	 *
+	 * @param  User $user User performing action
+	 * @return int        >0 if OK, <0 if KO
+	 */
+	public function resolve($user)
+	{
+		$this->status = self::STATUS_RESOLVED;
+		return $this->update($user);
+	}
+
+	/**
+	 * Close the RMA case
+	 *
+	 * @param  User $user      User closing
+	 * @param  int  $notrigger 0=launch triggers, 1=disable
+	 * @return int             >0 if OK, <0 if KO
+	 */
+	public function close($user, $notrigger = 0)
+	{
+		if (!in_array($this->status, array(self::STATUS_RESOLVED, self::STATUS_IN_PROGRESS, self::STATUS_AWAIT_RETURN))) {
+			$this->error = 'SvcRequestCannotBeClosedFromCurrentStatus';
+			return -1;
+		}
+
+		$this->status      = self::STATUS_CLOSED;
+		$this->date_closed = dol_now();
+		$this->fk_user_close = $user->id;
+
+		$result = $this->update($user, $notrigger);
+		if ($result > 0 && !$notrigger) {
+			$this->call_trigger('WARRANTYSVC_CLOSE', $user);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Cancel the RMA case
+	 *
+	 * @param  User $user User cancelling
+	 * @return int        >0 if OK, <0 if KO
+	 */
+	public function cancel($user)
+	{
+		if (in_array($this->status, array(self::STATUS_CLOSED, self::STATUS_CANCELLED))) {
+			$this->error = 'SvcRequestAlreadyClosedOrCancelled';
+			return -1;
+		}
+
+		$this->status = self::STATUS_CANCELLED;
+		return $this->update($user);
+	}
+
+	/**
+	 * Re-open a closed/resolved RMA case back to in_progress
+	 *
+	 * @param  User $user User re-opening
+	 * @return int        >0 if OK, <0 if KO
+	 */
+	public function reopen($user)
+	{
+		$this->status      = self::STATUS_IN_PROGRESS;
+		$this->date_closed = null;
+		$this->fk_user_close = null;
+		return $this->update($user);
+	}
+
+	/**
+	 * Check warranty coverage for this RMA case's serial number.
+	 * Sets $this->warranty_status and $this->billable accordingly.
+	 *
+	 * @return string warranty status: 'active', 'expired', or 'none'
+	 */
+	public function checkWarrantyStatus()
+	{
+		if (empty($this->serial_number)) {
+			$this->warranty_status = 'none';
+			$this->billable        = 1;
+			return 'none';
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarranty.class.php';
+
+		$warranty = new SvcWarranty($this->db);
+		$result   = $warranty->fetchBySerial($this->serial_number);
+
+		if ($result > 0) {
+			$this->fk_warranty     = $warranty->id;
+			$this->warranty_status = $warranty->status;
+			if ($warranty->status == 'active') {
+				$this->billable = 0;
+			} else {
+				$this->billable = 1;
+			}
+			return $warranty->status;
+		}
+
+		$this->warranty_status = 'none';
+		$this->billable        = 1;
+		return 'none';
+	}
+
+	/**
+	 * Whether this RMA is covered under active warranty
+	 *
+	 * @return bool
+	 */
+	public function isWarrantyCovered()
+	{
+		return ($this->warranty_status == 'active');
+	}
+
+	/**
+	 * Create an outbound shipment (Expedition) from this RMA's component lines
+	 *
+	 * @param  int  $warehouse_id Warehouse to ship from
+	 * @param  User $user         User performing action
+	 * @return int                Expedition ID if OK, <0 if KO
+	 */
+	public function createOutboundShipment($warehouse_id, $user)
+	{
+		if (!isModEnabled('expedition')) {
+			$this->error = 'ModuleExpeditionNotEnabled';
+			return -1;
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/expedition/class/expedition.class.php';
+
+		$shipment = new Expedition($this->db);
+		$shipment->socid      = $this->fk_soc;
+		$shipment->origin     = 'warrantysvc';
+		$shipment->origin_id  = $this->id;
+		$shipment->fk_project = $this->fk_project;
+		$shipment->note_private = 'RMA '.$this->ref;
+
+		$shipment_id = $shipment->create($user);
+		if ($shipment_id < 0) {
+			$this->error  = $shipment->error;
+			$this->errors = $shipment->errors;
+			return -1;
+		}
+
+		// Link back
+		$this->fk_shipment  = $shipment_id;
+		$this->date_shipped = dol_now();
+		$this->update($user);
+
+		return $shipment_id;
+	}
+
+	/**
+	 * Link an existing shipment to this RMA
+	 *
+	 * @param  int    $shipment_id Expedition ID
+	 * @param  string $tracking    Tracking number
+	 * @param  string $carrier     Carrier name
+	 * @param  User   $user        User performing action
+	 * @return int                 >0 if OK, <0 if KO
+	 */
+	public function linkShipment($shipment_id, $tracking, $carrier, $user)
+	{
+		$this->fk_shipment      = $shipment_id;
+		$this->outbound_tracking = $tracking;
+		$this->outbound_carrier  = $carrier;
+		$this->date_shipped      = dol_now();
+		return $this->update($user);
+	}
+
+	/**
+	 * Link a reception (return receipt) to this RMA
+	 *
+	 * @param  int    $reception_id  Reception ID
+	 * @param  string $condition     Condition notes for service log
+	 * @param  User   $user          User performing action
+	 * @return int                   >0 if OK, <0 if KO
+	 */
+	public function linkReception($reception_id, $condition, $user)
+	{
+		$this->fk_reception          = $reception_id;
+		$this->date_return_received  = dol_now();
+		return $this->update($user);
+	}
+
+	/**
+	 * Create a linked Intervention (fichinter) for repair work
+	 *
+	 * @param  User   $user User performing action
+	 * @param  string $type 'repair' or 'onsite'
+	 * @return int          Fichinter ID if OK, <0 if KO
+	 */
+	public function createLinkedIntervention($user, $type = 'repair')
+	{
+		if (!isModEnabled('ficheinter')) {
+			$this->error = 'ModuleInterventionNotEnabled';
+			return -1;
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/fichinter/class/fichinter.class.php';
+
+		$intervention = new Fichinter($this->db);
+		$intervention->socid       = $this->fk_soc;
+		$intervention->fk_projet   = $this->fk_project;
+		$intervention->description = 'RMA '.$this->ref.' - '.($this->issue_description ? substr($this->issue_description, 0, 200) : '');
+		$intervention->datec       = dol_now();
+		$intervention->datei       = dol_now();
+
+		// Store back-reference in extrafields
+		$intervention->array_options['options_rma_ref']           = $this->ref;
+		$intervention->array_options['options_rma_serial_in']     = $this->serial_in ? $this->serial_in : $this->serial_number;
+
+		$fichinter_id = $intervention->create($user);
+		if ($fichinter_id < 0) {
+			$this->error  = $intervention->error;
+			$this->errors = $intervention->errors;
+			return -1;
+		}
+
+		$this->fk_intervention = $fichinter_id;
+		$this->update($user);
+
+		return $fichinter_id;
+	}
+
+	/**
+	 * Link an existing intervention to this RMA
+	 *
+	 * @param  int  $fichinter_id Fichinter ID
+	 * @param  User $user         User
+	 * @return int                >0 if OK, <0 if KO
+	 */
+	public function linkIntervention($fichinter_id, $user)
+	{
+		$this->fk_intervention = $fichinter_id;
+		return $this->update($user);
+	}
+
+	/**
+	 * Send overdue return reminder email to customer
+	 *
+	 * @param  User $user User sending reminder
+	 * @return int        >0 if OK, <0 if KO
+	 */
+	public function sendReturnReminder($user)
+	{
+		// TODO: implement email send via Dolibarr CMailFile
+		$this->return_reminder_count++;
+		return $this->update($user);
+	}
+
+	/**
+	 * Generate an invoice for a non-returned unit
+	 *
+	 * @param  User $user     User creating invoice
+	 * @param  bool $validate Auto-validate the invoice
+	 * @return int            Invoice ID if OK, <0 if KO
+	 */
+	public function invoiceForNonReturn($user, $validate = false)
+	{
+		if (!isModEnabled('facture')) {
+			$this->error = 'ModuleFactureNotEnabled';
+			return -1;
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+
+		$invoice = new Facture($this->db);
+		$invoice->socid      = $this->fk_soc;
+		$invoice->type       = Facture::TYPE_STANDARD;
+		$invoice->fk_project = $this->fk_project;
+		$invoice->note_public = 'RMA '.$this->ref.' - Unit not returned by deadline';
+
+		$invoice_id = $invoice->create($user);
+		if ($invoice_id < 0) {
+			$this->error  = $invoice->error;
+			$this->errors = $invoice->errors;
+			return -1;
+		}
+
+		$this->fk_facture = $invoice_id;
+		$this->billable   = 1;
+		$this->update($user);
+
+		return $invoice_id;
+	}
+
+	/**
+	 * Suggest a replacement serial number from refurbished stock
+	 *
+	 * @param  int    $product_id Product ID to match
+	 * @param  string $strategy   'fifo'|'least_serviced'|'best_condition'
+	 * @return string|null        Serial number or null if none available
+	 */
+	public static function suggestReplacementSerial($product_id, $strategy = 'fifo')
+	{
+		// TODO: query llx_product_lot / llx_entrepot to find available serials
+		// Strategy logic to be implemented once warehouse config is known
+		return null;
+	}
+
+	/**
+	 * Cron job: check for overdue returns and send reminders
+	 *
+	 * @return int >0 if OK
+	 */
+	public function checkOverdueReturns()
+	{
+		global $db, $user;
+
+		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."svc_request";
+		$sql .= " WHERE status = ".self::STATUS_AWAIT_RETURN;
+		$sql .= " AND date_return_expected < '".dol_print_date(dol_now() - 7 * 86400, 'dayrfc')."'";
+		$sql .= " AND fk_reception IS NULL";
+
+		$resql = $db->query($sql);
+		if ($resql) {
+			while ($obj = $db->fetch_object($resql)) {
+				$rma = new SvcRequest($db);
+				if ($rma->fetch($obj->rowid) > 0) {
+					$rma->sendReturnReminder($user);
+				}
+			}
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Get next reference number
+	 *
+	 * @param  Societe|null $objsoc Thirdparty (unused, for compatibility)
+	 * @return string               Next ref
+	 */
+	public function getNextNumRef($objsoc = null)
+	{
+		global $db, $conf;
+
+		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/core/modules/warrantysvc/modules_warrantysvc.php';
+		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/core/modules/warrantysvc/mod_warrantysvc_standard.php';
+
+		$mod = new mod_warrantysvc_standard();
+		return $mod->getNextValue($objsoc, $this);
+	}
+
+	/**
+	 * Return label for a status code
+	 *
+	 * @param  int    $status Status code
+	 * @param  int    $mode   0=long label, 1=short, 2=picto+label
+	 * @return string         Label
+	 */
+	public function LibStatut($status, $mode = 0)
+	{
+		global $langs;
+		$langs->load('warrantysvc');
+
+		$statusLabels = array(
+			self::STATUS_DRAFT        => array('label' => 'Draft',        'picto' => 'status0'),
+			self::STATUS_VALIDATED    => array('label' => 'Validated',    'picto' => 'status1'),
+			self::STATUS_IN_PROGRESS  => array('label' => 'InProgress',   'picto' => 'status3'),
+			self::STATUS_AWAIT_RETURN => array('label' => 'AwaitingReturn','picto' => 'status4'),
+			self::STATUS_RESOLVED     => array('label' => 'Resolved',     'picto' => 'status6'),
+			self::STATUS_CLOSED       => array('label' => 'Closed',       'picto' => 'status6'),
+			self::STATUS_CANCELLED    => array('label' => 'Cancelled',    'picto' => 'status9'),
+		);
+
+		$s = isset($statusLabels[$status]) ? $statusLabels[$status] : array('label' => 'Unknown', 'picto' => 'status0');
+
+		if ($mode == 1) {
+			return $langs->trans($s['label']);
+		}
+
+		return '<span class="badge badge-status'.$status.'">'.$langs->trans($s['label']).'</span>';
+	}
+
+	/**
+	 * Return label of resolution type
+	 *
+	 * @param  string $type Resolution type constant
+	 * @return string       Translated label
+	 */
+	public function getResolutionLabel($type = '')
+	{
+		global $langs;
+		$langs->load('warrantysvc');
+
+		if (empty($type)) {
+			$type = $this->resolution_type;
+		}
+
+		$labels = array(
+			self::RESOLUTION_COMPONENT        => 'ResolutionComponent',
+			self::RESOLUTION_COMPONENT_RETURN => 'ResolutionComponentReturn',
+			self::RESOLUTION_SWAP_CROSS       => 'ResolutionSwapCross',
+			self::RESOLUTION_SWAP_WAIT        => 'ResolutionSwapWait',
+			self::RESOLUTION_INTERVENTION     => 'ResolutionIntervention',
+			self::RESOLUTION_GUIDANCE         => 'ResolutionGuidance',
+		);
+
+		return isset($labels[$type]) ? $langs->trans($labels[$type]) : $type;
+	}
+
+	/**
+	 * Load customer serials from their shipment history for a given product
+	 *
+	 * @param  int $fk_soc     Thirdparty ID
+	 * @param  int $fk_product Product ID (0 = all products)
+	 * @return array           Array of serial numbers
+	 */
+	public function getCustomerSerials($fk_soc, $fk_product = 0)
+	{
+		$serials = array();
+
+		$sql = "SELECT DISTINCT pl.batch as serial_number, p.ref as product_ref, p.label as product_label";
+		$sql .= " FROM ".MAIN_DB_PREFIX."expeditiondet_batch edl";
+		$sql .= " JOIN ".MAIN_DB_PREFIX."product_lot pl ON pl.rowid = edl.fk_lot";
+		$sql .= " JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.rowid = edl.fk_expeditiondet";
+		$sql .= " JOIN ".MAIN_DB_PREFIX."expedition e ON e.rowid = ed.fk_expedition";
+		$sql .= " JOIN ".MAIN_DB_PREFIX."product p ON p.rowid = ed.fk_product";
+		$sql .= " WHERE e.fk_soc = ".((int) $fk_soc);
+		if ($fk_product > 0) {
+			$sql .= " AND ed.fk_product = ".((int) $fk_product);
+		}
+		$sql .= " ORDER BY pl.batch ASC";
+
+		$resql = $this->db->query($sql);
+		if ($resql) {
+			while ($obj = $this->db->fetch_object($resql)) {
+				$serials[] = array(
+					'serial'        => $obj->serial_number,
+					'product_ref'   => $obj->product_ref,
+					'product_label' => $obj->product_label,
+				);
+			}
+		}
+
+		return $serials;
+	}
+}
