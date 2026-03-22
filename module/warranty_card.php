@@ -353,8 +353,6 @@ if ($action == 'create_from_shipment') {
 // CREATE FORM
 // ============================================================
 if ($action == 'create') {
-	// Standard mode products/serials are loaded via AJAX scoped to the selected customer.
-	// Only override and manual modes need static product lists built server-side.
 	$prev_mode    = GETPOST('warranty_mode', 'alpha');
 	$prev_product = (int) GETPOST('fk_product', 'int');
 	$prev_serial  = GETPOST('serial_number', 'alpha');
@@ -362,8 +360,8 @@ if ($action == 'create') {
 	if (!in_array($prev_mode, $valid_modes)) {
 		$prev_mode = 'standard';
 	}
-	$std_disabled = false; // Always available — populated via AJAX after customer selection
-	$ovr_disabled = false; // Override is a manual escape hatch — always selectable
+	$std_disabled = false;
+	$ovr_disabled = false;
 
 	// Override mode: all products from any validated shipment (not customer-scoped)
 	$sql_ovr  = "SELECT DISTINCT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
@@ -392,6 +390,70 @@ if ($action == 'create') {
 		while ($row_man = $db->fetch_object($res_man)) {
 			$manual_product_list[$row_man->rowid] = $row_man->ref.($row_man->label ? ' — '.$row_man->label : '');
 		}
+	}
+
+	// Standard mode: server-side product + serial lists when customer/product are known from GET params.
+	// This avoids the Select2 timing problem where AJAX callbacks run after Select2 has initialised.
+	$std_products_server = array();
+	$std_serials_server  = array();
+	$std_preloaded       = false;
+	$prev_socid_early    = (int) GETPOST('fk_soc', 'int');
+	if ($prev_socid_early > 0 && $prev_mode === 'standard') {
+		// Same SQL as ajax/warranty_products.php
+		$sql_sp  = "SELECT DISTINCT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
+		$sql_sp .= " INNER JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.fk_product = p.rowid";
+		$sql_sp .= " INNER JOIN ".MAIN_DB_PREFIX."expedition e ON e.rowid = ed.fk_expedition";
+		$sql_sp .= " INNER JOIN ".MAIN_DB_PREFIX."expeditiondet_batch edb ON edb.fk_expeditiondet = ed.rowid";
+		$sql_sp .= " INNER JOIN ".MAIN_DB_PREFIX."product_lot pl ON pl.batch = edb.batch AND pl.fk_product = p.rowid";
+		$sql_sp .= " WHERE e.fk_soc = ".((int) $prev_socid_early);
+		$sql_sp .= " AND e.fk_statut >= 1";
+		$sql_sp .= " AND e.entity IN (".getEntity('expedition').")";
+		$sql_sp .= " AND p.entity IN (".getEntity('product').")";
+		$sql_sp .= " AND edb.batch IS NOT NULL AND edb.batch != ''";
+		$sql_sp .= " AND edb.batch NOT IN (";
+		$sql_sp .= "   SELECT w.serial_number FROM ".MAIN_DB_PREFIX."svc_warranty w";
+		$sql_sp .= "   WHERE w.serial_number IS NOT NULL AND w.serial_number != ''";
+		$sql_sp .= "   AND w.entity IN (".getEntity('svcwarranty').")";
+		$sql_sp .= " ) ORDER BY p.ref ASC";
+		$res_sp = $db->query($sql_sp);
+		if ($res_sp) {
+			while ($osp = $db->fetch_object($res_sp)) {
+				$std_products_server[] = array('rowid' => (int) $osp->rowid, 'label' => $osp->ref.($osp->label ? ' — '.$osp->label : ''));
+			}
+		}
+		if ($prev_product > 0) {
+			// Same SQL as ajax/warranty_serials.php
+			$sql_ss  = "SELECT edb.batch AS serial_number, e.rowid AS fk_expedition, e.ref AS expedition_ref,";
+			$sql_ss .= " ee.fk_source AS fk_commande, c.ref AS commande_ref";
+			$sql_ss .= " FROM ".MAIN_DB_PREFIX."expeditiondet_batch edb";
+			$sql_ss .= " INNER JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.rowid = edb.fk_expeditiondet";
+			$sql_ss .= " INNER JOIN ".MAIN_DB_PREFIX."expedition e ON e.rowid = ed.fk_expedition";
+			$sql_ss .= " LEFT JOIN ".MAIN_DB_PREFIX."element_element ee ON ee.fk_target = e.rowid AND ee.targettype = 'shipping' AND ee.sourcetype = 'commande'";
+			$sql_ss .= " LEFT JOIN ".MAIN_DB_PREFIX."commande c ON c.rowid = ee.fk_source";
+			$sql_ss .= " WHERE e.fk_soc = ".((int) $prev_socid_early);
+			$sql_ss .= " AND ed.fk_product = ".((int) $prev_product);
+			$sql_ss .= " AND e.fk_statut >= 1";
+			$sql_ss .= " AND e.entity IN (".getEntity('expedition').")";
+			$sql_ss .= " AND edb.batch IS NOT NULL AND edb.batch != ''";
+			$sql_ss .= " AND edb.batch NOT IN (";
+			$sql_ss .= "   SELECT w.serial_number FROM ".MAIN_DB_PREFIX."svc_warranty w";
+			$sql_ss .= "   WHERE w.serial_number IS NOT NULL AND w.serial_number != ''";
+			$sql_ss .= "   AND w.entity IN (".getEntity('svcwarranty').")";
+			$sql_ss .= " ) ORDER BY e.rowid DESC, edb.batch ASC";
+			$res_ss = $db->query($sql_ss);
+			if ($res_ss) {
+				while ($oss = $db->fetch_object($res_ss)) {
+					$std_serials_server[] = array(
+						'serial'         => $oss->serial_number,
+						'fk_expedition'  => (int) $oss->fk_expedition,
+						'expedition_ref' => (string) $oss->expedition_ref,
+						'fk_commande'    => $oss->fk_commande ? (int) $oss->fk_commande : 0,
+						'commande_ref'   => (string) $oss->commande_ref,
+					);
+				}
+			}
+		}
+		$std_preloaded = true;
 	}
 
 	print load_fiche_titre($langs->trans('NewWarranty'), '', 'bill');
@@ -445,11 +507,19 @@ if ($action == 'create') {
 	print $formcompany->select_company(GETPOST('fk_soc', 'int'), 'fk_soc', '(s.client:IN:2,3)', $langs->trans('SelectThird'), 0, 0, null, 0, 'minwidth300 maxwidth500 widthcentpercentminusxx');
 	print '</td></tr>';
 
-	// Product — Standard row (populated via AJAX after customer is selected)
+	// Product — Standard row (server-side when customer known, otherwise AJAX after customer selection)
 	print '<tr id="row_std_product"'.($prev_mode !== 'standard' ? ' style="display:none"' : '').'>';
 	print '<td class="fieldrequired">'.$langs->trans('Product').'</td><td>';
-	print '<select name="fk_product" id="fk_product_std" class="flat minwidth300" disabled>';
-	print '<option value="-1">'.dol_escape_htmltag($langs->trans('SelectCustomerFirst')).'</option>';
+	if ($std_preloaded) {
+		print '<select name="fk_product" id="fk_product_std" class="flat minwidth300"'.(!count($std_products_server) ? ' disabled' : '').'>';
+		print '<option value="-1">— '.dol_escape_htmltag($langs->trans('SelectProduct')).' —</option>';
+		foreach ($std_products_server as $sp) {
+			print '<option value="'.(int) $sp['rowid'].'"'.($sp['rowid'] === $prev_product ? ' selected' : '').'>'.dol_escape_htmltag($sp['label']).'</option>';
+		}
+	} else {
+		print '<select name="fk_product" id="fk_product_std" class="flat minwidth300" disabled>';
+		print '<option value="-1">'.dol_escape_htmltag($langs->trans('SelectCustomerFirst')).'</option>';
+	}
 	print '</select>';
 	print '</td></tr>';
 
@@ -475,12 +545,27 @@ if ($action == 'create') {
 	print '</select>';
 	print '</td></tr>';
 
-	// Serial — Standard row (select from product_lot)
+	// Serial — Standard row (server-side when product known, otherwise AJAX after product selection)
 	print '<tr id="row_std_serial"'.($prev_mode !== 'standard' ? ' style="display:none"' : '').'>';
 	print '<td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td><td>';
-	print '<select name="serial_number" id="manual_serial_select" class="flat minwidth200" disabled>';
-	print '<option value="">'.$langs->trans('SelectProductFirst').'</option>';
-	print '</select>';
+	if ($std_preloaded && $prev_product > 0) {
+		print '<select name="serial_number" id="manual_serial_select" class="flat minwidth200"'.(!count($std_serials_server) ? ' disabled' : '').'>';
+		print '<option value="">— '.dol_escape_htmltag($langs->trans('SelectSerial')).' —</option>';
+		foreach ($std_serials_server as $ss) {
+			print '<option value="'.dol_escape_htmltag($ss['serial']).'"';
+			print ' data-fk-commande="'.(int) $ss['fk_commande'].'"';
+			print ' data-fk-expedition="'.(int) $ss['fk_expedition'].'"';
+			print ' data-commande-ref="'.dol_escape_htmltag($ss['commande_ref']).'"';
+			print ' data-expedition-ref="'.dol_escape_htmltag($ss['expedition_ref']).'"';
+			print ($ss['serial'] === $prev_serial ? ' selected' : '');
+			print '>'.dol_escape_htmltag($ss['serial']).'</option>';
+		}
+		print '</select>';
+	} else {
+		print '<select name="serial_number" id="manual_serial_select" class="flat minwidth200" disabled>';
+		print '<option value="">'.$langs->trans('SelectProductFirst').'</option>';
+		print '</select>';
+	}
 	print '</td></tr>';
 
 	// Serial — Override / Manual row (shared free-text input)
@@ -568,6 +653,12 @@ function resetSerials() {
 	clearOrder();
 }
 
+function notifySelect2(el) {
+	if (typeof jQuery !== "undefined" && jQuery.fn.select2) {
+		jQuery(el).trigger("change.select2");
+	}
+}
+
 function loadWarrantySerials(socid, pid) {
 	if (!stdSerSel) return;
 	pid = parseInt(pid, 10);
@@ -576,27 +667,28 @@ function loadWarrantySerials(socid, pid) {
 	stdSerSel.disabled = true;
 	var loadOpt = document.createElement("option"); loadOpt.value = ""; loadOpt.textContent = "Loading...";
 	stdSerSel.appendChild(loadOpt);
+	notifySelect2(stdSerSel);
 	fetch(ajaxBase + "warranty_serials.php?socid=" + socid + "&fk_product=" + pid)
 		.then(function(r){ return r.json(); })
 		.then(function(serials){
 			stdSerSel.innerHTML = "";
 			if (!serials.length) {
 				var o = document.createElement("option"); o.value = ""; o.textContent = noSerTxt;
-				stdSerSel.appendChild(o); stdSerSel.disabled = true; clearOrder(); return;
+				stdSerSel.appendChild(o); stdSerSel.disabled = true; notifySelect2(stdSerSel); clearOrder(); return;
 			}
 			var blank = document.createElement("option"); blank.value = ""; blank.textContent = selSerTxt;
 			stdSerSel.appendChild(blank);
 			serials.forEach(function(s){
 				var o = document.createElement("option");
 				o.value = s.serial; o.textContent = s.serial;
-				o.dataset.fkCommande   = s.fk_commande   || 0;
-				o.dataset.fkExpedition = s.fk_expedition || 0;
-				o.dataset.commandeRef  = s.commande_ref  || "";
+				o.dataset.fkCommande    = s.fk_commande   || 0;
+				o.dataset.fkExpedition  = s.fk_expedition || 0;
+				o.dataset.commandeRef   = s.commande_ref  || "";
 				o.dataset.expeditionRef = s.expedition_ref || "";
 				stdSerSel.appendChild(o);
 			});
 			stdSerSel.disabled = false;
-			if (prevSerial) { stdSerSel.value = prevSerial; prevSerial = ""; }
+			notifySelect2(stdSerSel);
 			syncOrder();
 		})
 		.catch(function(){ resetSerials(); });
@@ -609,10 +701,11 @@ function loadWarrantyProducts(socid) {
 	stdProdSel.disabled = true;
 	if (!socid || socid <= 0) {
 		var o = document.createElement("option"); o.value = "-1"; o.textContent = selCustTxt;
-		stdProdSel.appendChild(o); resetSerials(); return;
+		stdProdSel.appendChild(o); notifySelect2(stdProdSel); resetSerials(); return;
 	}
 	var loadOpt = document.createElement("option"); loadOpt.value = "-1"; loadOpt.textContent = "Loading...";
 	stdProdSel.appendChild(loadOpt);
+	notifySelect2(stdProdSel);
 	fetch(ajaxBase + "warranty_products.php?socid=" + socid)
 		.then(function(r){ return r.json(); })
 		.then(function(products){
@@ -624,12 +717,7 @@ function loadWarrantyProducts(socid) {
 				stdProdSel.appendChild(o);
 			});
 			stdProdSel.disabled = (products.length === 0);
-			if (prevProduct > 0) {
-				stdProdSel.value = prevProduct;
-				prevProduct = 0;
-				var selectedPid = parseInt(stdProdSel.value, 10);
-				if (selectedPid > 0) { loadWarrantySerials(socid, selectedPid); return; }
-			}
+			notifySelect2(stdProdSel);
 			resetSerials();
 		})
 		.catch(function(){ stdProdSel.disabled = false; });
@@ -661,10 +749,11 @@ function setMode(mode) {
 	if (ordManInp)  ordManInp.disabled  = isStd;
 	// Hidden flag
 	if (ovrValInp) ovrValInp.value = isOvr ? "1" : (isMan ? "2" : "0");
-	// Entering standard: clear order if no serial selected
+	// Entering standard: load products via AJAX only if select is not already populated server-side
 	if (isStd) {
 		var socid = getCurrentSocid();
-		if (socid > 0 && stdProdSel && (!stdProdSel.options.length || stdProdSel.options[0].value == "-1")) {
+		var alreadyLoaded = stdProdSel && stdProdSel.options.length > 1 && stdProdSel.options[0].value == "-1";
+		if (socid > 0 && stdProdSel && !alreadyLoaded) {
 			loadWarrantyProducts(socid);
 		}
 	}
@@ -708,10 +797,18 @@ document.querySelectorAll("[name=warranty_mode]").forEach(function(r) {
 // Init
 var initRadio = document.querySelector("[name=warranty_mode]:checked");
 var initMode  = initRadio ? initRadio.value : "standard";
+var stdServerPreloaded = '.($std_preloaded && $prev_product > 0 ? 'true' : 'false').';
 setMode(initMode);
 if (initMode === "standard") {
-	var initSocid = '.(int) $prev_socid.';
-	if (initSocid > 0) loadWarrantyProducts(initSocid);
+	if (stdServerPreloaded) {
+		// Selects rendered server-side — notify Select2 and sync order from pre-selected serial
+		notifySelect2(stdProdSel);
+		notifySelect2(stdSerSel);
+		syncOrder();
+	} else {
+		var initSocid = '.(int) $prev_socid_early.';
+		if (initSocid > 0) loadWarrantyProducts(initSocid);
+	}
 }
 })();</script>';
 
