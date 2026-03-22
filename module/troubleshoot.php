@@ -94,6 +94,7 @@ if ($action == 'save_findings' && $permwrite) {
 /*
  * View
  */
+$form = new Form($db);
 $head = warrantysvc_prepare_head($object);
 
 llxHeader('', $langs->trans('Troubleshoot').' — '.$object->ref, '');
@@ -151,8 +152,8 @@ print '<br>';
 // Summary text
 print '<div class="tagtable">';
 print '<table class="border centpercent">';
-print '<tr><td class="tdtop" style="width:180px">'.$langs->trans('TroubleshootSummary').'</td>';
-print '<td><textarea name="troubleshoot_summary" class="flat" rows="4" style="width:90%"></textarea></td></tr>';
+print '<tr><td class="tdtop" style="width:180px">'.$form->textwithpicto($langs->trans('TroubleshootSummary'), $langs->trans('TooltipTroubleshootSummary')).'</td>';
+print '<td><textarea name="troubleshoot_summary" class="flat" rows="4" style="width:90%" placeholder="'.$langs->trans('TroubleshootSummaryPlaceholder').'"></textarea></td></tr>';
 
 // Outcome
 $outcomes = array(
@@ -163,7 +164,7 @@ $outcomes = array(
 	'parts_needed'  => $langs->trans('TroubleshootOutcome_parts_needed'),
 	'intervention'  => $langs->trans('TroubleshootOutcome_intervention'),
 );
-print '<tr><td>'.$langs->trans('TroubleshootOutcome').'</td>';
+print '<tr><td>'.$form->textwithpicto($langs->trans('TroubleshootOutcome'), $langs->trans('TooltipTroubleshootOutcome')).'</td>';
 print '<td>';
 print Form::selectarray('troubleshoot_outcome', $outcomes, '', 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth200');
 print '</td></tr>';

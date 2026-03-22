@@ -255,7 +255,7 @@ if ($action == 'create_from_shipment') {
 			print '</td></tr>';
 
 			// Serial number dropdown (only uncovered serials from this shipment)
-			print '<tr><td class="fieldrequired">'.$langs->trans('SerialNumber').'</td>';
+			print '<tr><td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td>';
 			print '<td>';
 			print Form::selectarray('serial_number', $serial_options, dol_escape_htmltag(GETPOST('serial_number', 'alpha')), 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth300', 0, '', '', true);
 			print '</td></tr>';
@@ -265,7 +265,7 @@ if ($action == 'create_from_shipment') {
 			print '<td><span id="product_label" class="opacitymedium">'.$langs->trans('AutoFilledFromSerial').'</span></td></tr>';
 
 			// Warranty type
-			print '<tr><td>'.$langs->trans('WarrantyType').'</td>';
+			print '<tr><td>'.$form->textwithpicto($langs->trans('WarrantyType'), $langs->trans('TooltipWarrantyType')).'</td>';
 			print '<td>';
 			print Form::selectarray('warranty_type', $wtype_options, $selected_wtype, 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth200', 0, '', '', true);
 			print '</td></tr>';
@@ -277,7 +277,7 @@ if ($action == 'create_from_shipment') {
 			print '</td></tr>';
 
 			// Coverage days
-			print '<tr><td>'.$langs->trans('CoverageDays').'</td>';
+			print '<tr><td>'.$form->textwithpicto($langs->trans('CoverageDays'), $langs->trans('TooltipCoverageDays')).'</td>';
 			print '<td>';
 			print '<input type="number" id="coverage_days" name="coverage_days" value="'.$initial_days.'" class="flat width75" min="1" max="3650"'.$days_disabled.'>';
 			print ' '.$langs->trans('Days');
@@ -285,8 +285,8 @@ if ($action == 'create_from_shipment') {
 			print '</td></tr>';
 
 			// Notes
-			print '<tr><td>'.$langs->trans('NotePublic').'</td>';
-			print '<td><textarea name="note_public" class="flat" rows="3" style="width:90%"></textarea></td></tr>';
+			print '<tr><td>'.$form->textwithpicto($langs->trans('NotePublic'), $langs->trans('TooltipNotePublic')).'</td>';
+			print '<td><textarea name="note_public" class="flat" rows="3" style="width:90%" placeholder="'.$langs->trans('NotePublicPlaceholder').'"></textarea></td></tr>';
 
 			print '</table>';
 			print dol_get_fiche_end();
@@ -371,8 +371,8 @@ if ($action == 'create') {
 	print '</td></tr>';
 
 	// Serial number
-	print '<tr><td class="fieldrequired">'.$langs->trans('SerialNumber').'</td>';
-	print '<td><input type="text" name="serial_number" value="'.dol_escape_htmltag(GETPOST('serial_number', 'alpha')).'" class="flat minwidth200"></td></tr>';
+	print '<tr><td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td>';
+	print '<td><input type="text" name="serial_number" value="'.dol_escape_htmltag(GETPOST('serial_number', 'alpha')).'" class="flat minwidth200" placeholder="e.g. SN-20240100123"></td></tr>';
 
 	// Warranty type — load from DB
 	$wtype_items   = SvcWarrantyType::fetchAllForForm($db);
@@ -393,7 +393,7 @@ if ($action == 'create') {
 		}
 	}
 
-	print '<tr><td>'.$langs->trans('WarrantyType').'</td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('WarrantyType'), $langs->trans('TooltipWarrantyType')).'</td>';
 	print '<td>';
 	print Form::selectarray('warranty_type', $wtype_options, $selected_wtype, 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth200', 0, '', '', true);
 	print '</td></tr>';
@@ -406,7 +406,7 @@ if ($action == 'create') {
 
 	// Coverage months — disabled when a type is selected (auto-filled by JS)
 	$days_disabled = ($selected_wtype ? ' disabled style="opacity:0.5"' : '');
-	print '<tr><td>'.$langs->trans('CoverageDays').'</td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('CoverageDays'), $langs->trans('TooltipCoverageDays')).'</td>';
 	print '<td>';
 	print '<input type="number" id="coverage_days" name="coverage_days" value="'.$initial_days.'" class="flat width75" min="1" max="3650"'.$days_disabled.'>';
 	print ' '.$langs->trans('Days');
@@ -442,13 +442,13 @@ if ($action == 'create') {
 </script>';
 
 	// Manual expiry override
-	print '<tr><td>'.$langs->trans('ExpiryDateOverride').'</td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('ExpiryDateOverride'), $langs->trans('TooltipExpiryDateOverride')).'</td>';
 	print '<td>';
 	print $form->selectDate('', 'expiry_date', 0, 0, 1, 'formcreate', 1, 0);
 	print '</td></tr>';
 
 	// Coverage terms
-	print '<tr><td class="tdtop">'.$langs->trans('CoverageTerms').'</td>';
+	print '<tr><td class="tdtop">'.$form->textwithpicto($langs->trans('CoverageTerms'), $langs->trans('TooltipCoverageTerms')).'</td>';
 	print '<td>';
 	require_once DOL_DOCUMENT_ROOT.'/core/class/doleditor.class.php';
 	$doleditor = new DolEditor('coverage_terms', GETPOST('coverage_terms', 'restricthtml'), '', 100, 'dolibarr_notes', '', false, true, getDolGlobalInt('FCKEDITOR_ENABLE_DETAILS'), ROWS_4, '90%');
@@ -456,21 +456,21 @@ if ($action == 'create') {
 	print '</td></tr>';
 
 	// Exclusions
-	print '<tr><td class="tdtop">'.$langs->trans('Exclusions').'</td>';
+	print '<tr><td class="tdtop">'.$form->textwithpicto($langs->trans('Exclusions'), $langs->trans('TooltipExclusions')).'</td>';
 	print '<td>';
 	$doleditor2 = new DolEditor('exclusions', GETPOST('exclusions', 'restricthtml'), '', 100, 'dolibarr_notes', '', false, true, getDolGlobalInt('FCKEDITOR_ENABLE_DETAILS'), ROWS_3, '90%');
 	$doleditor2->Create();
 	print '</td></tr>';
 
 	// Origin order
-	print '<tr><td>'.$langs->trans('OriginOrder').'</td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('OriginOrder'), $langs->trans('TooltipOriginOrder')).'</td>';
 	print '<td>';
 	print '<input type="number" name="fk_commande" value="'.((int) GETPOST('fk_commande', 'int')).'" class="flat width100">';
 	print '</td></tr>';
 
 	// Notes
-	print '<tr><td>'.$langs->trans('NotePublic').'</td>';
-	print '<td><textarea name="note_public" class="flat" rows="3" style="width:90%">'.dol_escape_htmltag(GETPOST('note_public', 'restricthtml'), 1).'</textarea></td></tr>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('NotePublic'), $langs->trans('TooltipNotePublic')).'</td>';
+	print '<td><textarea name="note_public" class="flat" rows="3" style="width:90%" placeholder="'.$langs->trans('NotePublicPlaceholder').'">'.dol_escape_htmltag(GETPOST('note_public', 'restricthtml'), 1).'</textarea></td></tr>';
 
 	print '</table>';
 
@@ -572,7 +572,7 @@ if ($action == 'edit') {
 print '</td></tr>';
 
 // Serial number
-print '<tr><td>'.$langs->trans('SerialNumber').'</td>';
+print '<tr><td>'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td>';
 print '<td>';
 if ($action == 'edit') {
 	print '<input type="text" name="serial_number" value="'.dol_escape_htmltag($object->serial_number).'" class="flat minwidth200">';
@@ -582,7 +582,7 @@ if ($action == 'edit') {
 print '</td></tr>';
 
 // Warranty type
-print '<tr><td>'.$langs->trans('WarrantyType').'</td>';
+print '<tr><td>'.$form->textwithpicto($langs->trans('WarrantyType'), $langs->trans('TooltipWarrantyType')).'</td>';
 print '<td>';
 if ($action == 'edit') {
 	$wtype_items_edit   = SvcWarrantyType::fetchAllForForm($db);
@@ -644,7 +644,7 @@ if ($action == 'edit') {
 print '</td></tr>';
 
 // Coverage months
-print '<tr><td>'.$langs->trans('CoverageDays').'</td>';
+print '<tr><td>'.$form->textwithpicto($langs->trans('CoverageDays'), $langs->trans('TooltipCoverageDays')).'</td>';
 print '<td>';
 if ($action == 'edit') {
 	$edit_days_disabled = ($object->warranty_type ? ' disabled style="opacity:0.5"' : '');
@@ -681,7 +681,7 @@ print '</td></tr>';
 
 // Origin order
 if ($object->fk_commande || $action == 'edit') {
-	print '<tr><td>'.$langs->trans('OriginOrder').'</td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('OriginOrder'), $langs->trans('TooltipOriginOrder')).'</td>';
 	print '<td>';
 	if ($action == 'edit') {
 		print '<input type="number" name="fk_commande" value="'.((int) $object->fk_commande).'" class="flat width100">';

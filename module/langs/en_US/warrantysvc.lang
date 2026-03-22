@@ -367,3 +367,36 @@ AutoFilledFromSerial = Auto-filled when a serial is selected
 NoUncoveredSerialsInShipment = All serialized units in this shipment already have warranty coverage.
 Load = Load
 WarrantyVoided = Warranty has been voided.
+
+#
+# Tooltips — shown as hover help icons on form field labels
+#
+IssueDescriptionPlaceholder = Describe the fault, symptoms, or customer complaint in detail...
+NotePublicPlaceholder = Notes or comments visible to the customer...
+TooltipSerialNumber = The serial or lot number of the customer's defective unit. Used to automatically look up warranty coverage.
+TooltipSvcWarranty = Optional — link to an existing warranty record. If left blank, the system will auto-match by serial number on save.
+TooltipResolutionType = Determines the workflow: whether components are shipped, a unit is swapped, an on-site visit is scheduled, or guidance only is provided.
+TooltipIssueDescription = Describe the fault or complaint as reported by the customer. This text appears on the service authorization PDF.
+TooltipCustomerSite = Physical location or site name where the unit is installed. Helpful for on-site service calls.
+TooltipBillable = When checked, this request will be invoiced to the customer. Automatically set based on warranty status — override here if needed.
+TooltipResolutionNotes = Internal notes on how the issue was resolved. Visible on the closed case record and printed on service summaries.
+TooltipReportedVia = The channel through which the customer reported the issue. Used for intake volume reporting.
+TooltipIssueDate = The date the customer reported the issue — not necessarily today's date.
+TooltipSerialOut = Serial number of the replacement or component unit being sent to the customer.
+TooltipSerialIn = Serial number of the unit being returned by the customer for repair or analysis.
+TooltipWarrantySerial = The unique serial number of the unit covered by this warranty. Must match the serial recorded on the original shipment.
+TooltipWarrantyType = Predefined warranty template that auto-fills the coverage period. Select "No predefined type" to set days manually.
+TooltipCoverageDays = Duration of warranty coverage in days from the start date. Auto-filled when a warranty type is selected.
+TooltipExpiryDateOverride = Optionally set an exact expiry date. Leave blank to auto-compute from start date + coverage days.
+TooltipCoverageTerms = Describe what this warranty covers — parts, labour, on-site service, etc. Printed on warranty documents.
+TooltipExclusions = Explicitly list what is not covered — physical damage, accessories, misuse, etc. Printed on warranty documents.
+TooltipOriginOrder = Dolibarr order ID this warranty originated from. Optional — used for purchase traceability.
+TooltipNotePublic = Notes visible to the customer. Included in warranty registration emails if notifications are enabled.
+TooltipWTypeCode = Short machine-readable identifier, e.g. "standard" or "extended_2yr". Used internally — no spaces allowed.
+TooltipWTypeLabel = Human-readable name shown in warranty type dropdowns and on warranty records.
+TooltipWTypeDescription = Optional description of what this warranty type covers. Visible to staff when choosing a type.
+TooltipWTypeDefaultDays = Coverage duration that auto-fills the warranty form when this type is selected. Can be overridden per warranty.
+TooltipWTypePosition = Controls display order in dropdown menus. Lower numbers appear first.
+TroubleshootSummaryPlaceholder = Summarise what was checked, what symptoms were observed, and what action was recommended...
+TooltipTroubleshootSummary = Overall summary of this diagnostic session — what was checked, what was found, and recommended next steps.
+TooltipTroubleshootOutcome = The result of this session. Selecting "No fault found" will update the resolution type on the service request to Informational.

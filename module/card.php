@@ -346,12 +346,12 @@ if ($action == 'create') {
 	print '</td></tr>';
 
 	// Serial number
-	print '<tr><td>'.$langs->trans('SerialNumber').'</td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipSerialNumber')).'</td>';
 	print '<td><input type="text" name="serial_number" class="minwidth200" autocomplete="off">';
 	print '</td></tr>';
 
 	// Warranty (optional manual pairing)
-	print '<tr><td>'.$langs->trans('SvcWarranty').'</td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('SvcWarranty'), $langs->trans('TooltipSvcWarranty')).'</td>';
 	print '<td>';
 	$sql_w = "SELECT rowid, ref, serial_number, status FROM ".MAIN_DB_PREFIX."svc_warranty";
 	$sql_w .= " WHERE entity = ".((int) $conf->entity)." ORDER BY ref ASC";
@@ -371,13 +371,13 @@ if ($action == 'create') {
 	print '</td></tr>';
 
 	// Resolution type — chosen at intake so the workflow is immediately clear
-	print '<tr><td class="fieldrequired">'.$langs->trans('ResolutionType').'</td>';
+	print '<tr><td class="fieldrequired">'.$form->textwithpicto($langs->trans('ResolutionType'), $langs->trans('TooltipResolutionType')).'</td>';
 	print '<td>';
 	print Form::selectarray('resolution_type', svcrequest_resolution_types(), '', 1, 0, 0, '', 0, 0, 0, '', 'flat minwidth300');
 	print '</td></tr>';
 
 	// Reported via
-	print '<tr><td>'.$langs->trans('ReportedVia').'</td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('ReportedVia'), $langs->trans('TooltipReportedVia')).'</td>';
 	print '<td>';
 	$via_options = array(
 		'phone'   => $langs->trans('ReportedViaPhone'),
@@ -389,16 +389,16 @@ if ($action == 'create') {
 	print '</td></tr>';
 
 	// Issue date
-	print '<tr><td>'.$langs->trans('IssueDate').'</td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('IssueDate'), $langs->trans('TooltipIssueDate')).'</td>';
 	print '<td>'.$form->selectDate(dol_now(), 'issue_date', 0, 0, 0, '', 1, 1).'</td></tr>';
 
 	// Issue description
-	print '<tr><td class="fieldrequired tdtop">'.$langs->trans('IssueDescription').'</td>';
-	print '<td><textarea name="issue_description" class="centpercent" rows="4"></textarea></td></tr>';
+	print '<tr><td class="fieldrequired tdtop">'.$form->textwithpicto($langs->trans('IssueDescription'), $langs->trans('TooltipIssueDescription')).'</td>';
+	print '<td><textarea name="issue_description" class="centpercent" rows="4" placeholder="'.$langs->trans('IssueDescriptionPlaceholder').'"></textarea></td></tr>';
 
 	// Customer site note
-	print '<tr><td>'.$langs->trans('CustomerSite').'</td>';
-	print '<td><input type="text" name="customer_site" class="minwidth300"></td></tr>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('CustomerSite'), $langs->trans('TooltipCustomerSite')).'</td>';
+	print '<td><input type="text" name="customer_site" class="minwidth300" placeholder="e.g. Main warehouse, Building A"></td></tr>';
 
 	// Assigned to
 	print '<tr><td>'.$langs->trans('AssignedTo').'</td>';
@@ -496,7 +496,7 @@ if ($action == 'create') {
 	print '</td></tr>';
 
 	// Serial number (customer's defective unit)
-	print '<tr><td>'.$langs->trans('SerialNumber').'</td><td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipSerialNumber')).'</td><td>';
 	if ($action == 'edit' && $permwrite) {
 		print '<input type="text" name="serial_number" id="serial_number" class="minwidth200"'
 			.' value="'.dol_escape_htmltag($object->serial_number).'" list="serial_suggestions">';
@@ -514,7 +514,7 @@ if ($action == 'create') {
 	print '</td></tr>';
 
 	// Issue date
-	print '<tr><td>'.$langs->trans('IssueDate').'</td><td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('IssueDate'), $langs->trans('TooltipIssueDate')).'</td><td>';
 	if ($action == 'edit' && $permwrite) {
 		print $form->selectDate($object->issue_date, 'issue_date', 0, 0, 0, '', 1, 1);
 	} else {
@@ -523,7 +523,7 @@ if ($action == 'create') {
 	print '</td></tr>';
 
 	// Reported via
-	print '<tr><td>'.$langs->trans('ReportedVia').'</td><td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('ReportedVia'), $langs->trans('TooltipReportedVia')).'</td><td>';
 	if ($action == 'edit' && $permwrite) {
 		$via_options = array('phone'=>$langs->trans('ReportedViaPhone'),'email'=>$langs->trans('ReportedViaEmail'),'onsite'=>$langs->trans('ReportedViaOnSite'),'other'=>$langs->trans('ReportedViaOther'));
 		print Form::selectarray('reported_via', $via_options, $object->reported_via, 0, 0, 0, '', 0, 0, 0, '', 'flat');
@@ -547,7 +547,7 @@ if ($action == 'create') {
 	print '</td></tr>';
 
 	// Customer site
-	print '<tr><td>'.$langs->trans('CustomerSite').'</td><td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('CustomerSite'), $langs->trans('TooltipCustomerSite')).'</td><td>';
 	if ($action == 'edit' && $permwrite) {
 		print '<input type="text" name="customer_site" class="minwidth200" value="'.dol_escape_htmltag($object->customer_site).'">';
 	} else {
@@ -572,7 +572,7 @@ if ($action == 'create') {
 	print '<table class="border centpercent tableforfield">';
 
 	// Issue description
-	print '<tr><td class="titlefield tdtop">'.$langs->trans('IssueDescription').'</td><td>';
+	print '<tr><td class="titlefield tdtop">'.$form->textwithpicto($langs->trans('IssueDescription'), $langs->trans('TooltipIssueDescription')).'</td><td>';
 	if ($action == 'edit' && $permwrite) {
 		print '<textarea name="issue_description" class="centpercent" rows="5">'.dol_escape_htmltag($object->issue_description, 1, 1).'</textarea>';
 	} else {
@@ -581,7 +581,7 @@ if ($action == 'create') {
 	print '</td></tr>';
 
 	// Resolution type
-	print '<tr><td>'.$langs->trans('ResolutionType').'</td><td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('ResolutionType'), $langs->trans('TooltipResolutionType')).'</td><td>';
 	if ($action == 'edit' && $permwrite) {
 		print Form::selectarray('resolution_type', svcrequest_resolution_types(), $object->resolution_type, 1, 0, 0, '', 0, 0, 0, '', 'flat minwidth200');
 	} else {
@@ -598,7 +598,7 @@ if ($action == 'create') {
 	print '</td></tr>';
 
 	// Billable
-	print '<tr><td>'.$langs->trans('Billable').'</td><td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('Billable'), $langs->trans('TooltipBillable')).'</td><td>';
 	if ($action == 'edit' && $permwrite) {
 		print '<input type="checkbox" name="billable" value="1"'.($object->billable ? ' checked' : '').'>';
 	} else {
@@ -610,7 +610,7 @@ if ($action == 'create') {
 
 	// Resolution notes (visible once in progress)
 	if (!in_array($object->status, array(SvcRequest::STATUS_DRAFT, SvcRequest::STATUS_VALIDATED)) || $action == 'edit') {
-		print '<tr><td class="tdtop">'.$langs->trans('ResolutionNotes').'</td><td>';
+		print '<tr><td class="tdtop">'.$form->textwithpicto($langs->trans('ResolutionNotes'), $langs->trans('TooltipResolutionNotes')).'</td><td>';
 		if ($action == 'edit' && $permwrite) {
 			print '<textarea name="resolution_notes" class="centpercent" rows="3">'.dol_escape_htmltag($object->resolution_notes, 1, 1).'</textarea>';
 		} else {
@@ -672,7 +672,7 @@ if ($action == 'create') {
 				// Inline edit for carrier/tracking/serial_out when in-progress
 				if ($action == 'edit' && $permwrite) {
 					print '<br>';
-					print '<input type="text" name="serial_out" class="minwidth120" placeholder="'.$langs->trans('ReplacementSerial').'" value="'.dol_escape_htmltag($object->serial_out).'">';
+					print '<input type="text" name="serial_out" class="minwidth120" placeholder="'.$langs->trans('ReplacementSerial').'" title="'.$langs->trans('TooltipSerialOut').'" value="'.dol_escape_htmltag($object->serial_out).'">';
 					print ' <input type="text" name="outbound_carrier" class="minwidth80" placeholder="'.$langs->trans('Carrier').'" value="'.dol_escape_htmltag($object->outbound_carrier).'">';
 					print ' <input type="text" name="outbound_tracking" class="minwidth120" placeholder="'.$langs->trans('TrackingNumber').'" value="'.dol_escape_htmltag($object->outbound_tracking).'">';
 				}
@@ -772,7 +772,7 @@ if ($action == 'create') {
 				print '<form action="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'" method="POST" style="display:inline;">';
 				print '<input type="hidden" name="token" value="'.newToken().'">';
 				print '<input type="hidden" name="action" value="log_return_received">';
-				print '<input type="text" name="serial_in" class="minwidth120" placeholder="'.$langs->trans('SerialIn').'" value="">';
+				print '<input type="text" name="serial_in" class="minwidth120" placeholder="'.$langs->trans('SerialIn').'" title="'.$langs->trans('TooltipSerialIn').'" value="">';
 				print ' <input type="text" name="return_carrier" class="minwidth80" placeholder="'.$langs->trans('Carrier').'" value="">';
 				print ' <input type="text" name="return_tracking" class="minwidth120" placeholder="'.$langs->trans('TrackingNumber').'" value="">';
 				print ' <input type="submit" class="butAction" style="margin:0;" value="'.$langs->trans('Confirm').'">';

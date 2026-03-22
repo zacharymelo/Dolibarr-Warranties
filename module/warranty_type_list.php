@@ -126,6 +126,8 @@ if ($action == 'delete') {
 	);
 }
 
+$form = new Form($db);
+
 $wtype_obj = new SvcWarrantyType($db);
 $types     = $wtype_obj->fetchAll();
 
@@ -207,19 +209,19 @@ if ($permwrite && $action != 'edit') {
 
 	print '<table class="border centpercent tableforfieldcreate">';
 
-	print '<tr><td class="fieldrequired">'.$langs->trans('Code').'</td>';
+	print '<tr><td class="fieldrequired">'.$form->textwithpicto($langs->trans('Code'), $langs->trans('TooltipWTypeCode')).'</td>';
 	print '<td><input type="text" name="code" class="flat maxwidth100" placeholder="e.g. standard" required></td></tr>';
 
-	print '<tr><td class="fieldrequired">'.$langs->trans('Label').'</td>';
+	print '<tr><td class="fieldrequired">'.$form->textwithpicto($langs->trans('Label'), $langs->trans('TooltipWTypeLabel')).'</td>';
 	print '<td><input type="text" name="label" class="flat minwidth300" placeholder="'.$langs->trans('WarrantyTypeLabel').'" required></td></tr>';
 
-	print '<tr><td>'.$langs->trans('Description').'</td>';
-	print '<td><input type="text" name="description" class="flat minwidth300"></td></tr>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('Description'), $langs->trans('TooltipWTypeDescription')).'</td>';
+	print '<td><input type="text" name="description" class="flat minwidth300" placeholder="e.g. Covers parts and labour for standard equipment"></td></tr>';
 
-	print '<tr><td>'.$langs->trans('DefaultCoverageDays').'</td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('DefaultCoverageDays'), $langs->trans('TooltipWTypeDefaultDays')).'</td>';
 	print '<td><input type="number" name="default_coverage_days" class="flat width75" value="365" min="1" max="3650"> '.$langs->trans('Days').'</td></tr>';
 
-	print '<tr><td>'.$langs->trans('Position').'</td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('Position'), $langs->trans('TooltipWTypePosition')).'</td>';
 	print '<td><input type="number" name="position" class="flat width75" value="0"></td></tr>';
 
 	print '</table>';
