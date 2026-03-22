@@ -353,7 +353,7 @@ if ($action == 'create') {
 	}
 	print '</td></tr>';
 
-	// Serial number — server-side when product is known, AJAX-driven when user changes product
+	// Serial number — text input with datalist suggestions (allows free-text entry + autocomplete)
 	$prefill_serials = array();
 	if ($prefill_product > 0) {
 		$sql_ser  = "SELECT DISTINCT pl.batch AS serial_number";
@@ -372,17 +372,14 @@ if ($action == 'create') {
 	}
 	print '<tr><td>'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipSerialNumber')).'</td>';
 	print '<td>';
-	if ($prefill_product > 0) {
-		$ser_opts = array('' => '— '.$langs->trans('SelectSerial').' —');
-		foreach ($prefill_serials as $s) {
-			$ser_opts[$s] = $s;
-		}
-		print Form::selectarray('serial_number', $ser_opts, $prefill_serial, 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth200');
-	} else {
-		print '<select name="serial_number" id="serial_number" class="flat minwidth200" disabled>';
-		print '<option value="">'.$langs->trans('SelectProductFirst').'</option>';
-		print '</select>';
+	print '<input type="text" name="serial_number" id="serial_number" class="minwidth200"'
+		.' value="'.dol_escape_htmltag($prefill_serial).'" list="serial_suggestions"'
+		.' placeholder="'.dol_escape_htmltag($langs->trans('SerialNumber')).'">';
+	print '<datalist id="serial_suggestions">';
+	foreach ($prefill_serials as $s) {
+		print '<option value="'.dol_escape_htmltag($s).'"></option>';
 	}
+	print '</datalist>';
 	print '</td></tr>';
 
 	// Warranty (optional manual pairing)
@@ -464,66 +461,34 @@ if ($action == 'create') {
 	var serialAjaxUrl  = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/serials.php?mode=svcrequest"';
 	print ';
 	var projectAjaxUrl = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/projects.php'.'";
-	var selSer         = document.getElementById("serial_number");
-	var selProj        = document.getElementById("fk_project");
-	// True when the serial select was pre-rendered server-side (no AJAX needed on load)
-	var serialPreloaded = '.($prefill_product > 0 ? 'true' : 'false').';
-	var noSerial  = "'.dol_escape_js($langs->trans('NoSerialsAvailable')).'";
-	var pickProd  = "'.dol_escape_js($langs->trans('SelectProductFirst')).'";
-	var pickSer   = "\u2014 '.dol_escape_js($langs->trans('SelectSerial')).' \u2014";
-	var pickCust  = "'.dol_escape_js($langs->trans('SelectCustomerFirst')).'";
-	var noProj    = "'.dol_escape_js($langs->trans('NoProjectForCustomer')).'";
-	var pickProj  = "\u2014 '.dol_escape_js($langs->trans('SelectProject')).' \u2014";
+	var dlSer  = document.getElementById("serial_suggestions");
+	var selProj = document.getElementById("fk_project");
+	var pickCust = "'.dol_escape_js($langs->trans('SelectCustomerFirst')).'";
+	var noProj   = "'.dol_escape_js($langs->trans('NoProjectForCustomer')).'";
+	var pickProj = "\u2014 '.dol_escape_js($langs->trans('SelectProject')).' \u2014";
 
 	function notifySelect2(el){
-		// After manipulating the underlying <select>, tell Select2 to re-render
 		if(typeof jQuery !== "undefined" && jQuery.fn.select2){
 			jQuery(el).trigger("change.select2");
 		}
 	}
 
-	function setSerialOptions(serials, selectVal){
-		selSer.innerHTML = "";
-		if(!serials || !serials.length){
-			selSer.disabled = true;
-			var opt = document.createElement("option");
-			opt.value = "";
-			opt.textContent = noSerial;
-			selSer.appendChild(opt);
-		} else {
-			selSer.disabled = false;
-			var blank = document.createElement("option");
-			blank.value = "";
-			blank.textContent = pickSer;
-			selSer.appendChild(blank);
-			serials.forEach(function(s){
-				var opt = document.createElement("option");
-				opt.value = s;
-				opt.textContent = s;
-				selSer.appendChild(opt);
-			});
-			if(selectVal){ selSer.value = selectVal; }
-		}
-		notifySelect2(selSer);
-	}
-
 	function loadSerials(){
+		if(!dlSer) return;
 		var el  = document.getElementById("fk_product");
 		var pid = el ? parseInt(el.value, 10) || 0 : 0;
-		selSer.innerHTML = "";
-		selSer.disabled  = true;
-		if(!pid){
-			var opt = document.createElement("option");
-			opt.value = "";
-			opt.textContent = pickProd;
-			selSer.appendChild(opt);
-			notifySelect2(selSer);
-			return;
-		}
+		dlSer.innerHTML = "";
+		if(!pid) return;
 		fetch(serialAjaxUrl + "&fk_product=" + pid, {credentials:"same-origin"})
 			.then(function(r){ return r.json(); })
-			.then(function(data){ setSerialOptions(data, null); })
-			.catch(function(){ setSerialOptions([], null); });
+			.then(function(data){
+				data.forEach(function(s){
+					var opt = document.createElement("option");
+					opt.value = s;
+					dlSer.appendChild(opt);
+				});
+			})
+			.catch(function(){});
 	}
 
 	function loadProjects(){
@@ -568,8 +533,7 @@ if ($action == 'create') {
 		if(e.target && e.target.name === "fk_soc"){ loadProjects(); }
 	});
 
-	// Only AJAX-load serials on page load if the select was not pre-rendered server-side
-	if(!serialPreloaded){ loadSerials(); }
+	loadSerials();
 	loadProjects();
 })();</script>';
 
