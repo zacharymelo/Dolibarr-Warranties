@@ -400,3 +400,5 @@ TooltipWTypePosition = Controls display order in dropdown menus. Lower numbers a
 TroubleshootSummaryPlaceholder = Summarise what was checked, what symptoms were observed, and what action was recommended...
 TooltipTroubleshootSummary = Overall summary of this diagnostic session — what was checked, what was found, and recommended next steps.
 TooltipTroubleshootOutcome = The result of this session. Selecting "No fault found" will update the resolution type on the service request to Informational.
+SelectProductFirst = Select a product first
+NoSerialsAvailable = No known serials for this product

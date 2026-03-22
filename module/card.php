@@ -321,6 +321,7 @@ if ($action == 'create') {
 	// =====================================================================
 	// CREATE FORM
 	// =====================================================================
+
 	print load_fiche_titre($langs->trans('NewSvcRequest'), '', 'technic');
 
 	print '<form action="'.$_SERVER['PHP_SELF'].'" method="POST">';
@@ -345,9 +346,12 @@ if ($action == 'create') {
 	}
 	print '</td></tr>';
 
-	// Serial number
+	// Serial number (populated by JS when a product is chosen)
 	print '<tr><td>'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipSerialNumber')).'</td>';
-	print '<td><input type="text" name="serial_number" class="minwidth200" autocomplete="off">';
+	print '<td>';
+	print '<select name="serial_number" id="serial_number" class="flat minwidth200" disabled>';
+	print '<option value="">'.$langs->trans('SelectProductFirst').'</option>';
+	print '</select>';
 	print '</td></tr>';
 
 	// Warranty (optional manual pairing)
@@ -423,6 +427,65 @@ if ($action == 'create') {
 	print '</div>';
 
 	print '</form>';
+
+	print '<script>(function(){
+	var ajaxUrl  = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/serials.php"';
+	print ';
+	var selSer   = document.getElementById("serial_number");
+	var noSerial = "'.dol_escape_js($langs->trans('NoSerialsAvailable')).'";
+	var pickProd = "'.dol_escape_js($langs->trans('SelectProductFirst')).'";
+	var pickSer  = "— '.dol_escape_js($langs->trans('SelectSerial')).' —";
+
+	function setOptions(serials){
+		selSer.innerHTML = "";
+		if(!serials || !serials.length){
+			selSer.disabled = true;
+			var opt = document.createElement("option");
+			opt.value = "";
+			opt.textContent = noSerial;
+			selSer.appendChild(opt);
+		} else {
+			selSer.disabled = false;
+			var blank = document.createElement("option");
+			blank.value = "";
+			blank.textContent = pickSer;
+			selSer.appendChild(blank);
+			serials.forEach(function(s){
+				var opt = document.createElement("option");
+				opt.value = s;
+				opt.textContent = s;
+				selSer.appendChild(opt);
+			});
+		}
+	}
+
+	function loadSerials(){
+		var el  = document.getElementById("fk_product");
+		var pid = el ? parseInt(el.value, 10) || 0 : 0;
+		selSer.innerHTML = "";
+		selSer.disabled  = true;
+		if(!pid){
+			var opt = document.createElement("option");
+			opt.value = "";
+			opt.textContent = pickProd;
+			selSer.appendChild(opt);
+			return;
+		}
+		fetch(ajaxUrl + "?fk_product=" + pid, {credentials:"same-origin"})
+			.then(function(r){ return r.json(); })
+			.then(function(data){ setOptions(data); })
+			.catch(function(){ setOptions([]); });
+	}
+
+	document.addEventListener("change", function(e){
+		if(e.target && e.target.name === "fk_product"){ loadSerials(); }
+	});
+	if(typeof jQuery !== "undefined"){
+		jQuery(document).on("select2:select select2:clear", "[name=fk_product]", loadSerials);
+	}
+
+	loadSerials();
+})();</script>';
 
 } else {
 	// =====================================================================

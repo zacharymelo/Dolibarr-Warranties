@@ -680,16 +680,20 @@ class SvcRequest extends CommonObject
 	 */
 	public function checkWarrantyStatus()
 	{
-		if (empty($this->serial_number)) {
+		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarranty.class.php';
+
+		$warranty = new SvcWarranty($this->db);
+
+		// If a warranty was manually paired, use it directly; otherwise look up by serial
+		if (!empty($this->fk_warranty)) {
+			$result = $warranty->fetch($this->fk_warranty);
+		} elseif (!empty($this->serial_number)) {
+			$result = $warranty->fetchBySerial($this->serial_number);
+		} else {
 			$this->warranty_status = 'none';
 			$this->billable        = 1;
 			return 'none';
 		}
-
-		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarranty.class.php';
-
-		$warranty = new SvcWarranty($this->db);
-		$result   = $warranty->fetchBySerial($this->serial_number);
 
 		if ($result > 0) {
 			$this->fk_warranty     = $warranty->id;
