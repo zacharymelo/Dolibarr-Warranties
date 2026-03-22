@@ -204,6 +204,30 @@ Notes = Notes
 Documents = Documents
 
 #
+# Email notifications — trigger-based
+#
+NotifTechValidateSubject = [New Assignment] Service Request %s assigned to you
+NotifTechValidateBody = Hello %2$s,\n\nService request %1$s has been validated and assigned to you.
+NotifTechInProgressSubject = [In Progress] Service Request %s
+NotifTechInProgressBody = Hello %2$s,\n\nService request %1$s has been moved to In Progress status.
+NotifCustAwaitReturnSubject = [Action Required] Please return unit — Service Request %s
+NotifCustAwaitReturnBody = Dear customer,\n\nA replacement unit has been shipped for service request %1$s (serial: %2$s).\n\nPlease arrange the return of the original unit.
+NotifCustResolvedSubject = [Resolved] Service Request %s
+NotifCustResolvedBody = Dear customer,\n\nYour service request %s has been resolved.
+NotifWarrantyCreatedSubject = Warranty Registration — %s
+NotifWarrantyCreatedBody = Dear customer,\n\nYour warranty %1$s for serial number %2$s has been registered.\n\nCoverage expires: %3$s
+NoExpiryDate = No expiry date
+
+#
+# Email notifications — cron reminders
+#
+ReminderReturnSubject = [ACTION REQUIRED] Please return unit for service request %s
+ReminderReturnBody = Dear customer,\n\nThis is a reminder that we are waiting for the return of serial number %2$s related to service request %1$s.\n\nPlease arrange return shipment at your earliest convenience.
+ReminderReturnFooter = Thank you for your cooperation.\n\nWarranty & Service Team
+NoEmailForCustomer = No email address on file for this customer.
+NoSenderEmailConfigured = No sender email address configured in Dolibarr settings.
+
+#
 # Error messages (must start with Error)
 #
 ErrorSvcRequestNotInDraftStatus = This service request is not in draft status.

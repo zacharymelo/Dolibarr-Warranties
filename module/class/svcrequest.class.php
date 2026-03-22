@@ -842,16 +842,78 @@ class SvcRequest extends CommonObject
 	}
 
 	/**
-	 * Send overdue return reminder email to customer
+	 * Send overdue return reminder email to customer contact
+	 *
+	 * Uses CMailFile with Dolibarr's mail infrastructure. Increments
+	 * return_reminder_count and sets return_reminder_date on success.
 	 *
 	 * @param  User $user User sending reminder
-	 * @return int        >0 if OK, <0 if KO
+	 * @return int        1 if OK, -1 if KO
 	 */
 	public function sendReturnReminder($user)
 	{
-		// TODO: implement email send via Dolibarr CMailFile
-		$this->return_reminder_count++;
-		return $this->update($user);
+		global $conf, $langs;
+
+		$langs->loadLangs(array('warrantysvc@warrantysvc', 'mails'));
+
+		// Load customer email
+		$soc = new Societe($this->db);
+		if ($soc->fetch($this->fk_soc) <= 0 || empty($soc->email)) {
+			$this->error = 'NoEmailForCustomer';
+			return -1;
+		}
+
+		// Load company info for sender
+		require_once DOL_DOCUMENT_ROOT.'/core/class/CMailFile.class.php';
+
+		$from_name  = getDolGlobalString('MAIN_MAIL_FROM_NAME', $conf->global->MAIN_INFO_SOCIETE_NOM ?? '');
+		$from_email = getDolGlobalString('MAIN_MAIL_FROM_EMAIL', getDolGlobalString('MAIN_INFO_SOCIETE_MAIL', ''));
+
+		if (empty($from_email)) {
+			$this->error = 'NoSenderEmailConfigured';
+			return -1;
+		}
+
+		$to_email = $soc->email;
+		$subject  = $langs->trans('ReminderReturnSubject', $this->ref);
+
+		// Build body
+		$body  = $langs->trans('ReminderReturnBody', $this->ref, $this->serial_number ? $this->serial_number : '-');
+		$body .= "\n\n";
+		if (!empty($this->outbound_carrier)) {
+			$body .= $langs->trans('OutboundCarrier').': '.$this->outbound_carrier."\n";
+		}
+		if (!empty($this->outbound_tracking)) {
+			$body .= $langs->trans('OutboundTracking').': '.$this->outbound_tracking."\n";
+		}
+		$body .= "\n".$langs->trans('ReminderReturnFooter');
+
+		$mail = new CMailFile(
+			$subject,
+			$to_email,
+			$from_email,
+			$body,
+			array(),
+			array(),
+			array(),
+			'',
+			'',
+			0,
+			-1,
+			'',
+			'',
+			'',
+			$from_name
+		);
+
+		if ($mail->sendfile() <= 0) {
+			$this->error = $mail->error;
+			return -1;
+		}
+
+		$this->return_reminder_count = (int) $this->return_reminder_count + 1;
+		$this->return_reminder_date  = dol_now();
+		return $this->update($user, 1); // notrigger=1 — suppress trigger on reminder update
 	}
 
 	/**
@@ -905,30 +967,69 @@ class SvcRequest extends CommonObject
 	}
 
 	/**
-	 * Cron job: check for overdue returns and send reminders
+	 * Cron job: check for overdue returns, send reminders, and auto-invoice
 	 *
-	 * @return int >0 if OK
+	 * Reads WARRANTYSVC_RETURN_GRACE_DAYS (default 7) and
+	 * WARRANTYSVC_RETURN_INVOICE_DAYS (default 30) from config.
+	 *
+	 * - Sends a reminder email to each customer whose return is past the
+	 *   grace period and who has not yet been reminded today.
+	 * - Creates an invoice for each customer whose return is past the
+	 *   invoice deadline and who does not yet have an invoice linked.
+	 *
+	 * @return int >0 number of records processed, <0 if fatal error
 	 */
 	public function checkOverdueReturns()
 	{
-		global $db, $user;
+		global $conf, $user;
 
-		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."svc_request";
+		$grace_days   = getDolGlobalInt('WARRANTYSVC_RETURN_GRACE_DAYS', 7);
+		$invoice_days = getDolGlobalInt('WARRANTYSVC_RETURN_INVOICE_DAYS', 30);
+
+		$now          = dol_now();
+		$grace_limit  = $now - ($grace_days * 86400);
+		$invoice_limit= $now - ($invoice_days * 86400);
+
+		// Fetch all awaiting-return records with no reception and past grace period
+		$sql  = "SELECT rowid FROM ".MAIN_DB_PREFIX."svc_request";
 		$sql .= " WHERE status = ".self::STATUS_AWAIT_RETURN;
-		$sql .= " AND date_return_expected < '".dol_print_date(dol_now() - 7 * 86400, 'dayrfc')."'";
 		$sql .= " AND fk_reception IS NULL";
+		$sql .= " AND date_return_expected IS NOT NULL";
+		$sql .= " AND date_return_expected < '".$this->db->idate($grace_limit)."'";
+		$sql .= " AND entity IN (".getEntity('svcrequest').")";
 
-		$resql = $db->query($sql);
-		if ($resql) {
-			while ($obj = $db->fetch_object($resql)) {
-				$rma = new SvcRequest($db);
-				if ($rma->fetch($obj->rowid) > 0) {
-					$rma->sendReturnReminder($user);
-				}
-			}
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
 		}
 
-		return 1;
+		$processed = 0;
+
+		while ($obj = $this->db->fetch_object($resql)) {
+			$rma = new SvcRequest($this->db);
+			if ($rma->fetch($obj->rowid) <= 0) {
+				continue;
+			}
+
+			// --- AUTO-INVOICE for severely overdue ---
+			if ($rma->date_return_expected < $invoice_limit && empty($rma->fk_facture)) {
+				$rma->invoiceForNonReturn($user);
+			}
+
+			// --- SEND REMINDER if not sent today ---
+			$already_reminded_today = (!empty($rma->return_reminder_date)
+				&& dol_print_date($rma->return_reminder_date, 'day') == dol_print_date($now, 'day'));
+
+			if (!$already_reminded_today) {
+				$rma->sendReturnReminder($user);
+			}
+
+			$processed++;
+		}
+
+		$this->db->free($resql);
+		return $processed > 0 ? $processed : 1;
 	}
 
 	/**
