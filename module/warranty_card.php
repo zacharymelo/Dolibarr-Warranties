@@ -455,7 +455,7 @@ if ($action == 'create') {
 		// If product already selected on load (e.g. after failed submit), populate immediately
 		if (prodSel.value) { populateSerials(); }
 	}
-})();</script>
+})();</script>';
 
 	// Warranty type — load from DB
 	$wtype_items   = SvcWarrantyType::fetchAllForForm($db);
