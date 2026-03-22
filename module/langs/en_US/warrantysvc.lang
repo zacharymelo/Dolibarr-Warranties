@@ -402,3 +402,4 @@ TooltipTroubleshootSummary = Overall summary of this diagnostic session — what
 TooltipTroubleshootOutcome = The result of this session. Selecting "No fault found" will update the resolution type on the service request to Informational.
 SelectProductFirst = Select a product first
 NoSerialsAvailable = No known serials for this product
+NoProductsWithUnassignedSerials = All registered serials are already covered by a warranty. Register a new shipment or add serial numbers via the Stocks module before creating a manual warranty.

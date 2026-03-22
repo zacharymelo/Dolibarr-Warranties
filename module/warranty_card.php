@@ -370,10 +370,35 @@ if ($action == 'create') {
 		}
 	}
 	$serial_map_js = json_encode($serials_by_product);
-	$prev_serial   = dol_escape_js(GETPOST('serial_number', 'alpha'));
+	$prev_serial   = GETPOST('serial_number', 'alpha');
+
+	// Build the product list from the serial map — only products that have at least
+	// one unassigned serial can receive a new warranty, so restrict to those.
+	$warranty_product_list = array();
+	if (!empty($serials_by_product)) {
+		$pids_in = implode(',', array_map('intval', array_keys($serials_by_product)));
+		$sql_wp  = "SELECT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
+		$sql_wp .= " WHERE p.rowid IN (".$pids_in.")";
+		$sql_wp .= " AND p.entity IN (".getEntity('product').")";
+		$sql_wp .= " ORDER BY p.ref ASC";
+		$res_wp = $db->query($sql_wp);
+		if ($res_wp) {
+			while ($row_wp = $db->fetch_object($res_wp)) {
+				$warranty_product_list[$row_wp->rowid] = $row_wp->ref.($row_wp->label ? ' — '.$row_wp->label : '');
+			}
+		}
+	}
 
 	print load_fiche_titre($langs->trans('NewWarranty'), '', 'bill');
 	print '<p><a href="'.$_SERVER['PHP_SELF'].'?action=create_from_shipment">'.img_picto('', 'shipment', 'class="paddingright"').$langs->trans('CreateWarrantyFromShipment').'</a></p>';
+
+	// Guard: if no products have unassigned serials, the form would be useless — show a notice instead
+	if (empty($warranty_product_list)) {
+		print '<div class="info">'.img_picto('', 'info', 'class="paddingright"').$langs->trans('NoProductsWithUnassignedSerials').'</div>';
+		llxFooter();
+		$db->close();
+		exit;
+	}
 
 	print '<form action="'.$_SERVER['PHP_SELF'].'" method="POST">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
@@ -389,10 +414,10 @@ if ($action == 'create') {
 	print $formcompany->select_company(GETPOST('fk_soc', 'int'), 'fk_soc', '', $langs->trans('SelectThird'), 0, 0, null, 0, 'minwidth300 maxwidth500 widthcentpercentminusxx');
 	print '</td></tr>';
 
-	// Product
+	// Product — restricted to products with at least one unassigned serial in product_lot
 	print '<tr><td class="fieldrequired">'.$langs->trans('Product').'</td>';
 	print '<td>';
-	$form->select_produits(GETPOST('fk_product', 'int'), 'fk_product', '', 0, 0, 1, 2, '', 0, array(), 0, 1, 0, 'minwidth300');
+	print Form::selectarray('fk_product', $warranty_product_list, (int) GETPOST('fk_product', 'int'), 1, 0, 0, '', 0, 0, 0, '', 'flat minwidth300');
 	print '</td></tr>';
 
 	// Serial number — populated dynamically from product_lot based on selected product
