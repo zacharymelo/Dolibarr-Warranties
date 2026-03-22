@@ -1215,4 +1215,24 @@ class SvcRequest extends CommonObject
 
 		return $result;
 	}
+
+	/**
+	 * Count service requests linked to a project.
+	 * Used by complete_head_from_modules() for the project tab badge.
+	 *
+	 * @param  int $projectid Project ID
+	 * @return int             Number of service requests
+	 */
+	public function countForProject($projectid)
+	{
+		$sql = "SELECT COUNT(*) as nb FROM ".MAIN_DB_PREFIX.$this->table_element;
+		$sql .= " WHERE fk_project = ".((int) $projectid);
+		$sql .= " AND entity IN (".getEntity('svcrequest').")";
+		$resql = $this->db->query($sql);
+		if ($resql) {
+			$obj = $this->db->fetch_object($resql);
+			return (int) $obj->nb;
+		}
+		return 0;
+	}
 }

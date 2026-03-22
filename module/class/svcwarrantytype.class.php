@@ -32,6 +32,8 @@ class SvcWarrantyType extends CommonObject
 	public $code;
 	public $label;
 	public $description;
+	public $coverage_terms;
+	public $exclusions;
 	public $default_coverage_days = 365;
 	public $active                  = 1;
 	public $position                = 0;
@@ -62,12 +64,14 @@ class SvcWarrantyType extends CommonObject
 		$this->db->begin();
 
 		$sql  = "INSERT INTO ".MAIN_DB_PREFIX."svc_warranty_type";
-		$sql .= " (entity, code, label, description, default_coverage_days, active, position, import_key)";
+		$sql .= " (entity, code, label, description, coverage_terms, exclusions, default_coverage_days, active, position, import_key)";
 		$sql .= " VALUES (";
 		$sql .= ((int) $conf->entity).",";
 		$sql .= "'".$this->db->escape($this->code)."',";
 		$sql .= "'".$this->db->escape($this->label)."',";
-		$sql .= ($this->description ? "'".$this->db->escape($this->description)."'" : "NULL").",";
+		$sql .= ($this->description    ? "'".$this->db->escape($this->description)."'"    : "NULL").",";
+		$sql .= ($this->coverage_terms ? "'".$this->db->escape($this->coverage_terms)."'" : "NULL").",";
+		$sql .= ($this->exclusions     ? "'".$this->db->escape($this->exclusions)."'"     : "NULL").",";
 		$sql .= ((int) ($this->default_coverage_days ? $this->default_coverage_days : 365)).",";
 		$sql .= ((int) $this->active).",";
 		$sql .= ((int) $this->position).",";
@@ -95,7 +99,7 @@ class SvcWarrantyType extends CommonObject
 	 */
 	public function fetch($id, $code = '')
 	{
-		$sql  = "SELECT rowid, entity, code, label, description, default_coverage_days, active, position";
+		$sql  = "SELECT rowid, entity, code, label, description, coverage_terms, exclusions, default_coverage_days, active, position";
 		$sql .= " FROM ".MAIN_DB_PREFIX."svc_warranty_type";
 		if ($id > 0) {
 			$sql .= " WHERE rowid = ".((int) $id);
@@ -116,14 +120,16 @@ class SvcWarrantyType extends CommonObject
 			return 0;
 		}
 
-		$this->id                      = $obj->rowid;
-		$this->entity                  = $obj->entity;
-		$this->code                    = $obj->code;
-		$this->label                   = $obj->label;
-		$this->description             = $obj->description;
+		$this->id                    = $obj->rowid;
+		$this->entity                = $obj->entity;
+		$this->code                  = $obj->code;
+		$this->label                 = $obj->label;
+		$this->description           = $obj->description;
+		$this->coverage_terms        = $obj->coverage_terms;
+		$this->exclusions            = $obj->exclusions;
 		$this->default_coverage_days = $obj->default_coverage_days;
-		$this->active                  = $obj->active;
-		$this->position                = $obj->position;
+		$this->active                = $obj->active;
+		$this->position              = $obj->position;
 
 		return 1;
 	}
@@ -142,7 +148,9 @@ class SvcWarrantyType extends CommonObject
 		$sql  = "UPDATE ".MAIN_DB_PREFIX."svc_warranty_type SET";
 		$sql .= " code = '".$this->db->escape($this->code)."',";
 		$sql .= " label = '".$this->db->escape($this->label)."',";
-		$sql .= " description = ".($this->description ? "'".$this->db->escape($this->description)."'" : "NULL").",";
+		$sql .= " description = ".($this->description    ? "'".$this->db->escape($this->description)."'"    : "NULL").",";
+		$sql .= " coverage_terms = ".($this->coverage_terms ? "'".$this->db->escape($this->coverage_terms)."'" : "NULL").",";
+		$sql .= " exclusions = ".($this->exclusions     ? "'".$this->db->escape($this->exclusions)."'"     : "NULL").",";
 		$sql .= " default_coverage_days = ".((int) ($this->default_coverage_days ? $this->default_coverage_days : 365)).",";
 		$sql .= " active = ".((int) $this->active).",";
 		$sql .= " position = ".((int) $this->position);
@@ -211,7 +219,7 @@ class SvcWarrantyType extends CommonObject
 	{
 		$out = array();
 
-		$sql  = "SELECT code, label, default_coverage_days FROM ".MAIN_DB_PREFIX."svc_warranty_type";
+		$sql  = "SELECT code, label, coverage_terms, exclusions, default_coverage_days FROM ".MAIN_DB_PREFIX."svc_warranty_type";
 		$sql .= " WHERE active = 1";
 		$sql .= " AND entity IN (".getEntity('svcwarrantytype').")";
 		$sql .= " ORDER BY position ASC, label ASC";
@@ -236,7 +244,7 @@ class SvcWarrantyType extends CommonObject
 	{
 		$out = array();
 
-		$sql  = "SELECT rowid, code, label, description, default_coverage_days, active, position";
+		$sql  = "SELECT rowid, code, label, description, coverage_terms, exclusions, default_coverage_days, active, position";
 		$sql .= " FROM ".MAIN_DB_PREFIX."svc_warranty_type";
 		$sql .= " WHERE entity IN (".getEntity('svcwarrantytype').")";
 		$sql .= " ORDER BY position ASC, label ASC";

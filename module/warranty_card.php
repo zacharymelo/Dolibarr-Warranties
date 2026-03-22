@@ -1153,6 +1153,14 @@ if ($action == 'edit') {
 	if ($permwrite && $display_status != SvcWarranty::STATUS_VOIDED) {
 		print dolGetButtonAction('', $langs->trans('Modify'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=edit&token='.newToken(), '');
 	}
+	if ($user->hasRight('warrantysvc', 'svcrequest', 'write')) {
+		$sr_url = DOL_URL_ROOT.'/custom/warrantysvc/card.php?action=create'
+			.'&fk_warranty='.$object->id
+			.'&fk_soc='.$object->fk_soc
+			.'&serial_number='.urlencode($object->serial_number)
+			.(!empty($object->fk_product) ? '&fk_product='.$object->fk_product : '');
+		print dolGetButtonAction('', $langs->trans('NewSvcRequest'), 'default', $sr_url, '');
+	}
 	if ($permwrite && $display_status != SvcWarranty::STATUS_VOIDED) {
 		print dolGetButtonAction('', $langs->trans('VoidWarranty'), 'danger', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=void&token='.newToken(), '');
 	}

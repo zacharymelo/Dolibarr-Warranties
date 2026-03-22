@@ -38,12 +38,14 @@ if ($cancel) {
 // Add new type
 if ($action == 'add' && $permwrite) {
 	$wtype = new SvcWarrantyType($db);
-	$wtype->code                    = GETPOST('code', 'alpha');
-	$wtype->label                   = GETPOST('label', 'alphanohtml');
-	$wtype->description             = GETPOST('description', 'restricthtml');
+	$wtype->code                  = GETPOST('code', 'alpha');
+	$wtype->label                 = GETPOST('label', 'alphanohtml');
+	$wtype->description           = GETPOST('description', 'restricthtml');
+	$wtype->coverage_terms        = GETPOST('coverage_terms', 'restricthtml');
+	$wtype->exclusions            = GETPOST('exclusions', 'restricthtml');
 	$wtype->default_coverage_days = GETPOST('default_coverage_days', 'int');
-	$wtype->active                  = 1;
-	$wtype->position                = GETPOST('position', 'int');
+	$wtype->active                = 1;
+	$wtype->position              = GETPOST('position', 'int');
 
 	if (empty($wtype->code) || empty($wtype->label)) {
 		setEventMessages($langs->trans('ErrorWarrantyTypeCodeLabelRequired'), null, 'errors');
@@ -62,11 +64,13 @@ if ($action == 'add' && $permwrite) {
 if ($action == 'update' && $permwrite) {
 	$wtype = new SvcWarrantyType($db);
 	$wtype->fetch($id);
-	$wtype->code                    = GETPOST('code', 'alpha');
-	$wtype->label                   = GETPOST('label', 'alphanohtml');
-	$wtype->description             = GETPOST('description', 'restricthtml');
+	$wtype->code                  = GETPOST('code', 'alpha');
+	$wtype->label                 = GETPOST('label', 'alphanohtml');
+	$wtype->description           = GETPOST('description', 'restricthtml');
+	$wtype->coverage_terms        = GETPOST('coverage_terms', 'restricthtml');
+	$wtype->exclusions            = GETPOST('exclusions', 'restricthtml');
 	$wtype->default_coverage_days = GETPOST('default_coverage_days', 'int');
-	$wtype->position                = GETPOST('position', 'int');
+	$wtype->position              = GETPOST('position', 'int');
 
 	if (empty($wtype->code) || empty($wtype->label)) {
 		setEventMessages($langs->trans('ErrorWarrantyTypeCodeLabelRequired'), null, 'errors');
@@ -142,6 +146,8 @@ print '<tr class="liste_titre">';
 print '<td>'.$langs->trans('Code').'</td>';
 print '<td>'.$langs->trans('Label').'</td>';
 print '<td>'.$langs->trans('Description').'</td>';
+print '<td>'.$langs->trans('CoverageTerms').'</td>';
+print '<td>'.$langs->trans('Exclusions').'</td>';
 print '<td class="center">'.$langs->trans('DefaultCoverageDays').'</td>';
 print '<td class="center">'.$langs->trans('Position').'</td>';
 print '<td class="center">'.$langs->trans('Active').'</td>';
@@ -156,7 +162,9 @@ foreach ($types as $t) {
 		print '<input type="hidden" name="id" value="'.$t->rowid.'">';
 		print '<td><input type="text" name="code" class="flat maxwidth100" value="'.dol_escape_htmltag($t->code).'" required></td>';
 		print '<td><input type="text" name="label" class="flat minwidth200" value="'.dol_escape_htmltag($t->label).'" required></td>';
-		print '<td><input type="text" name="description" class="flat minwidth300" value="'.dol_escape_htmltag($t->description).'"></td>';
+		print '<td><input type="text" name="description" class="flat minwidth200" value="'.dol_escape_htmltag($t->description).'"></td>';
+		print '<td><textarea name="coverage_terms" class="flat" rows="3" style="width:100%;min-width:180px">'.dol_escape_htmltag($t->coverage_terms, 1).'</textarea></td>';
+		print '<td><textarea name="exclusions" class="flat" rows="3" style="width:100%;min-width:180px">'.dol_escape_htmltag($t->exclusions, 1).'</textarea></td>';
 		print '<td class="center"><input type="number" name="default_coverage_days" class="flat width50" min="1" max="3650" value="'.((int) $t->default_coverage_days).'"></td>';
 		print '<td class="center"><input type="number" name="position" class="flat width50" value="'.((int) $t->position).'"></td>';
 		print '<td class="center">—</td>';
@@ -171,6 +179,8 @@ foreach ($types as $t) {
 		print '<td><code>'.dol_escape_htmltag($t->code).'</code></td>';
 		print '<td>'.dol_escape_htmltag($t->label).'</td>';
 		print '<td class="opacitymedium">'.dol_escape_htmltag($t->description).'</td>';
+		print '<td class="opacitymedium">'.($t->coverage_terms ? '<span title="'.dol_escape_htmltag(dol_string_nohtmltag($t->coverage_terms)).'">'.dol_escape_htmltag(dol_trunc(dol_string_nohtmltag($t->coverage_terms), 60)).'</span>' : '').'</td>';
+		print '<td class="opacitymedium">'.($t->exclusions     ? '<span title="'.dol_escape_htmltag(dol_string_nohtmltag($t->exclusions)).'">'.dol_escape_htmltag(dol_trunc(dol_string_nohtmltag($t->exclusions), 60)).'</span>' : '').'</td>';
 		print '<td class="center">'.((int) $t->default_coverage_days).' '.$langs->trans('Days').'</td>';
 		print '<td class="center">'.((int) $t->position).'</td>';
 		print '<td class="center">';
@@ -217,6 +227,12 @@ if ($permwrite && $action != 'edit') {
 
 	print '<tr><td>'.$form->textwithpicto($langs->trans('Description'), $langs->trans('TooltipWTypeDescription')).'</td>';
 	print '<td><input type="text" name="description" class="flat minwidth300" placeholder="e.g. Covers parts and labour for standard equipment"></td></tr>';
+
+	print '<tr><td class="tdtop">'.$form->textwithpicto($langs->trans('CoverageTerms'), $langs->trans('TooltipWTypeCoverageTerms')).'</td>';
+	print '<td><textarea name="coverage_terms" class="flat" rows="4" style="width:90%" placeholder="'.$langs->trans('CoverageTermsPlaceholder').'"></textarea></td></tr>';
+
+	print '<tr><td class="tdtop">'.$form->textwithpicto($langs->trans('Exclusions'), $langs->trans('TooltipWTypeExclusions')).'</td>';
+	print '<td><textarea name="exclusions" class="flat" rows="3" style="width:90%" placeholder="'.$langs->trans('ExclusionsPlaceholder').'"></textarea></td></tr>';
 
 	print '<tr><td>'.$form->textwithpicto($langs->trans('DefaultCoverageDays'), $langs->trans('TooltipWTypeDefaultDays')).'</td>';
 	print '<td><input type="number" name="default_coverage_days" class="flat width75" value="365" min="1" max="3650"> '.$langs->trans('Days').'</td></tr>';

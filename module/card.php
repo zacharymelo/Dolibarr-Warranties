@@ -53,8 +53,8 @@ if (!$permread) { accessforbidden(); }
  */
 $types_with_outbound   = array('component', 'component_return', 'swap_cross', 'swap_wait');
 $types_with_return     = array('component_return', 'swap_cross', 'swap_wait');
-$types_intervention    = array('intervention', 'guidance');
-$types_no_movement     = array('informational');
+$types_intervention    = array('intervention');
+$types_no_movement     = array('guidance', 'informational');
 
 /*
  * Actions
@@ -107,6 +107,7 @@ if ($action == 'update' && $permwrite) {
 	$object->fk_commande         = GETPOST('fk_commande', 'int');
 	$object->issue_date          = dol_mktime(12, 0, 0, GETPOST('issue_datemonth', 'int'), GETPOST('issue_dateday', 'int'), GETPOST('issue_dateyear', 'int'));
 	$object->reported_via        = GETPOST('reported_via', 'alpha');
+	$object->fk_pbxcall          = GETPOST('fk_pbxcall', 'int');
 	$object->issue_description   = GETPOST('issue_description', 'restricthtml');
 	$object->resolution_type     = GETPOST('resolution_type', 'alpha');
 	$object->resolution_notes    = GETPOST('resolution_notes', 'restricthtml');
@@ -636,6 +637,62 @@ if ($action == 'create') {
 	}
 	print '</td></tr>';
 
+	// Linked Call (pbxcalls integration — optional)
+	if (isModEnabled('pbxcalls')) {
+		print '<tr><td>'.$form->textwithpicto($langs->trans('LinkedCall'), $langs->trans('TooltipLinkedCall')).'</td><td>';
+		if ($action == 'edit' && $permwrite) {
+			// Dropdown of recent calls for this company
+			$call_options = array(0 => '('.$langs->trans('None').')');
+			if (!empty($object->fk_soc)) {
+				global $conf;
+				$sql_calls  = "SELECT rowid, ref, caller_number, caller_name, call_start";
+				$sql_calls .= " FROM ".MAIN_DB_PREFIX."pbxcalls_call";
+				$sql_calls .= " WHERE fk_soc = ".((int) $object->fk_soc);
+				$sql_calls .= " AND entity = ".((int) $conf->entity);
+				$sql_calls .= " ORDER BY call_start DESC LIMIT 30";
+				$res_calls = $db->query($sql_calls);
+				if ($res_calls) {
+					while ($c = $db->fetch_object($res_calls)) {
+						$call_label = dol_escape_htmltag($c->ref);
+						if ($c->caller_name) {
+							$call_label .= ' — '.dol_escape_htmltag($c->caller_name);
+						} elseif ($c->caller_number) {
+							$call_label .= ' — '.dol_escape_htmltag($c->caller_number);
+						}
+						if ($c->call_start) {
+							$call_label .= ' ('.dol_print_date($db->jdate($c->call_start), 'dayhour').')';
+						}
+						$call_options[(int) $c->rowid] = $call_label;
+					}
+				}
+			}
+			print Form::selectarray('fk_pbxcall', $call_options, (int) $object->fk_pbxcall, 0, 0, 0, '', 0, 0, 0, '', 'flat');
+		} else {
+			if (!empty($object->fk_pbxcall)) {
+				print img_picto('', 'phoning', 'class="pictofixedwidth"');
+				print '<a href="'.dol_buildpath('/pbxcalls/call_card.php', 1).'?id='.$object->fk_pbxcall.'">';
+				// Fetch call ref for display
+				$sql_cr  = "SELECT ref, caller_name, caller_number FROM ".MAIN_DB_PREFIX."pbxcalls_call";
+				$sql_cr .= " WHERE rowid = ".((int) $object->fk_pbxcall);
+				$res_cr = $db->query($sql_cr);
+				if ($res_cr && ($cr = $db->fetch_object($res_cr))) {
+					print dol_escape_htmltag($cr->ref);
+					if ($cr->caller_name) {
+						print ' — '.dol_escape_htmltag($cr->caller_name);
+					} elseif ($cr->caller_number) {
+						print ' — '.dol_escape_htmltag($cr->caller_number);
+					}
+				} else {
+					print '#'.$object->fk_pbxcall;
+				}
+				print '</a>';
+			} else {
+				print '<span class="opacitymedium">'.$langs->trans('None').'</span>';
+			}
+		}
+		print '</td></tr>';
+	}
+
 	// Assigned to
 	print '<tr><td>'.$langs->trans('AssignedTo').'</td><td>';
 	if ($action == 'edit' && $permwrite) {
@@ -795,14 +852,16 @@ if ($action == 'create') {
 
 		// --- INTERVENTION card ---
 		if ($has_intervention) {
-			$inter_done  = !empty($object->fk_intervention);
-			$inter_class = $inter_done ? 'status4' : ($s >= SvcRequest::STATUS_IN_PROGRESS ? 'status1' : 'status0');
+			$inter_done     = !empty($object->fk_intervention);
+			$inter_class    = $inter_done ? 'status4' : ($s >= SvcRequest::STATUS_IN_PROGRESS ? 'status1' : 'status0');
+			$panel_label    = $langs->trans('OnSiteIntervention');
+			$btn_label      = $langs->trans('ScheduleIntervention');
 
 			print '<tr class="oddeven">';
 			print '<td style="width:20px; padding:8px 4px;">';
 			print '<span class="badge '.$inter_class.'" style="display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:middle;">&nbsp;</span>';
 			print '</td>';
-			print '<td style="padding:8px 12px; font-weight:bold;">'.img_picto('', 'intervention', 'class="pictofixedwidth"').$langs->trans('OnSiteIntervention').'</td>';
+			print '<td style="padding:8px 12px; font-weight:bold;">'.img_picto('', 'intervention', 'class="pictofixedwidth"').$panel_label.'</td>';
 			print '<td style="padding:8px 12px;">';
 			if ($inter_done) {
 				print img_picto('', 'intervention', 'class="pictofixedwidth"');
@@ -814,7 +873,7 @@ if ($action == 'create') {
 			print '</td>';
 			print '<td style="padding:8px 12px; text-align:right;">';
 			if (!$inter_done && $permwrite && in_array($s, array(SvcRequest::STATUS_VALIDATED, SvcRequest::STATUS_IN_PROGRESS)) && isModEnabled('ficheinter')) {
-				print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=create_intervention&token='.newToken().'" class="butAction" style="margin:0;">'.$langs->trans('ScheduleIntervention').'</a>';
+				print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=create_intervention&token='.newToken().'" class="butAction" style="margin:0;">'.$btn_label.'</a>';
 			}
 			print '</td>';
 			print '</tr>';

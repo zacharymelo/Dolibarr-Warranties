@@ -4,6 +4,8 @@ CREATE TABLE llx_svc_warranty_type(
 	code                    VARCHAR(50) NOT NULL,
 	label                   VARCHAR(255) NOT NULL,
 	description             TEXT,
+	coverage_terms          TEXT,
+	exclusions              TEXT,
 	default_coverage_days INTEGER DEFAULT 365,
 	active                  TINYINT DEFAULT 1 NOT NULL,
 	position                INTEGER DEFAULT 0,

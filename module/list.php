@@ -29,6 +29,9 @@ $massaction   = GETPOST('massaction', 'alpha');
 $contextpage  = GETPOST('contextpage', 'aZ') ? GETPOST('contextpage', 'aZ') : 'svcrequest';
 $optioncss    = GETPOST('optioncss', 'alpha');
 
+// Project tab context — pre-filter by project when accessed from project card
+$projectid = GETPOST('projectid', 'int');
+
 // Search filters
 $search_ref           = GETPOST('search_ref', 'alpha');
 $search_company       = GETPOST('search_company', 'alpha');
@@ -74,6 +77,10 @@ $sql .= " s.nom as company_name";
 $sql .= " FROM ".MAIN_DB_PREFIX."svc_request as t";
 $sql .= " LEFT JOIN ".MAIN_DB_PREFIX."societe as s ON s.rowid = t.fk_soc";
 $sql .= " WHERE t.entity IN (".getEntity('svcrequest').")";
+
+if ($projectid > 0) {
+	$sql .= " AND t.fk_project = ".((int) $projectid);
+}
 
 if ($search_ref) {
 	$sql .= natural_search('t.ref', $search_ref);
