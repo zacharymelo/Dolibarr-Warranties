@@ -236,6 +236,7 @@ print getTitleFieldOfList('Status',        0, $_SERVER['PHP_SELF'], 't.status', 
 print getTitleFieldOfList('StartDate',     0, $_SERVER['PHP_SELF'], 't.start_date',   '', '', '',       '', $sortfield, $sortorder);
 print getTitleFieldOfList('ExpiryDate',    0, $_SERVER['PHP_SELF'], 't.expiry_date',  '', '', '',       '', $sortfield, $sortorder);
 print getTitleFieldOfList('Claims',        0, $_SERVER['PHP_SELF'], 't.claim_count',  '', '', 'center', '', $sortfield, $sortorder);
+print getTitleFieldOfList('',              0, $_SERVER['PHP_SELF'], '',               '', '', 'maxwidthsearch', '', $sortfield, $sortorder);
 print '</tr>';
 
 // Data rows
@@ -245,7 +246,7 @@ if ($resql) {
 	$i   = 0;
 
 	if ($num == 0) {
-		print '<tr class="oddeven"><td colspan="9"><span class="opacitymedium">'.$langs->trans('NoRecordFound').'</span></td></tr>';
+		print '<tr class="oddeven"><td colspan="10"><span class="opacitymedium">'.$langs->trans('NoRecordFound').'</span></td></tr>';
 	}
 
 	$now = dol_now();
@@ -295,13 +296,14 @@ if ($resql) {
 		}
 		print '</td>';
 		print '<td class="center">'.((int) $obj->claim_count).'</td>';
+		print '<td></td>';
 		print '</tr>';
 
 		$i++;
 	}
 	$db->free($resql);
 } else {
-	print '<tr><td colspan="9">'.$db->lasterror().'</td></tr>';
+	print '<tr><td colspan="10">'.$db->lasterror().'</td></tr>';
 }
 
 print '</table>';
