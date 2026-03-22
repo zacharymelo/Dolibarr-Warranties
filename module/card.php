@@ -353,7 +353,8 @@ if ($action == 'create') {
 	}
 	print '</td></tr>';
 
-	// Serial number — text input with datalist suggestions (allows free-text entry + autocomplete)
+	// Serial number — select populated server-side when product is known, AJAX when changed interactively.
+	// No 'flat' class so Select2 does not own this element; native DOM updates work reliably.
 	$prefill_serials = array();
 	if ($prefill_product > 0) {
 		$sql_ser  = "SELECT DISTINCT pl.batch AS serial_number";
@@ -372,14 +373,19 @@ if ($action == 'create') {
 	}
 	print '<tr><td>'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipSerialNumber')).'</td>';
 	print '<td>';
-	print '<input type="text" name="serial_number" id="serial_number" class="minwidth200"'
-		.' value="'.dol_escape_htmltag($prefill_serial).'" list="serial_suggestions"'
-		.' placeholder="'.dol_escape_htmltag($langs->trans('SerialNumber')).'">';
-	print '<datalist id="serial_suggestions">';
-	foreach ($prefill_serials as $s) {
-		print '<option value="'.dol_escape_htmltag($s).'"></option>';
+	if ($prefill_product > 0) {
+		print '<select name="serial_number" id="serial_number" class="minwidth200">';
+		print '<option value="">— '.dol_escape_htmltag($langs->trans('SelectSerial')).' —</option>';
+		foreach ($prefill_serials as $s) {
+			$sel = ($s === $prefill_serial) ? ' selected' : '';
+			print '<option value="'.dol_escape_htmltag($s).'"'.$sel.'>'.dol_escape_htmltag($s).'</option>';
+		}
+		print '</select>';
+	} else {
+		print '<select name="serial_number" id="serial_number" class="minwidth200" disabled>';
+		print '<option value="">'.dol_escape_htmltag($langs->trans('SelectProductFirst')).'</option>';
+		print '</select>';
 	}
-	print '</datalist>';
 	print '</td></tr>';
 
 	// Warranty (optional manual pairing)
@@ -461,11 +467,17 @@ if ($action == 'create') {
 	var serialAjaxUrl  = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/serials.php?mode=svcrequest"';
 	print ';
 	var projectAjaxUrl = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/projects.php'.'";
-	var dlSer  = document.getElementById("serial_suggestions");
+	var selSer  = document.getElementById("serial_number");
 	var selProj = document.getElementById("fk_project");
-	var pickCust = "'.dol_escape_js($langs->trans('SelectCustomerFirst')).'";
-	var noProj   = "'.dol_escape_js($langs->trans('NoProjectForCustomer')).'";
-	var pickProj = "\u2014 '.dol_escape_js($langs->trans('SelectProject')).' \u2014";
+	var noSerial  = "'.dol_escape_js($langs->trans('NoSerialsAvailable')).'";
+	var pickProd  = "'.dol_escape_js($langs->trans('SelectProductFirst')).'";
+	var pickSer   = "\u2014 '.dol_escape_js($langs->trans('SelectSerial')).' \u2014";
+	var pickCust  = "'.dol_escape_js($langs->trans('SelectCustomerFirst')).'";
+	var noProj    = "'.dol_escape_js($langs->trans('NoProjectForCustomer')).'";
+	var pickProj  = "\u2014 '.dol_escape_js($langs->trans('SelectProject')).' \u2014";
+	// The serial select has no "flat" class so Select2 does not own it; native DOM updates work reliably.
+	// True when product was pre-filled server-side — skip the AJAX load on page init.
+	var serialPreloaded = '.($prefill_product > 0 ? 'true' : 'false').';
 
 	function notifySelect2(el){
 		if(typeof jQuery !== "undefined" && jQuery.fn.select2){
@@ -473,22 +485,41 @@ if ($action == 'create') {
 		}
 	}
 
+	function setSerialOptions(serials){
+		selSer.innerHTML = "";
+		if(!serials || !serials.length){
+			selSer.disabled = true;
+			var opt = document.createElement("option");
+			opt.value = "";
+			opt.textContent = noSerial;
+			selSer.appendChild(opt);
+		} else {
+			selSer.disabled = false;
+			var blank = document.createElement("option");
+			blank.value = "";
+			blank.textContent = pickSer;
+			selSer.appendChild(blank);
+			serials.forEach(function(s){
+				var opt = document.createElement("option");
+				opt.value = s;
+				opt.textContent = s;
+				selSer.appendChild(opt);
+			});
+		}
+	}
+
 	function loadSerials(){
-		if(!dlSer) return;
 		var el  = document.getElementById("fk_product");
 		var pid = el ? parseInt(el.value, 10) || 0 : 0;
-		dlSer.innerHTML = "";
-		if(!pid) return;
+		if(!pid){
+			selSer.innerHTML = "<option value=\'\'>" + pickProd + "</option>";
+			selSer.disabled = true;
+			return;
+		}
 		fetch(serialAjaxUrl + "&fk_product=" + pid, {credentials:"same-origin"})
 			.then(function(r){ return r.json(); })
-			.then(function(data){
-				data.forEach(function(s){
-					var opt = document.createElement("option");
-					opt.value = s;
-					dlSer.appendChild(opt);
-				});
-			})
-			.catch(function(){});
+			.then(function(data){ setSerialOptions(data); })
+			.catch(function(){ setSerialOptions([]); });
 	}
 
 	function loadProjects(){
@@ -533,7 +564,7 @@ if ($action == 'create') {
 		if(e.target && e.target.name === "fk_soc"){ loadProjects(); }
 	});
 
-	loadSerials();
+	if(!serialPreloaded){ loadSerials(); }
 	loadProjects();
 })();</script>';
 
