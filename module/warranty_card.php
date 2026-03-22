@@ -347,55 +347,23 @@ if ($action == 'create_from_shipment') {
 // CREATE FORM
 // ============================================================
 if ($action == 'create') {
-	// Build map of unassigned serials grouped by product_id for the JS picker
-	$sql_lot  = "SELECT pl.batch AS serial_number, pl.fk_product";
-	$sql_lot .= " FROM ".MAIN_DB_PREFIX."product_lot pl";
-	$sql_lot .= " WHERE pl.batch IS NOT NULL AND pl.batch != ''";
-	$sql_lot .= " AND pl.entity IN (".getEntity('product').")";
-	$sql_lot .= " AND pl.batch NOT IN (";
-	$sql_lot .= "   SELECT w.serial_number FROM ".MAIN_DB_PREFIX."svc_warranty w";
-	$sql_lot .= "   WHERE w.serial_number IS NOT NULL AND w.serial_number != ''";
-	$sql_lot .= "   AND w.entity IN (".getEntity('svcwarranty').")";
-	$sql_lot .= " )";
-	$sql_lot .= " ORDER BY pl.fk_product, pl.batch";
-	$res_lot = $db->query($sql_lot);
-	$serials_by_product = array();
-	if ($res_lot) {
-		while ($row_lot = $db->fetch_object($res_lot)) {
-			$pid = (int) $row_lot->fk_product;
-			if (!isset($serials_by_product[$pid])) {
-				$serials_by_product[$pid] = array();
-			}
-			$serials_by_product[$pid][] = $row_lot->serial_number;
-		}
+	// Standard mode products/serials are loaded via AJAX scoped to the selected customer.
+	// Only override and manual modes need static product lists built server-side.
+	$prev_mode    = GETPOST('warranty_mode', 'alpha');
+	$prev_product = (int) GETPOST('fk_product', 'int');
+	$prev_serial  = GETPOST('serial_number', 'alpha');
+	$valid_modes  = array('standard', 'override', 'manual');
+	if (!in_array($prev_mode, $valid_modes)) {
+		$prev_mode = 'standard';
 	}
-	$serial_map_js = json_encode($serials_by_product);
-	$prev_serial   = GETPOST('serial_number', 'alpha');
+	$std_disabled = false; // Always available — populated via AJAX after customer selection
+	$ovr_disabled = false; // Override is a manual escape hatch — always selectable
 
-	// Build the product list from the serial map — only products that have at least
-	// one unassigned serial can receive a new warranty, so restrict to those.
-	$warranty_product_list = array();
-	if (!empty($serials_by_product)) {
-		$pids_in = implode(',', array_map('intval', array_keys($serials_by_product)));
-		$sql_wp  = "SELECT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
-		$sql_wp .= " WHERE p.rowid IN (".$pids_in.")";
-		$sql_wp .= " AND p.entity IN (".getEntity('product').")";
-		$sql_wp .= " ORDER BY p.ref ASC";
-		$res_wp = $db->query($sql_wp);
-		if ($res_wp) {
-			while ($row_wp = $db->fetch_object($res_wp)) {
-				$warranty_product_list[$row_wp->rowid] = $row_wp->ref.($row_wp->label ? ' — '.$row_wp->label : '');
-			}
-		}
-	}
-
-	// Override mode: products that appear in at least one validated shipment (status=1)
-	// — tighter than all products but wider than the standard lot-restricted list
-	// Returns empty if the Expedition module is not installed (tables absent / query fails)
+	// Override mode: all products from any validated shipment (not customer-scoped)
 	$sql_ovr  = "SELECT DISTINCT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
 	$sql_ovr .= " INNER JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.fk_product = p.rowid";
 	$sql_ovr .= " INNER JOIN ".MAIN_DB_PREFIX."expedition e ON e.rowid = ed.fk_expedition";
-	$sql_ovr .= " WHERE e.status = 1";
+	$sql_ovr .= " WHERE e.fk_statut >= 1";
 	$sql_ovr .= " AND e.entity IN (".getEntity('expedition').")";
 	$sql_ovr .= " AND p.entity IN (".getEntity('product').")";
 	$sql_ovr .= " ORDER BY p.ref ASC";
@@ -407,8 +375,7 @@ if ($action == 'create') {
 		}
 	}
 
-	// Manual mode: all products in the system — fallback for installs without
-	// Expedition module or serial/lot tracking. No data-source restrictions.
+	// Manual mode: all active products — no module dependency
 	$sql_man  = "SELECT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
 	$sql_man .= " WHERE p.entity IN (".getEntity('product').")";
 	$sql_man .= " AND p.tosell = 1";
@@ -420,19 +387,6 @@ if ($action == 'create') {
 			$manual_product_list[$row_man->rowid] = $row_man->ref.($row_man->label ? ' — '.$row_man->label : '');
 		}
 	}
-
-	// Determine initial mode — persists across a failed submit.
-	// Auto-selects the most restrictive mode that has data; falls back to manual.
-	$prev_mode    = GETPOST('warranty_mode', 'alpha');
-	$prev_product = (int) GETPOST('fk_product', 'int');
-	$valid_modes  = array('standard', 'override', 'manual');
-	if (!in_array($prev_mode, $valid_modes)) {
-		if (!empty($warranty_product_list))     { $prev_mode = 'standard'; }
-		elseif (!empty($override_product_list)) { $prev_mode = 'override'; }
-		else                                    { $prev_mode = 'manual'; }
-	}
-	$std_disabled = empty($warranty_product_list);
-	$ovr_disabled = false; // Override is a manual escape hatch — always selectable regardless of shipment data
 
 	print load_fiche_titre($langs->trans('NewWarranty'), '', 'bill');
 	print '<p><a href="'.$_SERVER['PHP_SELF'].'?action=create_from_shipment">'.img_picto('', 'shipment', 'class="paddingright"').$langs->trans('CreateWarrantyFromShipment').'</a></p>';
@@ -485,12 +439,12 @@ if ($action == 'create') {
 	print $formcompany->select_company(GETPOST('fk_soc', 'int'), 'fk_soc', '(s.client:IN:2,3)', $langs->trans('SelectThird'), 0, 0, null, 0, 'minwidth300 maxwidth500 widthcentpercentminusxx');
 	print '</td></tr>';
 
-	// Product — Standard row (products with unassigned serials in product_lot)
+	// Product — Standard row (populated via AJAX after customer is selected)
 	print '<tr id="row_std_product"'.($prev_mode !== 'standard' ? ' style="display:none"' : '').'>';
 	print '<td class="fieldrequired">'.$langs->trans('Product').'</td><td>';
-	if (!empty($warranty_product_list)) {
-		print Form::selectarray('fk_product', $warranty_product_list, $prev_product, 1, 0, 0, '', 0, 0, 0, '', 'flat minwidth300', 0, '', '', false, ($prev_mode !== 'standard'));
-	}
+	print '<select name="fk_product" id="fk_product_std" class="flat minwidth300" disabled>';
+	print '<option value="-1">'.dol_escape_htmltag($langs->trans('SelectCustomerFirst')).'</option>';
+	print '</select>';
 	print '</td></tr>';
 
 	// Product — Override row (products with any validated shipment on record)
@@ -534,89 +488,225 @@ if ($action == 'create') {
 	print (!$show_free_ser ? ' disabled' : '').'>';
 	print '</td></tr>';
 
-	$warn_ovr_txt = dol_escape_js($langs->trans('WarrantyOverrideWarning'));
-	$warn_man_txt = dol_escape_js($langs->trans('WarrantyManualWarning'));
+	$warn_ovr_txt  = dol_escape_js($langs->trans('WarrantyOverrideWarning'));
+	$warn_man_txt  = dol_escape_js($langs->trans('WarrantyManualWarning'));
+	$ajax_base     = dol_escape_js(DOL_URL_ROOT.'/custom/warrantysvc/ajax/');
+	$prev_socid    = (int) GETPOST('fk_soc', 'int');
+	$std_prev_prod = ($prev_mode === 'standard') ? $prev_product : 0;
+	$std_prev_ser  = ($prev_mode === 'standard') ? dol_escape_js($prev_serial) : '';
 	print '<script>(function(){
-	var smap     = '.$serial_map_js.';
-	var noSelTxt = '.json_encode($langs->trans('SelectProductFirst')).';
-	var noneTxt  = '.json_encode($langs->trans('NoSerialsAvailable')).';
-	var selStr   = "— '.dol_escape_js($langs->trans('SelectSerial')).' —";
-	var prevSer  = "'.dol_escape_js($prev_serial).'";
-	var warnOvr  = "'.dol_escape_js($warn_ovr_txt).'";
-	var warnMan  = "'.dol_escape_js($warn_man_txt).'";
+var ajaxBase   = "'.$ajax_base.'";
+var selCustTxt = "'.dol_escape_js($langs->trans('SelectCustomerFirst')).'";
+var selProdTxt = "'.dol_escape_js($langs->trans('SelectProductFirst')).'";
+var selSerTxt  = "— '.dol_escape_js($langs->trans('SelectSerial')).' —";
+var noSerTxt   = "'.dol_escape_js($langs->trans('NoSerialsAvailable')).'";
+var autoOrdTxt = "'.dol_escape_js($langs->trans('AutoFilledFromSerial')).'";
+var warnOvr    = "'.$warn_ovr_txt.'";
+var warnMan    = "'.$warn_man_txt.'";
+var prevProduct = '.(int) $std_prev_prod.';
+var prevSerial  = "'.$std_prev_ser.'";
 
-	var stdProdSel  = document.getElementById("fk_product");
-	var stdSerSel   = document.getElementById("manual_serial_select");
-	var stdProdRow  = document.getElementById("row_std_product");
-	var stdSerRow   = document.getElementById("row_std_serial");
-	var ovrProdSel  = document.getElementById("fk_product_ovr");
-	var ovrProdRow  = document.getElementById("row_ovr_product");
-	var manProdSel  = document.getElementById("fk_product_man");
-	var manProdRow  = document.getElementById("row_man_product");
-	var freeSerInp  = document.getElementById("serial_number_free");
-	var freeSerRow  = document.getElementById("row_free_serial");
-	var warnRow     = document.getElementById("row_warn");
-	var warnMsg     = document.getElementById("warn_msg");
-	var ovrValInp   = document.getElementById("warranty_override_val");
+var stdProdSel = document.getElementById("fk_product_std");
+var stdSerSel  = document.getElementById("manual_serial_select");
+var stdProdRow = document.getElementById("row_std_product");
+var stdSerRow  = document.getElementById("row_std_serial");
+var ovrProdSel = document.getElementById("fk_product_ovr");
+var ovrProdRow = document.getElementById("row_ovr_product");
+var manProdSel = document.getElementById("fk_product_man");
+var manProdRow = document.getElementById("row_man_product");
+var freeSerInp = document.getElementById("serial_number_free");
+var freeSerRow = document.getElementById("row_free_serial");
+var warnRow    = document.getElementById("row_warn");
+var warnMsg    = document.getElementById("warn_msg");
+var ovrValInp  = document.getElementById("warranty_override_val");
+var fkComVal   = document.getElementById("fk_commande_val");
+var fkExpVal   = document.getElementById("fk_expedition_val");
+var ordRefSpan = document.getElementById("origin_order_ref");
+var ordStdRow  = document.getElementById("origin_order_std_row");
+var ordManRow  = document.getElementById("origin_order_man_row");
+var ordManInp  = document.getElementById("fk_commande_ovr_input");
 
-	function populateSerials() {
-		var pid = stdProdSel ? parseInt(stdProdSel.value, 10) : 0;
-		stdSerSel.innerHTML = "";
-		if (!pid || pid <= 0) {
-			var o = document.createElement("option"); o.value = ""; o.textContent = noSelTxt;
-			stdSerSel.appendChild(o); stdSerSel.disabled = true; return;
+function getCurrentSocid() {
+	var s = document.querySelector("[name=fk_soc]");
+	return s ? parseInt(s.value, 10) : 0;
+}
+
+function clearOrder() {
+	if (fkComVal) fkComVal.value = "";
+	if (fkExpVal) fkExpVal.value = "";
+	if (ordRefSpan) { ordRefSpan.textContent = autoOrdTxt; ordRefSpan.classList.add("opacitymedium"); }
+}
+
+function syncOrder() {
+	if (!stdSerSel) return;
+	var opt = stdSerSel.options[stdSerSel.selectedIndex];
+	if (!opt || !opt.value) { clearOrder(); return; }
+	var comId  = opt.dataset.fkCommande   || 0;
+	var expId  = opt.dataset.fkExpedition || 0;
+	var comRef = opt.dataset.commandeRef  || "";
+	if (fkComVal) fkComVal.value = comId;
+	if (fkExpVal) fkExpVal.value = expId;
+	if (ordRefSpan) {
+		ordRefSpan.textContent = comRef ? comRef : autoOrdTxt;
+		if (comRef) ordRefSpan.classList.remove("opacitymedium");
+		else ordRefSpan.classList.add("opacitymedium");
+	}
+}
+
+function resetSerials() {
+	if (!stdSerSel) return;
+	stdSerSel.innerHTML = "";
+	var o = document.createElement("option"); o.value = ""; o.textContent = selProdTxt;
+	stdSerSel.appendChild(o);
+	stdSerSel.disabled = true;
+	clearOrder();
+}
+
+function loadWarrantySerials(socid, pid) {
+	if (!stdSerSel) return;
+	pid = parseInt(pid, 10);
+	if (!pid || pid <= 0) { resetSerials(); return; }
+	stdSerSel.innerHTML = "";
+	stdSerSel.disabled = true;
+	var loadOpt = document.createElement("option"); loadOpt.value = ""; loadOpt.textContent = "Loading...";
+	stdSerSel.appendChild(loadOpt);
+	fetch(ajaxBase + "warranty_serials.php?socid=" + socid + "&fk_product=" + pid)
+		.then(function(r){ return r.json(); })
+		.then(function(serials){
+			stdSerSel.innerHTML = "";
+			if (!serials.length) {
+				var o = document.createElement("option"); o.value = ""; o.textContent = noSerTxt;
+				stdSerSel.appendChild(o); stdSerSel.disabled = true; clearOrder(); return;
+			}
+			var blank = document.createElement("option"); blank.value = ""; blank.textContent = selSerTxt;
+			stdSerSel.appendChild(blank);
+			serials.forEach(function(s){
+				var o = document.createElement("option");
+				o.value = s.serial; o.textContent = s.serial;
+				o.dataset.fkCommande   = s.fk_commande   || 0;
+				o.dataset.fkExpedition = s.fk_expedition || 0;
+				o.dataset.commandeRef  = s.commande_ref  || "";
+				o.dataset.expeditionRef = s.expedition_ref || "";
+				stdSerSel.appendChild(o);
+			});
+			stdSerSel.disabled = false;
+			if (prevSerial) { stdSerSel.value = prevSerial; prevSerial = ""; }
+			syncOrder();
+		})
+		.catch(function(){ resetSerials(); });
+}
+
+function loadWarrantyProducts(socid) {
+	if (!stdProdSel) return;
+	socid = parseInt(socid, 10);
+	stdProdSel.innerHTML = "";
+	stdProdSel.disabled = true;
+	if (!socid || socid <= 0) {
+		var o = document.createElement("option"); o.value = "-1"; o.textContent = selCustTxt;
+		stdProdSel.appendChild(o); resetSerials(); return;
+	}
+	var loadOpt = document.createElement("option"); loadOpt.value = "-1"; loadOpt.textContent = "Loading...";
+	stdProdSel.appendChild(loadOpt);
+	fetch(ajaxBase + "warranty_products.php?socid=" + socid)
+		.then(function(r){ return r.json(); })
+		.then(function(products){
+			stdProdSel.innerHTML = "";
+			var blank = document.createElement("option"); blank.value = "-1"; blank.textContent = "— " + selProdTxt + " —";
+			stdProdSel.appendChild(blank);
+			products.forEach(function(p){
+				var o = document.createElement("option"); o.value = p.rowid; o.textContent = p.label;
+				stdProdSel.appendChild(o);
+			});
+			stdProdSel.disabled = (products.length === 0);
+			if (prevProduct > 0) {
+				stdProdSel.value = prevProduct;
+				prevProduct = 0;
+				var selectedPid = parseInt(stdProdSel.value, 10);
+				if (selectedPid > 0) { loadWarrantySerials(socid, selectedPid); return; }
+			}
+			resetSerials();
+		})
+		.catch(function(){ stdProdSel.disabled = false; });
+}
+
+function setMode(mode) {
+	var isStd = (mode === "standard");
+	var isOvr = (mode === "override");
+	var isMan = (mode === "manual");
+	// Product rows
+	if (stdProdRow) stdProdRow.style.display = isStd ? "" : "none";
+	if (ovrProdRow) ovrProdRow.style.display = isOvr ? "" : "none";
+	if (manProdRow) manProdRow.style.display = isMan ? "" : "none";
+	// Serial rows
+	if (stdSerRow)  stdSerRow.style.display  = isStd ? "" : "none";
+	if (freeSerRow) freeSerRow.style.display  = (isOvr || isMan) ? "" : "none";
+	// Warning row
+	if (warnRow) warnRow.style.display = (isOvr || isMan) ? "" : "none";
+	if (warnMsg) warnMsg.innerHTML = isMan ? warnMan : warnOvr;
+	// Origin order rows
+	if (ordStdRow) ordStdRow.style.display = isStd ? "" : "none";
+	if (ordManRow) ordManRow.style.display = (isOvr || isMan) ? "" : "none";
+	// Enable/disable (disabled fields do not submit)
+	if (!isStd && stdProdSel) stdProdSel.disabled = true;
+	if (!isStd && stdSerSel)  stdSerSel.disabled = true;
+	if (ovrProdSel) ovrProdSel.disabled = !isOvr;
+	if (manProdSel) manProdSel.disabled = !isMan;
+	if (freeSerInp) freeSerInp.disabled = isStd;
+	if (ordManInp)  ordManInp.disabled  = isStd;
+	// Hidden flag
+	if (ovrValInp) ovrValInp.value = isOvr ? "1" : (isMan ? "2" : "0");
+	// Entering standard: clear order if no serial selected
+	if (isStd) {
+		var socid = getCurrentSocid();
+		if (socid > 0 && stdProdSel && (!stdProdSel.options.length || stdProdSel.options[0].value == "-1")) {
+			loadWarrantyProducts(socid);
 		}
-		var serials = (smap[pid] && smap[pid].length) ? smap[pid] : null;
-		if (!serials) {
-			var o = document.createElement("option"); o.value = ""; o.textContent = noneTxt;
-			stdSerSel.appendChild(o); stdSerSel.disabled = true; return;
-		}
-		var blank = document.createElement("option"); blank.value = ""; blank.textContent = selStr;
-		stdSerSel.appendChild(blank);
-		serials.forEach(function(s) {
-			var o = document.createElement("option"); o.value = s; o.textContent = s;
-			stdSerSel.appendChild(o);
-		});
-		stdSerSel.disabled = false;
-		if (prevSer) { stdSerSel.value = prevSer; prevSer = ""; }
 	}
+}
 
-	function setMode(mode) {
-		var isStd = (mode === "standard");
-		var isOvr = (mode === "override");
-		var isMan = (mode === "manual");
-		// Product rows
-		if (stdProdRow) stdProdRow.style.display = isStd ? "" : "none";
-		if (ovrProdRow) ovrProdRow.style.display = isOvr ? "" : "none";
-		if (manProdRow) manProdRow.style.display = isMan ? "" : "none";
-		// Serial rows
-		if (stdSerRow)  stdSerRow.style.display  = isStd ? "" : "none";
-		if (freeSerRow) freeSerRow.style.display  = (isOvr || isMan) ? "" : "none";
-		// Warning row
-		if (warnRow) warnRow.style.display = (isOvr || isMan) ? "" : "none";
-		if (warnMsg) warnMsg.innerHTML = (typeof Image !== "undefined" ? "" : "") + (isMan ? warnMan : warnOvr);
-		// Enable/disable for form submission (disabled fields do not submit)
-		if (stdProdSel) stdProdSel.disabled = !isStd;
-		if (ovrProdSel) ovrProdSel.disabled = !isOvr;
-		if (manProdSel) manProdSel.disabled = !isMan;
-		if (freeSerInp) freeSerInp.disabled = isStd;
-		if (isStd) { populateSerials(); }
-		else if (stdSerSel) { stdSerSel.disabled = true; }
-		// Update hidden flag
-		if (ovrValInp) ovrValInp.value = isOvr ? "1" : (isMan ? "2" : "0");
-	}
-
-	if (stdProdSel) {
-		stdProdSel.addEventListener("change", populateSerials);
-		if (typeof jQuery !== "undefined") { jQuery(stdProdSel).on("change", populateSerials); }
-	}
-	document.querySelectorAll("[name=warranty_mode]").forEach(function(r) {
-		r.addEventListener("change", function() { setMode(this.value); });
+// Customer select (Select2)
+if (typeof jQuery !== "undefined") {
+	jQuery(document).on("select2:select", "[name=fk_soc]", function(e) {
+		var socid = e.params && e.params.data ? parseInt(e.params.data.id, 10) : getCurrentSocid();
+		var mode = (document.querySelector("[name=warranty_mode]:checked") || {}).value || "standard";
+		if (mode === "standard") loadWarrantyProducts(socid);
 	});
+	jQuery(document).on("select2:clear", "[name=fk_soc]", function() {
+		var mode = (document.querySelector("[name=warranty_mode]:checked") || {}).value || "standard";
+		if (mode === "standard") loadWarrantyProducts(0);
+	});
+}
 
-	var initRadio = document.querySelector("[name=warranty_mode]:checked");
-	setMode(initRadio ? initRadio.value : "standard");
-	if (stdProdSel && stdProdSel.value) { populateSerials(); }
+// Standard product select
+if (stdProdSel) {
+	stdProdSel.addEventListener("change", function() {
+		loadWarrantySerials(getCurrentSocid(), this.value);
+	});
+}
+
+// Standard serial select
+if (stdSerSel) { stdSerSel.addEventListener("change", syncOrder); }
+
+// Override/Manual manual order input → sync hidden field
+if (ordManInp) {
+	ordManInp.addEventListener("input", function() {
+		if (fkComVal) fkComVal.value = this.value;
+	});
+}
+
+// Mode radios
+document.querySelectorAll("[name=warranty_mode]").forEach(function(r) {
+	r.addEventListener("change", function() { setMode(this.value); });
+});
+
+// Init
+var initRadio = document.querySelector("[name=warranty_mode]:checked");
+var initMode  = initRadio ? initRadio.value : "standard";
+setMode(initMode);
+if (initMode === "standard") {
+	var initSocid = '.(int) $prev_socid.';
+	if (initSocid > 0) loadWarrantyProducts(initSocid);
+}
 })();</script>';
 
 	// Warranty type — load from DB
@@ -718,10 +808,18 @@ if ($action == 'create') {
 	$doleditor2->Create();
 	print '</td></tr>';
 
-	// Origin order
+	// Hidden FK fields — auto-filled by JS in Standard mode; fk_commande_ovr_input syncs in Override/Manual
+	print '<input type="hidden" name="fk_commande" id="fk_commande_val" value="'.((int) GETPOST('fk_commande', 'int')).'">';
+	print '<input type="hidden" name="fk_expedition" id="fk_expedition_val" value="'.((int) GETPOST('fk_expedition', 'int')).'">';
+
+	// Origin order — Standard: auto-detect display; Override/Manual: manual entry
+	$show_ord_manual = in_array($prev_mode, array('override', 'manual'));
 	print '<tr><td>'.$form->textwithpicto($langs->trans('OriginOrder'), $langs->trans('TooltipOriginOrder')).'</td>';
 	print '<td>';
-	print '<input type="number" name="fk_commande" value="'.((int) GETPOST('fk_commande', 'int')).'" class="flat width100">';
+	print '<span id="origin_order_std_row"'.($show_ord_manual ? ' style="display:none"' : '').'>';
+	print '<span id="origin_order_ref" class="opacitymedium">'.dol_escape_htmltag($langs->trans('AutoFilledFromSerial')).'</span>';
+	print '</span>';
+	print '<input type="number" id="fk_commande_ovr_input" value="'.((int) GETPOST('fk_commande', 'int')).'" class="flat width100"'.(!$show_ord_manual ? ' style="display:none" disabled' : '').'>';
 	print '</td></tr>';
 
 	// Notes
