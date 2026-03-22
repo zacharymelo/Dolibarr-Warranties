@@ -408,12 +408,13 @@ if ($action == 'create') {
 	print '<tr><td>'.$langs->trans('AssignedTo').'</td>';
 	print '<td>'.$form->select_dolusers($user->id, 'fk_user_assigned', 1).'</td></tr>';
 
-	// Project (if enabled)
+	// Project (if enabled) — disabled until a customer is chosen; populated via AJAX
 	if (isModEnabled('project')) {
 		print '<tr><td>'.$langs->trans('Project').'</td>';
 		print '<td>';
-		$formproject = new FormProjets($db);
-		$formproject->select_projects(-1, '', 'fk_project', 0, 0, 1, 0, 0, 0, 0, '', 0, 0, 'minwidth300');
+		print '<select name="fk_project" id="fk_project" class="flat minwidth300" disabled>';
+		print '<option value="">'.dol_escape_htmltag($langs->trans('SelectCustomerFirst')).'</option>';
+		print '</select>';
 		print '</td></tr>';
 	}
 
@@ -429,14 +430,19 @@ if ($action == 'create') {
 	print '</form>';
 
 	print '<script>(function(){
-	var ajaxUrl  = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/serials.php"';
+	var serialAjaxUrl  = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/serials.php"';
 	print ';
+	var projectAjaxUrl = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/projects.php'.'";
 	var selSer   = document.getElementById("serial_number");
-	var noSerial = "'.dol_escape_js($langs->trans('NoSerialsAvailable')).'";
-	var pickProd = "'.dol_escape_js($langs->trans('SelectProductFirst')).'";
-	var pickSer  = "— '.dol_escape_js($langs->trans('SelectSerial')).' —";
+	var selProj  = document.getElementById("fk_project");
+	var noSerial  = "'.dol_escape_js($langs->trans('NoSerialsAvailable')).'";
+	var pickProd  = "'.dol_escape_js($langs->trans('SelectProductFirst')).'";
+	var pickSer   = "\u2014 '.dol_escape_js($langs->trans('SelectSerial')).' \u2014";
+	var pickCust  = "'.dol_escape_js($langs->trans('SelectCustomerFirst')).'";
+	var noProj    = "'.dol_escape_js($langs->trans('NoProjectForCustomer')).'";
+	var pickProj  = "\u2014 '.dol_escape_js($langs->trans('SelectProject')).' \u2014";
 
-	function setOptions(serials){
+	function setSerialOptions(serials){
 		selSer.innerHTML = "";
 		if(!serials || !serials.length){
 			selSer.disabled = true;
@@ -471,20 +477,54 @@ if ($action == 'create') {
 			selSer.appendChild(opt);
 			return;
 		}
-		fetch(ajaxUrl + "?fk_product=" + pid, {credentials:"same-origin"})
+		fetch(serialAjaxUrl + "?fk_product=" + pid, {credentials:"same-origin"})
 			.then(function(r){ return r.json(); })
-			.then(function(data){ setOptions(data); })
-			.catch(function(){ setOptions([]); });
+			.then(function(data){ setSerialOptions(data); })
+			.catch(function(){ setSerialOptions([]); });
+	}
+
+	function loadProjects(){
+		if(!selProj) return;
+		var el  = document.querySelector("[name=fk_soc]");
+		var sid = el ? parseInt(el.value, 10) || 0 : 0;
+		selProj.innerHTML = "";
+		selProj.disabled  = true;
+		if(!sid){
+			var opt = document.createElement("option");
+			opt.value = "";
+			opt.textContent = pickCust;
+			selProj.appendChild(opt);
+			return;
+		}
+		fetch(projectAjaxUrl + "?socid=" + sid, {credentials:"same-origin"})
+			.then(function(r){ return r.json(); })
+			.then(function(data){
+				var blank = document.createElement("option");
+				blank.value = "";
+				blank.textContent = data.length ? pickProj : noProj;
+				selProj.appendChild(blank);
+				data.forEach(function(p){
+					var opt = document.createElement("option");
+					opt.value = p.rowid;
+					opt.textContent = p.label;
+					selProj.appendChild(opt);
+				});
+				selProj.disabled = (data.length === 0);
+			})
+			.catch(function(){ selProj.disabled = true; });
 	}
 
 	document.addEventListener("change", function(e){
 		if(e.target && e.target.name === "fk_product"){ loadSerials(); }
+		if(e.target && e.target.name === "fk_soc"){ loadProjects(); }
 	});
 	if(typeof jQuery !== "undefined"){
 		jQuery(document).on("select2:select select2:clear", "[name=fk_product]", loadSerials);
+		jQuery(document).on("select2:select select2:clear", "[name=fk_soc]", loadProjects);
 	}
 
 	loadSerials();
+	loadProjects();
 })();</script>';
 
 } else {
