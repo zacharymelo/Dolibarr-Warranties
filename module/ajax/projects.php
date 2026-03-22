@@ -40,7 +40,7 @@ if ($resql) {
 	while ($obj = $db->fetch_object($resql)) {
 		$projects[] = array(
 			'rowid' => (int) $obj->rowid,
-			'label' => $obj->ref.($obj->title ? ' \u2014 '.$obj->title : ''),
+			'label' => $obj->ref.($obj->title ? ' — '.$obj->title : ''),
 		);
 	}
 }

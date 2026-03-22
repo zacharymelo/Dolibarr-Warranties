@@ -53,8 +53,8 @@ if (!$permread) { accessforbidden(); }
  */
 $types_with_outbound   = array('component', 'component_return', 'swap_cross', 'swap_wait');
 $types_with_return     = array('component_return', 'swap_cross', 'swap_wait');
-$types_intervention    = array('intervention');
-$types_no_movement     = array('guidance', 'informational');
+$types_intervention    = array('intervention', 'guidance');
+$types_no_movement     = array('informational');
 
 /*
  * Actions
@@ -334,7 +334,7 @@ if ($action == 'create') {
 
 	// Customer
 	print '<tr><td class="fieldrequired">'.$langs->trans('Company').'</td>';
-	print '<td>'.$form->select_company('', 'fk_soc', '(s.client:IN:1,3)', 1, 0, 0, array(), 0, 'minwidth300').'</td></tr>';
+	print '<td>'.$form->select_company('', 'fk_soc', '(s.client:IN:2,3)', 1, 0, 0, array(), 0, 'minwidth300').'</td></tr>';
 
 	// Product
 	print '<tr><td class="fieldrequired">'.$langs->trans('Product').'</td>';
@@ -570,7 +570,7 @@ if ($action == 'create') {
 	// Customer
 	print '<tr><td class="titlefield">'.$langs->trans('Company').'</td><td>';
 	if ($action == 'edit' && $permwrite) {
-		print $form->select_company($object->fk_soc, 'fk_soc', '(s.client:IN:1,3)', 1, 0, 0, array(), 0, 'minwidth200');
+		print $form->select_company($object->fk_soc, 'fk_soc', '(s.client:IN:2,3)', 1, 0, 0, array(), 0, 'minwidth200');
 	} else {
 		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
 		$soc = new Societe($db);
