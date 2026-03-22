@@ -42,6 +42,9 @@ if ($action == 'update') {
 		'WARRANTYSVC_RETURN_INVOICE_DAYS',
 		'WARRANTYSVC_REPLACEMENT_STRATEGY',
 		'WARRANTYSVC_AUTO_WARRANTY_CHECK',
+		'WARRANTYSVC_AUTO_WARRANTY_ON_SHIPMENT',
+		'WARRANTYSVC_DEFAULT_COVERAGE_MONTHS',
+		'WARRANTYSVC_NOTIFY_WARRANTY_CREATED',
 	);
 
 	foreach ($settings as $key) {
@@ -155,6 +158,33 @@ print '<td>'.$langs->trans('AutoWarrantyCheck').'<br><span class="opacitymedium"
 print '<td>';
 $chk = getDolGlobalString('WARRANTYSVC_AUTO_WARRANTY_CHECK', '1') ? ' checked' : '';
 print '<input type="checkbox" name="WARRANTYSVC_AUTO_WARRANTY_CHECK" value="1"'.$chk.'>';
+print '</td></tr>';
+
+// Auto-create warranty on shipment validation (STRETCH #14)
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans('AutoWarrantyOnShipment').'<br><span class="opacitymedium">'
+	.$langs->trans('AutoWarrantyOnShipmentDesc').'</span></td>';
+print '<td>';
+$chk2 = getDolGlobalString('WARRANTYSVC_AUTO_WARRANTY_ON_SHIPMENT') ? ' checked' : '';
+print '<input type="checkbox" name="WARRANTYSVC_AUTO_WARRANTY_ON_SHIPMENT" value="1"'.$chk2.'>';
+print '</td></tr>';
+
+// Default warranty coverage months
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans('DefaultCoverageMonths').'<br><span class="opacitymedium">'
+	.$langs->trans('DefaultCoverageMonthsDesc').'</span></td>';
+print '<td>';
+print '<input type="number" name="WARRANTYSVC_DEFAULT_COVERAGE_MONTHS" value="'.((int) getDolGlobalInt('WARRANTYSVC_DEFAULT_COVERAGE_MONTHS', 12)).'" class="flat width75" min="1" max="120">';
+print ' '.$langs->trans('Months');
+print '</td></tr>';
+
+// Notify customer when warranty created
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans('NotifyWarrantyCreated').'<br><span class="opacitymedium">'
+	.$langs->trans('NotifyWarrantyCreatedDesc').'</span></td>';
+print '<td>';
+$chk3 = getDolGlobalString('WARRANTYSVC_NOTIFY_WARRANTY_CREATED') ? ' checked' : '';
+print '<input type="checkbox" name="WARRANTYSVC_NOTIFY_WARRANTY_CREATED" value="1"'.$chk3.'>';
 print '</td></tr>';
 
 print '</table>';

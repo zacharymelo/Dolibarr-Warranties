@@ -125,6 +125,16 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 				}
 				return 1;
 
+			// ------------------------------------------------------------------
+			// STRETCH #14: Shipment validated — auto-create warranty records
+			// for each shipped serialized product line (gated by config flag)
+			// ------------------------------------------------------------------
+			case 'EXPEDITION_VALIDATE':
+				if (getDolGlobalInt('WARRANTYSVC_AUTO_WARRANTY_ON_SHIPMENT')) {
+					$this->_autoCreateWarrantiesFromShipment($object, $user, $langs);
+				}
+				return 1;
+
 			default:
 				return 0;
 		}
@@ -332,5 +342,69 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 	{
 		$email = getDolGlobalString('MAIN_MAIL_FROM_EMAIL', getDolGlobalString('MAIN_INFO_SOCIETE_MAIL', ''));
 		return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : '';
+	}
+
+	/**
+	 * STRETCH #14: Auto-create SvcWarranty records for serialized products
+	 * in a validated shipment (EXPEDITION_VALIDATE trigger).
+	 *
+	 * For each expedition line with a serial/lot (llx_expeditiondet_batch),
+	 * check if a warranty already exists for that serial. If not, create one
+	 * using the default coverage from WARRANTYSVC_DEFAULT_COVERAGE_MONTHS (default 12).
+	 *
+	 * @param  Expedition $object Validated shipment object
+	 * @param  User       $user   Actor
+	 * @param  Translate  $langs  Lang
+	 * @return void
+	 */
+	private function _autoCreateWarrantiesFromShipment($object, $user, $langs)
+	{
+		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarranty.class.php';
+
+		$coverage_months = getDolGlobalInt('WARRANTYSVC_DEFAULT_COVERAGE_MONTHS', 12);
+
+		// Fetch serialized lines for this shipment
+		$sql  = "SELECT edl.fk_expeditiondet, edl.fk_lot,";
+		$sql .= " pl.batch as serial_number,";
+		$sql .= " ed.fk_product";
+		$sql .= " FROM ".MAIN_DB_PREFIX."expeditiondet_batch edl";
+		$sql .= " JOIN ".MAIN_DB_PREFIX."product_lot pl ON pl.rowid = edl.fk_lot";
+		$sql .= " JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.rowid = edl.fk_expeditiondet";
+		$sql .= " WHERE ed.fk_expedition = ".((int) $object->id);
+		$sql .= " AND pl.batch IS NOT NULL AND pl.batch != ''";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog('WarrantySvcTrigger: EXPEDITION_VALIDATE query failed: '.$this->db->lasterror(), LOG_WARNING);
+			return;
+		}
+
+		while ($line = $this->db->fetch_object($resql)) {
+			// Skip if a warranty already exists for this serial
+			$existing = new SvcWarranty($this->db);
+			if ($existing->fetchBySerial($line->serial_number) > 0) {
+				continue; // already covered
+			}
+
+			$warranty                  = new SvcWarranty($this->db);
+			$warranty->serial_number   = $line->serial_number;
+			$warranty->fk_product      = $line->fk_product;
+			$warranty->fk_soc          = $object->socid;
+			$warranty->fk_expedition   = $object->id;
+			$warranty->warranty_type   = 'standard';
+			$warranty->start_date      = dol_now();
+			$warranty->coverage_months = $coverage_months;
+			// expiry_date auto-computed in create() from coverage_months + start_date
+
+			$result = $warranty->create($user);
+			if ($result < 0) {
+				dol_syslog(
+					'WarrantySvcTrigger: failed to create warranty for serial '.$line->serial_number.': '.$warranty->error,
+					LOG_WARNING
+				);
+			}
+		}
+
+		$this->db->free($resql);
 	}
 }
