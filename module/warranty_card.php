@@ -432,7 +432,7 @@ if ($action == 'create') {
 		else                                    { $prev_mode = 'manual'; }
 	}
 	$std_disabled = empty($warranty_product_list);
-	$ovr_disabled = empty($override_product_list);
+	$ovr_disabled = false; // Override is a manual escape hatch — always selectable regardless of shipment data
 
 	print load_fiche_titre($langs->trans('NewWarranty'), '', 'bill');
 	print '<p><a href="'.$_SERVER['PHP_SELF'].'?action=create_from_shipment">'.img_picto('', 'shipment', 'class="paddingright"').$langs->trans('CreateWarrantyFromShipment').'</a></p>';
@@ -562,7 +562,7 @@ if ($action == 'create') {
 	function populateSerials() {
 		var pid = stdProdSel ? parseInt(stdProdSel.value, 10) : 0;
 		stdSerSel.innerHTML = "";
-		if (!pid) {
+		if (!pid || pid <= 0) {
 			var o = document.createElement("option"); o.value = ""; o.textContent = noSelTxt;
 			stdSerSel.appendChild(o); stdSerSel.disabled = true; return;
 		}
