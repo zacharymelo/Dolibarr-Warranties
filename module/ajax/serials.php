@@ -23,30 +23,44 @@ if (!$user->id || !$user->hasRight('warrantysvc', 'svcrequest', 'read')) {
 	exit;
 }
 
-$fk_product = GETPOST('fk_product', 'int');
+$fk_product = (int) GETPOST('fk_product', 'int');
+$fk_soc     = (int) GETPOST('fk_soc', 'int');
 if ($fk_product <= 0) {
 	header('Content-Type: application/json');
 	print '[]';
 	exit;
 }
 
-// mode=svcrequest: include serials that already have a warranty (they are the primary target for SRs)
-// default (warranty creation flow): exclude already-warranted serials
+// mode=svcrequest: serials come from registered warranties — the correct source for SR filing.
+// Override-mode warranties have manually typed serials that live only in svc_warranty,
+// not in expeditiondet_batch. Scope to customer if supplied.
+// default (warranty creation flow): shipped serials not yet covered by a warranty.
 $mode = GETPOST('mode', 'alpha');
 
-$sql  = "SELECT DISTINCT pl.batch AS serial_number";
-$sql .= " FROM ".MAIN_DB_PREFIX."expeditiondet_batch edl";
-$sql .= " JOIN ".MAIN_DB_PREFIX."product_lot pl ON pl.rowid = edl.fk_lot";
-$sql .= " JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.rowid = edl.fk_expeditiondet";
-$sql .= " WHERE ed.fk_product = ".((int) $fk_product);
-$sql .= " AND pl.batch IS NOT NULL AND pl.batch != ''";
-if ($mode !== 'svcrequest') {
+if ($mode === 'svcrequest') {
+	$sql  = "SELECT DISTINCT w.serial_number";
+	$sql .= " FROM ".MAIN_DB_PREFIX."svc_warranty w";
+	$sql .= " WHERE w.fk_product = ".$fk_product;
+	$sql .= " AND w.serial_number IS NOT NULL AND w.serial_number != ''";
+	$sql .= " AND w.status != 'voided'";
+	if ($fk_soc > 0) {
+		$sql .= " AND w.fk_soc = ".$fk_soc;
+	}
+	$sql .= " AND w.entity IN (".getEntity('svcwarranty').")";
+	$sql .= " ORDER BY w.serial_number ASC";
+} else {
+	$sql  = "SELECT DISTINCT pl.batch AS serial_number";
+	$sql .= " FROM ".MAIN_DB_PREFIX."expeditiondet_batch edl";
+	$sql .= " JOIN ".MAIN_DB_PREFIX."product_lot pl ON pl.rowid = edl.fk_lot";
+	$sql .= " JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.rowid = edl.fk_expeditiondet";
+	$sql .= " WHERE ed.fk_product = ".$fk_product;
+	$sql .= " AND pl.batch IS NOT NULL AND pl.batch != ''";
 	$sql .= " AND pl.batch NOT IN (";
 	$sql .= "   SELECT serial_number FROM ".MAIN_DB_PREFIX."svc_warranty";
 	$sql .= "   WHERE serial_number IS NOT NULL AND serial_number != ''";
 	$sql .= " )";
+	$sql .= " ORDER BY pl.batch ASC";
 }
-$sql .= " ORDER BY pl.batch ASC";
 
 $resql = $db->query($sql);
 

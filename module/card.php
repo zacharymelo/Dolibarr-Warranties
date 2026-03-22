@@ -355,15 +355,21 @@ if ($action == 'create') {
 
 	// Serial number — select populated server-side when product is known, AJAX when changed interactively.
 	// No 'flat' class so Select2 does not own this element; native DOM updates work reliably.
+	// Serials for SRs come from registered warranties — not from shipment records.
+	// Override-mode warranties have serials typed manually; they exist in svc_warranty
+	// but not in expeditiondet_batch. Scope to customer if known.
 	$prefill_serials = array();
 	if ($prefill_product > 0) {
-		$sql_ser  = "SELECT DISTINCT pl.batch AS serial_number";
-		$sql_ser .= " FROM ".MAIN_DB_PREFIX."expeditiondet_batch edl";
-		$sql_ser .= " JOIN ".MAIN_DB_PREFIX."product_lot pl ON pl.rowid = edl.fk_lot";
-		$sql_ser .= " JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.rowid = edl.fk_expeditiondet";
-		$sql_ser .= " WHERE ed.fk_product = ".((int) $prefill_product);
-		$sql_ser .= " AND pl.batch IS NOT NULL AND pl.batch != ''";
-		$sql_ser .= " ORDER BY pl.batch ASC";
+		$sql_ser  = "SELECT DISTINCT w.serial_number";
+		$sql_ser .= " FROM ".MAIN_DB_PREFIX."svc_warranty w";
+		$sql_ser .= " WHERE w.fk_product = ".((int) $prefill_product);
+		$sql_ser .= " AND w.serial_number IS NOT NULL AND w.serial_number != ''";
+		$sql_ser .= " AND w.status != 'voided'";
+		if ($prefill_soc > 0) {
+			$sql_ser .= " AND w.fk_soc = ".((int) $prefill_soc);
+		}
+		$sql_ser .= " AND w.entity IN (".getEntity('svcwarranty').")";
+		$sql_ser .= " ORDER BY w.serial_number ASC";
 		$res_ser = $db->query($sql_ser);
 		if ($res_ser) {
 			while ($oser = $db->fetch_object($res_ser)) {
@@ -516,7 +522,9 @@ if ($action == 'create') {
 			selSer.disabled = true;
 			return;
 		}
-		fetch(serialAjaxUrl + "&fk_product=" + pid, {credentials:"same-origin"})
+		var socEl = document.querySelector("[name=fk_soc]");
+		var sid   = socEl ? parseInt(socEl.value, 10) || 0 : 0;
+		fetch(serialAjaxUrl + "&fk_product=" + pid + (sid > 0 ? "&fk_soc=" + sid : ""), {credentials:"same-origin"})
 			.then(function(r){ return r.json(); })
 			.then(function(data){ setSerialOptions(data); })
 			.catch(function(){ setSerialOptions([]); });
