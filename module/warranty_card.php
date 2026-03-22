@@ -482,7 +482,7 @@ if ($action == 'create') {
 	// Customer (shared across all modes)
 	print '<tr><td class="fieldrequired">'.$langs->trans('Customer').'</td>';
 	print '<td>';
-	print $formcompany->select_company(GETPOST('fk_soc', 'int'), 'fk_soc', 's.client IN (2,3)', $langs->trans('SelectThird'), 0, 0, null, 0, 'minwidth300 maxwidth500 widthcentpercentminusxx');
+	print $formcompany->select_company(GETPOST('fk_soc', 'int'), 'fk_soc', '(s.client:IN:1,3)', $langs->trans('SelectThird'), 0, 0, null, 0, 'minwidth300 maxwidth500 widthcentpercentminusxx');
 	print '</td></tr>';
 
 	// Product — Standard row (products with unassigned serials in product_lot)
@@ -625,7 +625,7 @@ if ($action == 'create') {
 	$wtype_defaults_js = '{';
 	foreach ($wtype_items as $wt) {
 		$wtype_options[$wt->code] = dol_escape_htmltag($wt->label);
-		$wtype_defaults_js .= '"'.dol_escape_js($wt->code).'":'.((int) $wt->default_coverage_days).',';
+		$wtype_defaults_js .= '"'.dol_escape_js($wt->code).'":{"days":'.((int) $wt->default_coverage_days).',"terms":'.json_encode((string) $wt->coverage_terms).',"excl":'.json_encode((string) $wt->exclusions).'},';
 	}
 	$wtype_defaults_js = rtrim($wtype_defaults_js, ',').'}';
 
@@ -659,7 +659,7 @@ if ($action == 'create') {
 	print ' <span id="coverage_manual_hint" class="opacitymedium"'.($selected_wtype ? ' style="display:none"' : '').'>'.$langs->trans('ExpiryAutoComputed').'</span>';
 	print '</td></tr>';
 
-	// Inline JS for coverage auto-fill
+	// Inline JS for coverage auto-fill + coverage terms / exclusions prefill
 	print '<script>
 (function(){
 	var defaults = '.$wtype_defaults_js.';
@@ -667,14 +667,25 @@ if ($action == 'create') {
 	var cm  = document.getElementById("coverage_days");
 	var autoHint   = document.getElementById("coverage_auto_hint");
 	var manualHint = document.getElementById("coverage_manual_hint");
+	function setEditorValue(name, val){
+		if(typeof CKEDITOR !== "undefined" && CKEDITOR.instances[name]){
+			CKEDITOR.instances[name].setData(val);
+		} else {
+			var el = document.getElementById(name);
+			if(el) el.value = val;
+		}
+	}
 	function sync(){
 		var code = sel ? sel.value : "";
 		if(code && defaults[code] !== undefined){
-			cm.value    = defaults[code];
+			var d = defaults[code];
+			cm.value    = d.days;
 			cm.disabled = true;
 			cm.style.opacity = "0.5";
 			if(autoHint)   autoHint.style.display   = "";
 			if(manualHint) manualHint.style.display = "none";
+			setEditorValue("coverage_terms", d.terms || "");
+			setEditorValue("exclusions",     d.excl  || "");
 		} else {
 			cm.disabled = false;
 			cm.style.opacity = "";
@@ -794,7 +805,7 @@ print '<table class="border centpercent tableforfield">';
 print '<tr><td class="titlefield">'.$langs->trans('Customer').'</td>';
 print '<td>';
 if ($action == 'edit') {
-	print $formcompany->select_company($object->fk_soc, 'fk_soc', 's.client IN (2,3)', '', 0, 0, null, 0, 'minwidth200 maxwidth400');
+	print $formcompany->select_company($object->fk_soc, 'fk_soc', '(s.client:IN:1,3)', '', 0, 0, null, 0, 'minwidth200 maxwidth400');
 } else {
 	$soc = new Societe($db);
 	if ($soc->fetch($object->fk_soc) > 0) {
@@ -835,7 +846,7 @@ if ($action == 'edit') {
 	$wtype_defaults_edit_js = '{';
 	foreach ($wtype_items_edit as $wt) {
 		$wtype_options_edit[$wt->code] = dol_escape_htmltag($wt->label);
-		$wtype_defaults_edit_js .= '"'.dol_escape_js($wt->code).'":'.((int) $wt->default_coverage_days).',';
+		$wtype_defaults_edit_js .= '"'.dol_escape_js($wt->code).'":{"days":'.((int) $wt->default_coverage_days).',"terms":'.json_encode((string) $wt->coverage_terms).',"excl":'.json_encode((string) $wt->exclusions).'},';
 	}
 	$wtype_defaults_edit_js = rtrim($wtype_defaults_edit_js, ',').'}';
 	print Form::selectarray('warranty_type', $wtype_options_edit, $object->warranty_type, 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth200', 0, '', '', true);
@@ -844,13 +855,30 @@ if ($action == 'edit') {
 	var defaults = '.$wtype_defaults_edit_js.';
 	var sel = document.getElementById("warranty_type");
 	var cm  = document.getElementById("coverage_days");
+	function setEditorValue(name, val){
+		if(typeof CKEDITOR !== "undefined" && CKEDITOR.instances[name]){
+			CKEDITOR.instances[name].setData(val);
+		} else {
+			var el = document.getElementById(name);
+			if(el) el.value = val;
+		}
+	}
+	var userChanged = false;
 	function sync(){
 		var code = sel ? sel.value : "";
 		if(code && defaults[code] !== undefined){
-			cm.value = defaults[code]; cm.disabled = true; cm.style.opacity = "0.5";
+			var d = defaults[code];
+			cm.value = d.days; cm.disabled = true; cm.style.opacity = "0.5";
+			if(userChanged){
+				setEditorValue("coverage_terms", d.terms || "");
+				setEditorValue("exclusions",     d.excl  || "");
+			}
 		} else { cm.disabled = false; cm.style.opacity = ""; }
 	}
-	if(sel){ sel.addEventListener("change", sync); sync(); }
+	if(sel){
+		sel.addEventListener("change", function(){ userChanged = true; sync(); });
+		sync();
+	}
 })();
 </script>';
 } else {
