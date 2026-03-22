@@ -109,45 +109,45 @@ class modWarrantySvc extends DolibarrModules
 
 		$r = 0;
 
-		// RMA Case permissions
+		// Service Request permissions — object = 'svcrequest'
 		$r++;
 		$this->rights[$r][0] = 510001;
-		$this->rights[$r][1] = 'Read RMA cases';
+		$this->rights[$r][1] = 'Read service requests';
 		$this->rights[$r][2] = 'r';
 		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'warrantysvc';
+		$this->rights[$r][4] = 'svcrequest';
 		$this->rights[$r][5] = 'read';
 
 		$r++;
 		$this->rights[$r][0] = 510002;
-		$this->rights[$r][1] = 'Create and edit RMA cases';
+		$this->rights[$r][1] = 'Create and edit service requests';
 		$this->rights[$r][2] = 'w';
 		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'warrantysvc';
+		$this->rights[$r][4] = 'svcrequest';
 		$this->rights[$r][5] = 'write';
 
 		$r++;
 		$this->rights[$r][0] = 510003;
-		$this->rights[$r][1] = 'Delete RMA cases';
+		$this->rights[$r][1] = 'Delete service requests';
 		$this->rights[$r][2] = 'd';
 		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'warrantysvc';
+		$this->rights[$r][4] = 'svcrequest';
 		$this->rights[$r][5] = 'delete';
 
 		$r++;
 		$this->rights[$r][0] = 510004;
-		$this->rights[$r][1] = 'Validate RMA cases';
+		$this->rights[$r][1] = 'Validate service requests';
 		$this->rights[$r][2] = 'w';
 		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'warrantysvc';
+		$this->rights[$r][4] = 'svcrequest';
 		$this->rights[$r][5] = 'validate';
 
 		$r++;
 		$this->rights[$r][0] = 510005;
-		$this->rights[$r][1] = 'Close RMA cases';
+		$this->rights[$r][1] = 'Close service requests';
 		$this->rights[$r][2] = 'w';
 		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'warrantysvc';
+		$this->rights[$r][4] = 'svcrequest';
 		$this->rights[$r][5] = 'close';
 
 		// Warranty permissions
@@ -191,13 +191,13 @@ class modWarrantySvc extends DolibarrModules
 			'langs'    => 'warrantysvc@warrantysvc',
 			'position' => 100,
 			'enabled'  => 'isModEnabled("warrantysvc")',
-			'perms'    => '$user->hasRight("warrantysvc", "warrantysvc", "read")',
+			'perms'    => '$user->hasRight("warrantysvc", "svcrequest", "read")',
 			'target'   => '',
 			'user'     => 0,
 		);
 		$r++;
 
-		// RMA Cases sub-menu
+		// Service Requests sub-menu
 		$this->menu[$r] = array(
 			'fk_menu'  => 'fk_mainmenu=warrantysvc',
 			'type'     => 'left',
@@ -209,13 +209,13 @@ class modWarrantySvc extends DolibarrModules
 			'langs'    => 'warrantysvc@warrantysvc',
 			'position' => 100,
 			'enabled'  => 'isModEnabled("warrantysvc")',
-			'perms'    => '$user->hasRight("warrantysvc", "warrantysvc", "read")',
+			'perms'    => '$user->hasRight("warrantysvc", "svcrequest", "read")',
 			'target'   => '',
 			'user'     => 0,
 		);
 		$r++;
 
-		// New RMA
+		// New Service Request
 		$this->menu[$r] = array(
 			'fk_menu'  => 'fk_mainmenu=warrantysvc,fk_leftmenu=warrantysvc_list',
 			'type'     => 'left',
@@ -227,7 +227,7 @@ class modWarrantySvc extends DolibarrModules
 			'langs'    => 'warrantysvc@warrantysvc',
 			'position' => 110,
 			'enabled'  => 'isModEnabled("warrantysvc")',
-			'perms'    => '$user->hasRight("warrantysvc", "warrantysvc", "write")',
+			'perms'    => '$user->hasRight("warrantysvc", "svcrequest", "write")',
 			'target'   => '',
 			'user'     => 0,
 		);
