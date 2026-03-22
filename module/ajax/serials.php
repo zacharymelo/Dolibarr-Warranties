@@ -30,16 +30,22 @@ if ($fk_product <= 0) {
 	exit;
 }
 
+// mode=svcrequest: include serials that already have a warranty (they are the primary target for SRs)
+// default (warranty creation flow): exclude already-warranted serials
+$mode = GETPOST('mode', 'alpha');
+
 $sql  = "SELECT DISTINCT pl.batch AS serial_number";
 $sql .= " FROM ".MAIN_DB_PREFIX."expeditiondet_batch edl";
 $sql .= " JOIN ".MAIN_DB_PREFIX."product_lot pl ON pl.rowid = edl.fk_lot";
 $sql .= " JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.rowid = edl.fk_expeditiondet";
 $sql .= " WHERE ed.fk_product = ".((int) $fk_product);
 $sql .= " AND pl.batch IS NOT NULL AND pl.batch != ''";
-$sql .= " AND pl.batch NOT IN (";
-$sql .= "   SELECT serial_number FROM ".MAIN_DB_PREFIX."svc_warranty";
-$sql .= "   WHERE serial_number IS NOT NULL AND serial_number != ''";
-$sql .= " )";
+if ($mode !== 'svcrequest') {
+	$sql .= " AND pl.batch NOT IN (";
+	$sql .= "   SELECT serial_number FROM ".MAIN_DB_PREFIX."svc_warranty";
+	$sql .= "   WHERE serial_number IS NOT NULL AND serial_number != ''";
+	$sql .= " )";
+}
 $sql .= " ORDER BY pl.batch ASC";
 
 $resql = $db->query($sql);

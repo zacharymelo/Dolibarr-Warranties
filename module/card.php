@@ -333,17 +333,23 @@ if ($action == 'create') {
 
 	print '<table class="border centpercent tableforfieldcreate">';
 
+	// Pre-fill values from GET params (e.g. when arriving from warranty card button)
+	$prefill_soc     = GETPOST('fk_soc', 'int');
+	$prefill_product = GETPOST('fk_product', 'int');
+	$prefill_serial  = GETPOST('serial_number', 'alpha');
+	$prefill_project = GETPOST('fk_project', 'int');
+
 	// Customer
 	print '<tr><td class="fieldrequired">'.$langs->trans('Company').'</td>';
-	print '<td>'.$form->select_company('', 'fk_soc', '(s.client:IN:2,3)', 1, 0, 0, array(), 0, 'minwidth300').'</td></tr>';
+	print '<td>'.$form->select_company($prefill_soc, 'fk_soc', '(s.client:IN:2,3)', 1, 0, 0, array(), 0, 'minwidth300').'</td></tr>';
 
 	// Product
 	print '<tr><td class="fieldrequired">'.$langs->trans('Product').'</td>';
 	print '<td>';
 	if (!is_null($filtered_product_list)) {
-		print Form::selectarray('fk_product', $filtered_product_list, '', 1, 0, 0, '', 0, 0, 0, '', 'flat minwidth300');
+		print Form::selectarray('fk_product', $filtered_product_list, $prefill_product, 1, 0, 0, '', 0, 0, 0, '', 'flat minwidth300');
 	} else {
-		$form->select_produits(0, 'fk_product', '', 0, 0, -1, 0, '', 1, 0, 'minwidth300');
+		$form->select_produits($prefill_product, 'fk_product', '', 0, 0, -1, 0, '', 1, 0, 'minwidth300');
 	}
 	print '</td></tr>';
 
@@ -431,11 +437,13 @@ if ($action == 'create') {
 	print '</form>';
 
 	print '<script>(function(){
-	var serialAjaxUrl  = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/serials.php"';
+	var serialAjaxUrl  = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/serials.php?mode=svcrequest"';
 	print ';
 	var projectAjaxUrl = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/projects.php'.'";
-	var selSer   = document.getElementById("serial_number");
-	var selProj  = document.getElementById("fk_project");
+	var selSer      = document.getElementById("serial_number");
+	var selProj     = document.getElementById("fk_project");
+	var prefillSer  = '.json_encode($prefill_serial).';
+	var prefillProj = '.((int) $prefill_project).';
 	var noSerial  = "'.dol_escape_js($langs->trans('NoSerialsAvailable')).'";
 	var pickProd  = "'.dol_escape_js($langs->trans('SelectProductFirst')).'";
 	var pickSer   = "\u2014 '.dol_escape_js($langs->trans('SelectSerial')).' \u2014";
@@ -478,9 +486,12 @@ if ($action == 'create') {
 			selSer.appendChild(opt);
 			return;
 		}
-		fetch(serialAjaxUrl + "?fk_product=" + pid, {credentials:"same-origin"})
+		fetch(serialAjaxUrl + "&fk_product=" + pid, {credentials:"same-origin"})
 			.then(function(r){ return r.json(); })
-			.then(function(data){ setSerialOptions(data); })
+			.then(function(data){
+				setSerialOptions(data);
+				if(prefillSer){ selSer.value = prefillSer; }
+			})
 			.catch(function(){ setSerialOptions([]); });
 	}
 
@@ -511,6 +522,7 @@ if ($action == 'create') {
 					selProj.appendChild(opt);
 				});
 				selProj.disabled = (data.length === 0);
+				if(prefillProj){ selProj.value = prefillProj; }
 			})
 			.catch(function(){ selProj.disabled = true; });
 	}
