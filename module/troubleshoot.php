@@ -21,6 +21,7 @@ if (!$res && file_exists("../../../main.inc.php")) { $res = @include "../../../m
 if (!$res) { die("Include of main fails"); }
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcrequest.class.php';
 require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/lib/warrantysvc.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/lib/troubleshoot.lib.php';
