@@ -176,6 +176,25 @@ SvcRequestSlip = Service Request Authorization
 ReturnInstructions = Return Instructions
 ReturnShipTo = Please return the unit to:
 EstimatedResolution = Estimated Resolution
+DatePrinted = Printed
+ComponentLines = Component Lines
+TrackingInfo = Tracking Information
+LineType = Type
+Shipped = Shipped
+LineTypeComponentOut = Outbound Part
+LineTypeComponentIn = Return Part
+LineTypeConsumedSite = Consumed On-Site
+TechnicianSignature = Technician Signature
+CustomerSignature = Customer Signature
+DateSigned = Date
+SerialOut = Replacement Serial
+SerialIn = Returned Serial
+OutboundCarrier = Outbound Carrier
+OutboundTracking = Outbound Tracking #
+ReturnCarrier = Return Carrier
+ReturnTracking = Return Tracking #
+IssueDescription = Issue Description
+ResolutionNotes = Resolution Notes
 
 #
 # Tabs
