@@ -394,24 +394,36 @@ if ($action == 'create') {
 	}
 	print '</td></tr>';
 
-	// Warranty (optional manual pairing)
+	// Warranty — selecting one auto-fills product + serial; selecting a serial auto-fills this.
+	// Render manually so we can embed data-serial and data-product on each option.
 	print '<tr><td>'.$form->textwithpicto($langs->trans('SvcWarranty'), $langs->trans('TooltipSvcWarranty')).'</td>';
 	print '<td>';
-	$sql_w = "SELECT rowid, ref, serial_number, status FROM ".MAIN_DB_PREFIX."svc_warranty";
-	$sql_w .= " WHERE entity = ".((int) $conf->entity)." ORDER BY ref ASC";
+	$sql_w  = "SELECT rowid, ref, serial_number, fk_product, status FROM ".MAIN_DB_PREFIX."svc_warranty";
+	$sql_w .= " WHERE entity = ".((int) $conf->entity);
+	$sql_w .= " AND status != 'voided'";
+	if ($prefill_soc > 0) {
+		$sql_w .= " AND fk_soc = ".((int) $prefill_soc);
+	}
+	$sql_w .= " ORDER BY ref ASC";
 	$res_w = $db->query($sql_w);
-	$warranty_opts = array('' => '');
+	$prefill_warranty = (int) GETPOST('fk_warranty', 'int');
+	print '<select name="fk_warranty" id="fk_warranty" class="minwidth300">';
+	print '<option value=""></option>';
 	if ($res_w) {
 		while ($ow = $db->fetch_object($res_w)) {
-			$label = $ow->ref;
+			$label = dol_escape_htmltag($ow->ref);
 			if ($ow->serial_number) {
-				$label .= ' — '.$ow->serial_number;
+				$label .= ' — '.dol_escape_htmltag($ow->serial_number);
 			}
-			$label .= ' ('.$ow->status.')';
-			$warranty_opts[$ow->rowid] = $label;
+			$label .= ' ('.dol_escape_htmltag($ow->status).')';
+			$sel = ($prefill_warranty === (int) $ow->rowid) ? ' selected' : '';
+			print '<option value="'.(int) $ow->rowid.'"'
+				.' data-serial="'.dol_escape_htmltag($ow->serial_number).'"'
+				.' data-product="'.(int) $ow->fk_product.'"'
+				.$sel.'>'.$label.'</option>';
 		}
 	}
-	print Form::selectarray('fk_warranty', $warranty_opts, GETPOST('fk_warranty', 'int'), 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
+	print '</select>';
 	print '</td></tr>';
 
 	// Resolution type — chosen at intake so the workflow is immediately clear
@@ -484,6 +496,8 @@ if ($action == 'create') {
 	// The serial select has no "flat" class so Select2 does not own it; native DOM updates work reliably.
 	// True when product was pre-filled server-side — skip the AJAX load on page init.
 	var serialPreloaded = '.($prefill_product > 0 ? 'true' : 'false').';
+	var pendingSerial   = "";   // set before triggering a product change; consumed by setSerialOptions
+	var selWar = document.getElementById("fk_warranty");
 
 	function notifySelect2(el){
 		if(typeof jQuery !== "undefined" && jQuery.fn.select2){
@@ -512,6 +526,48 @@ if ($action == 'create') {
 				selSer.appendChild(opt);
 			});
 		}
+		// Auto-select serial requested by warranty sync
+		if(pendingSerial){
+			selSer.value = pendingSerial;
+			pendingSerial = "";
+		}
+	}
+
+	// Warranty → serial + product sync
+	function onWarrantyChange(){
+		if(!selWar) return;
+		var opt = selWar.options[selWar.selectedIndex];
+		if(!opt || !opt.value) return;
+		var serial  = opt.dataset.serial  || "";
+		var product = parseInt(opt.dataset.product, 10) || 0;
+		// Set product first; loadSerials fires on product change and will pick up pendingSerial
+		var prodEl = document.getElementById("fk_product") || document.querySelector("[name=fk_product]");
+		if(product && prodEl && parseInt(prodEl.value, 10) !== product){
+			pendingSerial = serial;
+			if(typeof jQuery !== "undefined" && jQuery.fn.select2){
+				jQuery(prodEl).val(product).trigger("change");
+			} else {
+				prodEl.value = product;
+				prodEl.dispatchEvent(new Event("change", {bubbles:true}));
+			}
+		} else if(serial && selSer){
+			// Product already correct — just set the serial directly
+			selSer.value = serial;
+		}
+	}
+
+	// Serial → warranty sync
+	function onSerialChange(){
+		if(!selWar || !selSer) return;
+		var serial = selSer.value;
+		for(var i = 0; i < selWar.options.length; i++){
+			if(selWar.options[i].dataset.serial === serial){
+				selWar.selectedIndex = i;
+				return;
+			}
+		}
+		// No matching warranty found — clear the warranty field
+		selWar.selectedIndex = 0;
 	}
 
 	function loadSerials(){
@@ -568,8 +624,10 @@ if ($action == 'create') {
 		jQuery(document).on("select2:select select2:clear", "[name=fk_soc]", loadProjects);
 	}
 	document.addEventListener("change", function(e){
-		if(e.target && e.target.name === "fk_product"){ loadSerials(); }
-		if(e.target && e.target.name === "fk_soc"){ loadProjects(); }
+		if(e.target && e.target.name === "fk_product")  { loadSerials(); }
+		if(e.target && e.target.name === "fk_soc")      { loadProjects(); }
+		if(e.target && e.target.name === "fk_warranty") { onWarrantyChange(); }
+		if(e.target && e.target.name === "serial_number"){ onSerialChange(); }
 	});
 
 	if(!serialPreloaded){ loadSerials(); }
