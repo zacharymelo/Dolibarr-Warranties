@@ -73,6 +73,12 @@ if ($action == 'add' && $permwrite) {
 
 	$result = $object->create($user);
 	if ($result > 0) {
+		if ($object->fk_expedition > 0) {
+			$object->add_object_linked('expedition', $object->fk_expedition);
+		}
+		if ($object->fk_commande > 0) {
+			$object->add_object_linked('commande', $object->fk_commande);
+		}
 		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$result);
 		exit;
 	} else {
@@ -1133,6 +1139,15 @@ print '</div>'; // fichecenter
 print '<div class="clearboth"></div>';
 
 print dol_get_fiche_end();
+
+// ---- Linked objects block ----
+if ($action != 'edit' && $object->id > 0) {
+	$tmparray = $form->showLinkToObjectBlock($object, array(), array('svcwarranty'), 1);
+	$linktoelem = isset($tmparray['linktoelem']) ? $tmparray['linktoelem'] : '';
+	$htmltoenteralink = isset($tmparray['htmltoenteralink']) ? $tmparray['htmltoenteralink'] : '';
+	print $htmltoenteralink;
+	$somethingshown = $form->showLinkedObjectBlock($object, $linktoelem);
+}
 
 // ---- Action buttons ----
 if ($action == 'edit') {

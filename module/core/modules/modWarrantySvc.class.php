@@ -50,7 +50,7 @@ class modWarrantySvc extends DolibarrModules
 			'login' => 0,
 			'substitutions' => 0,
 			'menus' => 0,
-			'hooks' => array('data' => array('globalcard'), 'entity' => '0'),
+			'hooks' => array('data' => array('globalcard', 'elementproperties'), 'entity' => '0'),
 			'apis' => 1,      // api/ directory enabled (registers via Luracast)
 		);
 
