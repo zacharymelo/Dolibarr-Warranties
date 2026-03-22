@@ -46,11 +46,12 @@ class modWarrantySvc extends DolibarrModules
 
 		// Module parts (triggers, login, substitutions, menus, tpl, hooks, modulebuilder, cronjobs, unittest)
 		$this->module_parts = array(
-			'triggers' => 0,
+			'triggers' => 1,  // triggers/ directory enabled
 			'login' => 0,
 			'substitutions' => 0,
 			'menus' => 0,
 			'hooks' => array('data' => array('globalcard'), 'entity' => '0'),
+			'apis' => 1,      // api/ directory enabled (registers via Luracast)
 		);
 
 		// Data dirs created when module enabled

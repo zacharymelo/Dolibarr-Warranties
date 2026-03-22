@@ -1143,4 +1143,72 @@ class SvcRequest extends CommonObject
 
 		return $serials;
 	}
+
+	/**
+	 * Factory: create a SvcRequest pre-populated from a CRM phone call (actioncomm)
+	 *
+	 * Reads the actioncomm record to pull: fk_soc, fk_contact, description,
+	 * date, and the call record ID. Saves the new SvcRequest as draft and
+	 * links back via fk_pbxcall / add_object_linked().
+	 *
+	 * @param  int  $actioncomm_id  ID of the llx_actioncomm record (phone call)
+	 * @param  User $user           User creating the request
+	 * @return int                  >0 = new SvcRequest ID, <0 = error
+	 */
+	public function createFromCall($actioncomm_id, $user)
+	{
+		if (empty($actioncomm_id)) {
+			$this->error = 'MissingActionCommId';
+			return -1;
+		}
+
+		// Load the actioncomm (CRM event / phone call)
+		$sql  = "SELECT rowid, fk_soc, fk_contact, note, datep, fk_user_action";
+		$sql .= " FROM ".MAIN_DB_PREFIX."actioncomm";
+		$sql .= " WHERE rowid = ".((int) $actioncomm_id);
+		$sql .= " AND entity IN (".getEntity('actioncomm').")";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+
+		$call = $this->db->fetch_object($resql);
+		$this->db->free($resql);
+
+		if (!$call) {
+			$this->error = 'ActionCommNotFound';
+			return -1;
+		}
+
+		// Pre-fill from call
+		$this->fk_soc          = $call->fk_soc;
+		$this->fk_contact      = $call->fk_contact;
+		$this->issue_description = $call->note ? strip_tags($call->note) : '';
+		$this->issue_date      = $this->db->jdate($call->datep);
+		$this->reported_via    = 'phone';
+		$this->fk_pbxcall      = $actioncomm_id;
+		$this->resolution_type = 'guidance'; // default — agent will update
+
+		if (empty($this->fk_user_assigned) && !empty($call->fk_user_action)) {
+			$this->fk_user_assigned = $call->fk_user_action;
+		}
+
+		// Check warranty automatically if configured
+		global $conf;
+		if (getDolGlobalInt('WARRANTYSVC_AUTO_WARRANTY_CHECK') && !empty($this->serial_number)) {
+			$this->checkWarrantyStatus();
+		}
+
+		$result = $this->create($user);
+		if ($result <= 0) {
+			return $result;
+		}
+
+		// Link back to the actioncomm via object_linked table
+		$this->add_object_linked('actioncomm', $actioncomm_id);
+
+		return $result;
+	}
 }
