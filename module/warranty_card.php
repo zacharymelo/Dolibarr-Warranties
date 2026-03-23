@@ -241,7 +241,7 @@ if ($action == 'create_from_shipment') {
 			foreach ($wtype_items as $wt) {
 				if ($wt->code === $selected_wtype) { $initial_days = (int) $wt->default_coverage_days; break; }
 			}
-			$days_disabled = ($selected_wtype ? ' disabled style="opacity:0.5"' : '');
+			$days_disabled = ($selected_wtype ? ' readonly style="opacity:0.5"' : '');
 
 			print '<br>';
 			print '<form action="'.$_SERVER['PHP_SELF'].'" method="POST">';
@@ -333,10 +333,10 @@ if ($action == 'create_from_shipment') {
 	function syncType(){
 		var code = selType ? selType.value : "";
 		if(code && wtdef[code] !== undefined){
-			inpCov.value = wtdef[code]; inpCov.disabled = true; inpCov.style.opacity = "0.5";
+			inpCov.value = wtdef[code]; inpCov.readOnly = true; inpCov.style.opacity = "0.5";
 			if(hint) hint.style.display = "";
 		} else {
-			inpCov.disabled = false; inpCov.style.opacity = "";
+			inpCov.readOnly = false; inpCov.style.opacity = "";
 			if(hint) hint.style.display = "none";
 		}
 	}
@@ -759,7 +759,7 @@ if (initMode === "standard") {
 	print '</td></tr>';
 
 	// Coverage months — disabled when a type is selected (auto-filled by JS)
-	$days_disabled = ($selected_wtype ? ' disabled style="opacity:0.5"' : '');
+	$days_disabled = ($selected_wtype ? ' readonly style="opacity:0.5"' : '');
 	print '<tr><td>'.$form->textwithpicto($langs->trans('CoverageDays'), $langs->trans('TooltipCoverageDays')).'</td>';
 	print '<td>';
 	print '<input type="number" id="coverage_days" name="coverage_days" value="'.$initial_days.'" class="flat width75" min="1" max="3650"'.$days_disabled.'>';
@@ -789,14 +789,14 @@ if (initMode === "standard") {
 		if(code && defaults[code] !== undefined){
 			var d = defaults[code];
 			cm.value    = d.days;
-			cm.disabled = true;
+			cm.readOnly = true;
 			cm.style.opacity = "0.5";
 			if(autoHint)   autoHint.style.display   = "";
 			if(manualHint) manualHint.style.display = "none";
 			setEditorValue("coverage_terms", d.terms || "");
 			setEditorValue("exclusions",     d.excl  || "");
 		} else {
-			cm.disabled = false;
+			cm.readOnly = false;
 			cm.style.opacity = "";
 			if(autoHint)   autoHint.style.display   = "none";
 			if(manualHint) manualHint.style.display = "";
