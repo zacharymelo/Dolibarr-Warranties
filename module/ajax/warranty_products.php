@@ -32,19 +32,21 @@ if ($socid <= 0) {
 
 // Products shipped to this customer that still have at least one unassigned serial
 // (serial exists in product_lot but not yet in svc_warranty)
+// Note: batch/serial is in product_lot.batch, referenced via expeditiondet_batch.fk_lot
 $sql  = "SELECT DISTINCT p.rowid, p.ref, p.label";
 $sql .= " FROM ".MAIN_DB_PREFIX."product p";
 $sql .= " INNER JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.fk_product = p.rowid";
 $sql .= " INNER JOIN ".MAIN_DB_PREFIX."expedition e ON e.rowid = ed.fk_expedition";
 $sql .= " INNER JOIN ".MAIN_DB_PREFIX."expeditiondet_batch edb ON edb.fk_expeditiondet = ed.rowid";
+$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product_lot pl ON pl.rowid = edb.fk_lot";
 $sql .= " WHERE e.fk_soc = ".((int) $socid);
 $sql .= " AND e.fk_statut >= 1";
 $sql .= " AND e.entity IN (".getEntity('expedition').")";
 $sql .= " AND p.entity IN (".getEntity('product').")";
-$sql .= " AND edb.batch IS NOT NULL AND edb.batch != ''";
+$sql .= " AND pl.batch IS NOT NULL AND pl.batch != ''";
 $sql .= " AND NOT EXISTS (";
 $sql .= "   SELECT 1 FROM ".MAIN_DB_PREFIX."svc_warranty w";
-$sql .= "   WHERE w.serial_number = edb.batch";
+$sql .= "   WHERE w.serial_number = pl.batch";
 $sql .= "   AND w.fk_product = p.rowid";
 $sql .= "   AND w.status != 'voided'";
 $sql .= "   AND w.serial_number IS NOT NULL AND w.serial_number != ''";

@@ -419,6 +419,7 @@ NoSerialsAvailable = No known serials for this product
 SelectCustomerFirst = Select a customer first
 SelectProject = Select a project...
 NoProjectForCustomer = No open projects for this customer
+NoProductForCustomer = No shipped products found for this customer
 NoProductsWithUnassignedSerials = All registered serials are already covered by a warranty. Register a new shipment or add serial numbers via the Stocks module before creating a manual warranty.
 WarrantyModeStandard = Standard
 WarrantyModeOverride = Override / Special Case

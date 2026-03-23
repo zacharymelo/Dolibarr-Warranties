@@ -314,30 +314,8 @@ if ($action == 'confirm_delete' && GETPOST('confirm', 'alpha') == 'yes' && $perm
 $form = new Form($db);
 $formcompany = new FormCompany($db);
 
-// Build filtered product list: show products that either have a warranty record OR
-// appear in at least one validated shipment. This covers units shipped but not yet
-// warranted — they should still be selectable on a service request.
-// Falls back to null (full Ajax select) only if neither source has any records yet.
-$filtered_product_list = array();
-$lot_filter = getDolGlobalString('WARRANTYSVC_WARRANTY_REQUIRES_LOTS') ? " AND p.tobatch > 0" : "";
-$sql_fp  = "SELECT DISTINCT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
-$sql_fp .= " WHERE p.entity IN (".getEntity('product').")".$lot_filter;
-$sql_fp .= " AND (";
-$sql_fp .= "   EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."svc_warranty w WHERE w.fk_product = p.rowid AND w.entity IN (".getEntity('svcwarranty')."))";
-$sql_fp .= "   OR EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."expeditiondet ed";
-$sql_fp .= "     JOIN ".MAIN_DB_PREFIX."expedition e ON e.rowid = ed.fk_expedition";
-$sql_fp .= "     WHERE ed.fk_product = p.rowid AND e.fk_statut >= 1 AND e.entity IN (".getEntity('expedition')."))";
-$sql_fp .= " )";
-$sql_fp .= " ORDER BY p.ref ASC";
-$res_fp = $db->query($sql_fp);
-if ($res_fp) {
-	while ($obj_fp = $db->fetch_object($res_fp)) {
-		$filtered_product_list[$obj_fp->rowid] = $obj_fp->ref.($obj_fp->label ? ' — '.$obj_fp->label : '');
-	}
-}
-if (empty($filtered_product_list)) {
-	$filtered_product_list = null; // no warranties on record yet — fall back to full product select
-}
+// Product list is now loaded dynamically via AJAX (ajax/sr_products.php) when the customer changes.
+// No server-side product list needed for the create form.
 
 llxHeader('', ($id ? $object->ref : $langs->trans('NewSvcRequest')), '');
 
@@ -359,10 +337,9 @@ if ($action == 'create') {
 	print '<input type="hidden" name="backtopage" value="'.dol_escape_htmltag($backtopage).'">';
 	print '<input type="hidden" name="sr_mode" id="sr_mode_hidden" value="'.dol_escape_htmltag($sr_mode).'">';
 
-	print dol_get_fiche_head(array(), '', '', -1);
-
-	// Mode selector
-	print '<div class="tabsAction" style="margin-bottom:8px;padding:8px 0;">';
+	// Mode selector — plain div (no tabsAction class) placed before dol_get_fiche_head,
+	// matching warranty_card.php. tabsAction applies right-aligned action-bar CSS.
+	print '<div style="padding:8px 0 12px 0">';
 	print '<label style="margin-right:16px;font-weight:bold;">'.$langs->trans('SrMode').'</label>';
 	print '<label style="margin-right:12px;cursor:pointer;">';
 	print '<input type="radio" name="_sr_mode_radio" value="standard"'.($sr_mode === 'standard' ? ' checked' : '').'> ';
@@ -371,6 +348,8 @@ if ($action == 'create') {
 	print '<input type="radio" name="_sr_mode_radio" value="override"'.($sr_mode === 'override' ? ' checked' : '').'> ';
 	print dol_escape_htmltag($langs->trans('SrModeOverride')).'</label>';
 	print '</div>';
+
+	print dol_get_fiche_head(array(), '', '', -1);
 
 	// Override warning banner
 	if ($sr_mode === 'override') {
@@ -395,14 +374,13 @@ if ($action == 'create') {
 	print '<tr><td class="fieldrequired">'.$langs->trans('Company').'</td>';
 	print '<td>'.$form->select_company($prefill_soc, 'fk_soc', '(s.client:IN:1,3)', 1, 0, 0, array(), 0, 'minwidth300').'</td></tr>';
 
-	// Product
+	// Product — disabled until customer is selected; populated via AJAX (ajax/sr_products.php).
+	// When arriving from warranty card with fk_product prefilled, JS re-enables and sets value after customer loads.
 	print '<tr><td class="fieldrequired">'.$langs->trans('Product').'</td>';
 	print '<td>';
-	if (!is_null($filtered_product_list)) {
-		print Form::selectarray('fk_product', $filtered_product_list, $prefill_product, 1, 0, 0, '', 0, 0, 0, '', 'flat minwidth300');
-	} else {
-		$form->select_produits($prefill_product, 'fk_product', '', 0, 0, -1, 0, '', 1, 0, 'minwidth300');
-	}
+	print '<select name="fk_product" id="fk_product" class="flat minwidth300" '.($prefill_soc > 0 ? '' : 'disabled').'>';
+	print '<option value="">'.dol_escape_htmltag($langs->trans('SelectCustomerFirst')).'</option>';
+	print '</select>';
 	print '</td></tr>';
 
 	// Serial number — select populated server-side when product is known, AJAX when changed interactively.
@@ -412,7 +390,7 @@ if ($action == 'create') {
 	// but not in expeditiondet_batch. Scope to customer if known.
 	$prefill_serials = array();
 	if ($prefill_product > 0) {
-		// Serials from warranty records
+		// Query 1: serials from warranty records (primary source for SRs)
 		$sql_ser  = "SELECT DISTINCT w.serial_number AS serial_number";
 		$sql_ser .= " FROM ".MAIN_DB_PREFIX."svc_warranty w";
 		$sql_ser .= " WHERE w.fk_product = ".((int) $prefill_product);
@@ -422,19 +400,6 @@ if ($action == 'create') {
 			$sql_ser .= " AND w.fk_soc = ".((int) $prefill_soc);
 		}
 		$sql_ser .= " AND w.entity IN (".getEntity('svcwarranty').")";
-		// UNION serials from validated shipments (covers units without a warranty record)
-		$sql_ser .= " UNION SELECT DISTINCT pl.batch AS serial_number";
-		$sql_ser .= " FROM ".MAIN_DB_PREFIX."expeditiondet_batch edl";
-		$sql_ser .= " JOIN ".MAIN_DB_PREFIX."product_lot pl ON pl.rowid = edl.fk_lot";
-		$sql_ser .= " JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.rowid = edl.fk_expeditiondet";
-		$sql_ser .= " JOIN ".MAIN_DB_PREFIX."expedition e ON e.rowid = ed.fk_expedition";
-		$sql_ser .= " WHERE ed.fk_product = ".((int) $prefill_product);
-		$sql_ser .= " AND e.fk_statut >= 1";
-		if ($prefill_soc > 0) {
-			$sql_ser .= " AND e.fk_soc = ".((int) $prefill_soc);
-		}
-		$sql_ser .= " AND e.entity IN (".getEntity('expedition').")";
-		$sql_ser .= " AND pl.batch IS NOT NULL AND pl.batch != ''";
 		$sql_ser .= " ORDER BY serial_number ASC";
 		$res_ser = $db->query($sql_ser);
 		if ($res_ser) {
@@ -442,6 +407,28 @@ if ($action == 'create') {
 				$prefill_serials[] = $oser->serial_number;
 			}
 		}
+		// Query 2: serials from validated shipments via lot tracking (secondary; skipped if table unavailable)
+		$sql_ser2  = "SELECT DISTINCT pl.batch AS serial_number";
+		$sql_ser2 .= " FROM ".MAIN_DB_PREFIX."expeditiondet_batch edl";
+		$sql_ser2 .= " JOIN ".MAIN_DB_PREFIX."product_lot pl ON pl.rowid = edl.fk_lot";
+		$sql_ser2 .= " JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.rowid = edl.fk_expeditiondet";
+		$sql_ser2 .= " JOIN ".MAIN_DB_PREFIX."expedition e ON e.rowid = ed.fk_expedition";
+		$sql_ser2 .= " WHERE ed.fk_product = ".((int) $prefill_product);
+		$sql_ser2 .= " AND e.fk_statut >= 1";
+		if ($prefill_soc > 0) {
+			$sql_ser2 .= " AND e.fk_soc = ".((int) $prefill_soc);
+		}
+		$sql_ser2 .= " AND e.entity IN (".getEntity('expedition').")";
+		$sql_ser2 .= " AND pl.batch IS NOT NULL AND pl.batch != ''";
+		$sql_ser2 .= " ORDER BY serial_number ASC";
+		$res_ser2 = $db->query($sql_ser2);
+		if ($res_ser2) {
+			while ($oser2 = $db->fetch_object($res_ser2)) {
+				$prefill_serials[] = $oser2->serial_number;
+			}
+		}
+		$prefill_serials = array_values(array_unique($prefill_serials));
+		sort($prefill_serials);
 	}
 	print '<tr><td>'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipSerialNumber')).'</td>';
 	print '<td>';
@@ -565,21 +552,23 @@ if ($action == 'create') {
 	print '</form>';
 
 	print '<script>(function(){
-	var serialAjaxUrl  = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/serials.php?mode=svcrequest"';
+	var serialAjaxUrl    = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/serials.php?mode=svcrequest"';
 	print ';
-	var projectAjaxUrl = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/projects.php'.'";
+	var srProductAjaxUrl = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/sr_products.php'.'";
+	var projectAjaxUrl   = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/projects.php'.'";
 	var selSer  = document.getElementById("serial_number");
 	var selProj = document.getElementById("fk_project");
 	var noSerial  = "'.dol_escape_js($langs->trans('NoSerialsAvailable')).'";
 	var pickProd  = "'.dol_escape_js($langs->trans('SelectProductFirst')).'";
+	var pickSel   = "'.dol_escape_js($langs->trans('SelectProduct')).'";
+	var noProd    = "'.dol_escape_js($langs->trans('NoProductForCustomer')).'";
 	var pickSer   = "\u2014 '.dol_escape_js($langs->trans('SelectSerial')).' \u2014";
 	var pickCust  = "'.dol_escape_js($langs->trans('SelectCustomerFirst')).'";
 	var noProj    = "'.dol_escape_js($langs->trans('NoProjectForCustomer')).'";
 	var pickProj  = "\u2014 '.dol_escape_js($langs->trans('SelectProject')).' \u2014";
-	// The serial select has no "flat" class so Select2 does not own it; native DOM updates work reliably.
-	// True when product was pre-filled server-side — skip the AJAX load on page init.
-	var serialPreloaded = '.($prefill_product > 0 ? 'true' : 'false').';
-	var pendingSerial   = "";   // set before triggering a product change; consumed by setSerialOptions
+	// pending* vars are consumed after an async product/serial load
+	var pendingProduct  = '.((int) $prefill_product).';
+	var pendingSerial   = "'.dol_escape_js($prefill_serial).'";
 	var selWar = document.getElementById("fk_warranty");
 
 	function notifySelect2(el){
@@ -623,16 +612,22 @@ if ($action == 'create') {
 		if(!opt || !opt.value) return;
 		var serial  = opt.dataset.serial  || "";
 		var product = parseInt(opt.dataset.product, 10) || 0;
-		// Set product first; loadSerials fires on product change and will pick up pendingSerial
 		var prodEl = document.getElementById("fk_product") || document.querySelector("[name=fk_product]");
-		if(product && prodEl && parseInt(prodEl.value, 10) !== product){
+		if(!product || !prodEl) return;
+		// Check if the product option exists in the current list
+		var hasOption = prodEl.querySelector("option[value=\"" + product + "\"]");
+		if(!hasOption){
+			// Product options not yet loaded — queue and trigger a product load
+			pendingProduct = product;
+			pendingSerial  = serial;
+			loadSrProducts();
+			return;
+		}
+		if(parseInt(prodEl.value, 10) !== product){
+			// Product is in list but not selected — set it (triggers loadSerials via change event)
 			pendingSerial = serial;
-			if(typeof jQuery !== "undefined" && jQuery.fn.select2){
-				jQuery(prodEl).val(product).trigger("change");
-			} else {
-				prodEl.value = product;
-				prodEl.dispatchEvent(new Event("change", {bubbles:true}));
-			}
+			prodEl.value  = product;
+			prodEl.dispatchEvent(new Event("change", {bubbles:true}));
 		} else if(serial && selSer){
 			// Product already correct — just set the serial directly
 			selSer.value = serial;
@@ -667,6 +662,46 @@ if ($action == 'create') {
 			.then(function(r){ return r.json(); })
 			.then(function(data){ setSerialOptions(data); })
 			.catch(function(){ setSerialOptions([]); });
+	}
+
+	function loadSrProducts(){
+		var socEl = document.querySelector("[name=fk_soc]");
+		var sid   = socEl ? parseInt(socEl.value, 10) || 0 : 0;
+		var prodEl = document.getElementById("fk_product");
+		if(!prodEl) return;
+		if(!sid){
+			prodEl.innerHTML = "<option value=\'\'>" + pickCust + "</option>";
+			prodEl.disabled = true;
+			// Reset serial when customer is cleared
+			if(selSer){ selSer.innerHTML = "<option value=\'\'>" + pickProd + "</option>"; selSer.disabled = true; }
+			return;
+		}
+		fetch(srProductAjaxUrl + "?socid=" + sid, {credentials:"same-origin"})
+			.then(function(r){ return r.json(); })
+			.then(function(data){
+				prodEl.innerHTML = "";
+				var blank = document.createElement("option");
+				blank.value = "";
+				blank.textContent = data.length ? ("\u2014 " + pickSel + " \u2014") : noProd;
+				prodEl.appendChild(blank);
+				data.forEach(function(p){
+					var opt = document.createElement("option");
+					opt.value = p.rowid;
+					opt.textContent = p.label;
+					prodEl.appendChild(opt);
+				});
+				prodEl.disabled = (data.length === 0);
+				// Consume pending product (e.g. arrived via URL param or warranty sync)
+				if(pendingProduct && prodEl.querySelector("option[value=\"" + pendingProduct + "\"]")){
+					prodEl.value   = pendingProduct;
+					pendingProduct = 0;
+					loadSerials();
+				} else if(!pendingProduct){
+					// Customer changed interactively — reset serial
+					if(selSer){ selSer.innerHTML = "<option value=\'\'>" + pickProd + "</option>"; selSer.disabled = true; }
+				}
+			})
+			.catch(function(){ prodEl.disabled = true; });
 	}
 
 	function loadProjects(){
@@ -704,16 +739,17 @@ if ($action == 'create') {
 
 	if(typeof jQuery !== "undefined"){
 		jQuery(document).on("select2:select select2:clear", "[name=fk_product]", loadSerials);
-		jQuery(document).on("select2:select select2:clear", "[name=fk_soc]", loadProjects);
+		jQuery(document).on("select2:select select2:clear", "[name=fk_soc]", function(){ loadSrProducts(); loadProjects(); });
 	}
 	document.addEventListener("change", function(e){
-		if(e.target && e.target.name === "fk_product")  { loadSerials(); }
-		if(e.target && e.target.name === "fk_soc")      { loadProjects(); }
-		if(e.target && e.target.name === "fk_warranty") { onWarrantyChange(); }
+		if(e.target && e.target.name === "fk_product")   { loadSerials(); }
+		if(e.target && e.target.name === "fk_soc")       { loadSrProducts(); loadProjects(); }
+		if(e.target && e.target.name === "fk_warranty")  { onWarrantyChange(); }
 		if(e.target && e.target.name === "serial_number"){ onSerialChange(); }
 	});
 
-	if(!serialPreloaded){ loadSerials(); }
+	// On init: load products and projects for pre-selected customer (if any)
+	loadSrProducts();
 	loadProjects();
 })();</script>';
 
