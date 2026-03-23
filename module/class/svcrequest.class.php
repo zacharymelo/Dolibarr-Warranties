@@ -722,38 +722,344 @@ class SvcRequest extends CommonObject
 	}
 
 	/**
-	 * Create an outbound shipment (Expedition) from this RMA's component lines
+	 * Create a replacement sales order (Commande) with 100% discount for this RMA.
 	 *
-	 * @param  User $user User performing action
-	 * @return int        Expedition ID if OK, <0 if KO
+	 * Creates and validates an SO for the customer, adds a single line for the
+	 * chosen replacement product at 0 price (100% discount), and stores
+	 * fk_commande, serial_out, and fk_warehouse_source on the SR.
+	 *
+	 * @param  User   $user          User performing action
+	 * @param  int    $fk_product    Replacement product ID
+	 * @param  string $serial        Replacement serial number
+	 * @param  int    $fk_warehouse  Source warehouse ID
+	 * @return int                   SO ID if OK, <0 if KO
 	 */
-	public function createOutboundShipment($user)
+	public function createReplacementOrder($user, $fk_product, $serial, $fk_warehouse)
+	{
+		global $conf;
+
+		if (!isModEnabled('order')) {
+			$this->error = 'ModuleOrderNotEnabled';
+			return -1;
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
+
+		$prod = new Product($this->db);
+		$prod->fetch((int) $fk_product);
+		$desc = $prod->label ? $prod->label : $prod->ref;
+
+		$order                = new Commande($this->db);
+		$order->socid         = $this->fk_soc;
+		$order->date_commande = dol_now();
+		$order->entity        = $conf->entity;
+		$order->fk_project    = $this->fk_project;
+		$order->note_private  = 'RMA '.$this->ref.' - replacement order';
+
+		$this->db->begin();
+
+		$order_id = $order->create($user);
+		if ($order_id < 0) {
+			$this->db->rollback();
+			$this->error  = $order->error;
+			$this->errors = $order->errors;
+			return -1;
+		}
+
+		// Add line with 100% discount so the SO has zero value
+		$result = $order->addline(
+			$desc,       // description
+			0,           // unit price HT
+			1,           // qty
+			0,           // TVA rate
+			0,           // localtax1
+			0,           // localtax2
+			(int) $fk_product,
+			100          // remise_percent — 100% discount
+		);
+		if ($result < 0) {
+			$this->db->rollback();
+			$this->error  = $order->error;
+			$this->errors = $order->errors;
+			return -1;
+		}
+
+		// Validate SO so Dolibarr allows expedition creation from it
+		if ($order->valid($user) < 0) {
+			$this->db->rollback();
+			$this->error  = $order->error;
+			$this->errors = $order->errors;
+			return -1;
+		}
+
+		$this->fk_commande        = $order_id;
+		$this->serial_out         = $serial;
+		$this->fk_warehouse_source = (int) $fk_warehouse;
+		if ($this->update($user) < 0) {
+			$this->db->rollback();
+			return -1;
+		}
+
+		$this->db->commit();
+		return $order_id;
+	}
+
+	/**
+	 * Create an outbound shipment (Expedition) from this RMA's replacement order.
+	 *
+	 * Requires fk_commande to be set (call createReplacementOrder first).
+	 * Creates an Expedition linked to the SO, adds the product line, and
+	 * attaches the serial batch record when serial_out is present.
+	 *
+	 * @param  User $user          User performing action
+	 * @param  int  $fk_warehouse  Source warehouse (overrides fk_warehouse_source if >0)
+	 * @return int                 Expedition ID if OK, <0 if KO
+	 */
+	public function createOutboundShipment($user, $fk_warehouse = 0)
 	{
 		if (!isModEnabled('expedition')) {
 			$this->error = 'ModuleExpeditionNotEnabled';
+			return -1;
+		}
+		if (empty($this->fk_commande)) {
+			$this->error = 'NoReplacementOrderLinked';
+			return -1;
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/expedition/class/expedition.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
+
+		$order = new Commande($this->db);
+		if ($order->fetch($this->fk_commande) <= 0) {
+			$this->error = 'CannotLoadReplacementOrder';
+			return -1;
+		}
+		if (empty($order->lines)) {
+			$order->fetch_lines();
+		}
+		if (empty($order->lines)) {
+			$this->error = 'ReplacementOrderHasNoLines';
+			return -1;
+		}
+		$order_line = $order->lines[0];
+
+		$wh = ($fk_warehouse > 0) ? (int) $fk_warehouse : (int) $this->fk_warehouse_source;
+
+		$this->db->begin();
+
+		$shipment               = new Expedition($this->db);
+		$shipment->socid        = $this->fk_soc;
+		$shipment->origin       = 'commande';
+		$shipment->origin_id    = $this->fk_commande;
+		$shipment->fk_project   = $this->fk_project;
+		$shipment->note_private = 'RMA '.$this->ref;
+
+		$shipment_id = $shipment->create($user);
+		if ($shipment_id < 0) {
+			$this->db->rollback();
+			$this->error  = $shipment->error;
+			$this->errors = $shipment->errors;
+			return -1;
+		}
+
+		// Add expedition line referencing the SO line
+		$exp_line_id = $shipment->addline($wh, $order_line->id, 1);
+		if ($exp_line_id < 0) {
+			$this->db->rollback();
+			$this->error  = $shipment->error;
+			$this->errors = $shipment->errors;
+			return -1;
+		}
+
+		// Attach serial/lot batch record on the expedition line
+		if (!empty($this->serial_out) && $exp_line_id > 0) {
+			// Resolve product_stock rowid for this product+warehouse
+			$sql_ps = "SELECT rowid FROM ".MAIN_DB_PREFIX."product_stock"
+				." WHERE fk_product = ".((int) $order_line->fk_product)
+				." AND fk_entrepot = ".$wh
+				." LIMIT 1";
+			$resql_ps = $this->db->query($sql_ps);
+			$ps_id = ($resql_ps && ($obj_ps = $this->db->fetch_object($resql_ps))) ? (int) $obj_ps->rowid : 0;
+
+			$sql_batch = "INSERT INTO ".MAIN_DB_PREFIX."expeditiondet_batch"
+				." (fk_expeditiondet, fk_origin_stock, batch, qty, eatby, sellby)"
+				." VALUES ("
+				.$exp_line_id.", "
+				.$ps_id.", "
+				."'".$this->db->escape($this->serial_out)."', "
+				."1, NULL, NULL)";
+			$this->db->query($sql_batch); // non-fatal: shipment exists even if batch insert fails
+		}
+
+		$this->fk_shipment  = $shipment_id;
+		$this->date_shipped = dol_now();
+		if ($wh > 0) {
+			$this->fk_warehouse_source = $wh;
+		}
+		if ($this->update($user) < 0) {
+			$this->db->rollback();
+			return -1;
+		}
+
+		$this->db->commit();
+		return $shipment_id;
+	}
+
+	/**
+	 * Validate the outbound shipment linked to this RMA.
+	 *
+	 * @param  User $user User performing action
+	 * @return int        >0 if OK, <0 if KO
+	 */
+	public function validateShipment($user)
+	{
+		if (empty($this->fk_shipment)) {
+			$this->error = 'NoShipmentLinked';
 			return -1;
 		}
 
 		require_once DOL_DOCUMENT_ROOT.'/expedition/class/expedition.class.php';
 
 		$shipment = new Expedition($this->db);
-		$shipment->socid      = $this->fk_soc;
-		$shipment->fk_project = $this->fk_project;
-		$shipment->note_private = 'RMA '.$this->ref;
+		if ($shipment->fetch($this->fk_shipment) <= 0) {
+			$this->error = 'CannotLoadShipment';
+			return -1;
+		}
+		if ((int) $shipment->statut >= 1) {
+			return 1; // already validated
+		}
 
-		$shipment_id = $shipment->create($user);
-		if ($shipment_id < 0) {
+		if ($shipment->valid($user) < 0) {
 			$this->error  = $shipment->error;
 			$this->errors = $shipment->errors;
 			return -1;
 		}
 
-		// Link back
-		$this->fk_shipment  = $shipment_id;
 		$this->date_shipped = dol_now();
-		$this->update($user);
+		return $this->update($user);
+	}
 
-		return $shipment_id;
+	/**
+	 * Create a return reception (Reception) for equipment coming back from the customer.
+	 *
+	 * The reception is created without a source PO. Product lines are derived from
+	 * the outbound shipment (fk_shipment) so the customer can only return what was sent.
+	 * Lines are inserted directly into receptiondet_batch (fk_commandefourndet = NULL).
+	 *
+	 * @param  User $user          User performing action
+	 * @param  int  $fk_warehouse  Destination warehouse for the returned goods
+	 * @return int                 Reception ID if OK, <0 if KO
+	 */
+	public function createReturnReception($user, $fk_warehouse)
+	{
+		global $conf;
+
+		if (!isModEnabled('reception')) {
+			$this->error = 'ModuleReceptionNotEnabled';
+			return -1;
+		}
+		if (empty($this->fk_shipment)) {
+			$this->error = 'NoShipmentLinked';
+			return -1;
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/reception/class/reception.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/expedition/class/expedition.class.php';
+
+		$shipment = new Expedition($this->db);
+		if ($shipment->fetch($this->fk_shipment) <= 0) {
+			$this->error = 'CannotLoadShipment';
+			return -1;
+		}
+		if (empty($shipment->lines)) {
+			$shipment->fetch_lines();
+		}
+
+		$this->db->begin();
+
+		$reception               = new Reception($this->db);
+		$reception->socid        = $this->fk_soc;
+		$reception->fk_projet    = $this->fk_project;
+		$reception->note_private = 'RMA '.$this->ref.' - customer return';
+		$reception->entity       = $conf->entity;
+
+		$rec_id = $reception->create($user);
+		if ($rec_id < 0) {
+			$this->db->rollback();
+			$this->error  = $reception->error;
+			$this->errors = $reception->errors;
+			return -1;
+		}
+
+		// Insert one reception line per expedition product (no PO line — fk_commandefourndet NULL)
+		foreach ($shipment->lines as $exp_line) {
+			$fk_product = (int) $exp_line->fk_product;
+			$qty        = (float) $exp_line->qty;
+			if ($fk_product <= 0 || $qty <= 0) {
+				continue;
+			}
+
+			$sql = "INSERT INTO ".MAIN_DB_PREFIX."receptiondet_batch"
+				." (fk_reception, fk_product, qty, fk_entrepot, fk_commandefourndet, comment, status)"
+				." VALUES ("
+				.$rec_id.", "
+				.$fk_product.", "
+				.$qty.", "
+				.((int) $fk_warehouse).", "
+				."NULL, "
+				."'".$this->db->escape('RMA '.$this->ref)."', "
+				."0)";
+			if (!$this->db->query($sql)) {
+				$this->db->rollback();
+				$this->error = $this->db->lasterror();
+				return -1;
+			}
+		}
+
+		$this->fk_reception        = $rec_id;
+		$this->fk_warehouse_return = (int) $fk_warehouse;
+		if ($this->update($user) < 0) {
+			$this->db->rollback();
+			return -1;
+		}
+
+		$this->db->commit();
+		return $rec_id;
+	}
+
+	/**
+	 * Validate the return reception linked to this RMA.
+	 *
+	 * @param  User $user User performing action
+	 * @return int        >0 if OK, <0 if KO
+	 */
+	public function validateReception($user)
+	{
+		if (empty($this->fk_reception)) {
+			$this->error = 'NoReceptionLinked';
+			return -1;
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/reception/class/reception.class.php';
+
+		$reception = new Reception($this->db);
+		if ($reception->fetch($this->fk_reception) <= 0) {
+			$this->error = 'CannotLoadReception';
+			return -1;
+		}
+		if ((int) $reception->statut >= 1) {
+			return 1; // already validated
+		}
+
+		if ($reception->valid($user) < 0) {
+			$this->error  = $reception->error;
+			$this->errors = $reception->errors;
+			return -1;
+		}
+
+		$this->date_return_received = dol_now();
+		return $this->update($user);
 	}
 
 	/**
