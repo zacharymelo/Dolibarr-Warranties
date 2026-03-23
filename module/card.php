@@ -383,43 +383,14 @@ if ($action == 'create') {
 	// CREATE FORM
 	// =====================================================================
 
-	$sr_mode = GETPOST('sr_mode', 'alpha');
-	if (!in_array($sr_mode, array('standard', 'override'))) {
-		$sr_mode = 'standard';
-	}
-
 	print load_fiche_titre($langs->trans('NewSvcRequest'), '', 'technic');
 
 	print '<form action="'.$_SERVER['PHP_SELF'].'" method="POST">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
 	print '<input type="hidden" name="action" value="add">';
 	print '<input type="hidden" name="backtopage" value="'.dol_escape_htmltag($backtopage).'">';
-	print '<input type="hidden" name="sr_mode" id="sr_mode_hidden" value="'.dol_escape_htmltag($sr_mode).'">';
-
-	// Mode selector — plain div (no tabsAction class) placed before dol_get_fiche_head,
-	// matching warranty_card.php. tabsAction applies right-aligned action-bar CSS.
-	print '<div style="padding:8px 0 12px 0">';
-	print '<label style="margin-right:16px;font-weight:bold;">'.$langs->trans('SrMode').'</label>';
-	print '<label style="margin-right:12px;cursor:pointer;">';
-	print '<input type="radio" name="_sr_mode_radio" value="standard"'.($sr_mode === 'standard' ? ' checked' : '').'> ';
-	print dol_escape_htmltag($langs->trans('SrModeStandard')).'</label>';
-	print '<label style="cursor:pointer;">';
-	print '<input type="radio" name="_sr_mode_radio" value="override"'.($sr_mode === 'override' ? ' checked' : '').'> ';
-	print dol_escape_htmltag($langs->trans('SrModeOverride')).'</label>';
-	print '</div>';
 
 	print dol_get_fiche_head(array(), '', '', -1);
-
-	// Override warning banner
-	if ($sr_mode === 'override') {
-		print '<div class="warning" id="sr_override_warning" style="margin-bottom:8px;">'
-			.$langs->trans('SrModeOverrideWarning')
-			.'</div>';
-	} else {
-		print '<div class="warning" id="sr_override_warning" style="margin-bottom:8px;display:none;">'
-			.$langs->trans('SrModeOverrideWarning')
-			.'</div>';
-	}
 
 	print '<table class="border centpercent tableforfieldcreate">';
 
