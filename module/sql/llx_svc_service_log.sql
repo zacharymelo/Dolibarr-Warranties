@@ -9,7 +9,8 @@ CREATE TABLE llx_svc_service_log(
 	last_service_date      DATE,
 	condition_score        INTEGER,
 	condition_notes        TEXT,
-	condition_status       VARCHAR(50)   DEFAULT 'good',
+	condition_status       SMALLINT      DEFAULT 0,
 	date_last_updated      DATETIME,
-	tms                    TIMESTAMP
+	tms                    TIMESTAMP,
+	import_key             VARCHAR(14)
 ) ENGINE=innodb;

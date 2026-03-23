@@ -194,9 +194,9 @@ foreach ($types as $t) {
 		print '</td>';
 		print '<td class="center">';
 		if ($permwrite) {
-			print '<a class="editfielda" href="'.$_SERVER['PHP_SELF'].'?action=edit&id='.$t->rowid.'">'.img_picto($langs->trans('Edit'), 'edit').'</a>';
+			print '<a class="editfielda" href="'.$_SERVER['PHP_SELF'].'?action=edit&token='.newToken().'&id='.$t->rowid.'">'.img_picto($langs->trans('Edit'), 'edit').'</a>';
 			print ' &nbsp; ';
-			print '<a class="deletefielda" href="'.$_SERVER['PHP_SELF'].'?action=delete&id='.$t->rowid.'">'.img_picto($langs->trans('Delete'), 'delete').'</a>';
+			print '<a class="deletefielda" href="'.$_SERVER['PHP_SELF'].'?action=delete&token='.newToken().'&id='.$t->rowid.'">'.img_picto($langs->trans('Delete'), 'delete').'</a>';
 		}
 		print '</td>';
 		print '</tr>';

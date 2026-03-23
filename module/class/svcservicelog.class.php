@@ -26,11 +26,11 @@ class SvcServiceLog
 	/** @var int ID */
 	public $id;
 
-	// Condition status constants
-	const CONDITION_GOOD     = 'good';
-	const CONDITION_FAIR     = 'fair';
-	const CONDITION_POOR     = 'poor';
-	const CONDITION_SCRAP    = 'scrap';
+	// Condition status constants — stored as SMALLINT in DB
+	const CONDITION_GOOD     = 0;
+	const CONDITION_FAIR     = 1;
+	const CONDITION_POOR     = 2;
+	const CONDITION_SCRAP    = 3;
 
 	public $entity;
 	public $fk_product;
@@ -119,7 +119,7 @@ class SvcServiceLog
 			$sql .= ", last_service_date = ".($this->last_service_date ? "'".$this->db->idate($this->last_service_date)."'" : "NULL");
 			$sql .= ", condition_score = ".((int) $this->condition_score);
 			$sql .= ", condition_notes = ".($this->condition_notes ? "'".$this->db->escape($this->condition_notes)."'" : "NULL");
-			$sql .= ", condition_status = '".$this->db->escape($this->condition_status)."'";
+			$sql .= ", condition_status = ".((int) $this->condition_status);
 			$sql .= ", date_last_updated = '".$this->db->idate($this->date_last_updated)."'";
 			$sql .= " WHERE rowid = ".((int) $this->id);
 		} else {
@@ -136,7 +136,7 @@ class SvcServiceLog
 			$sql .= ", ".($this->last_service_date ? "'".$this->db->idate($this->last_service_date)."'" : "NULL");
 			$sql .= ", ".((int) $this->condition_score);
 			$sql .= ", ".($this->condition_notes ? "'".$this->db->escape($this->condition_notes)."'" : "NULL");
-			$sql .= ", '".$this->db->escape($this->condition_status)."'";
+			$sql .= ", ".((int) $this->condition_status);
 			$sql .= ", '".$this->db->idate($this->date_last_updated)."'";
 			$sql .= ")";
 		}

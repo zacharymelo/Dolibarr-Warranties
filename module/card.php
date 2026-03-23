@@ -23,10 +23,11 @@ require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/lib/warrantysvc.lib.php';
 
 $langs->loadLangs(array('warrantysvc@warrantysvc', 'companies', 'bills', 'stocks'));
 
-$id     = GETPOST('id', 'int');
-$ref    = GETPOST('ref', 'alpha');
-$action = GETPOST('action', 'aZ09');
-$cancel = GETPOST('cancel', 'alpha');
+$id         = GETPOST('id', 'int');
+$ref        = GETPOST('ref', 'alpha');
+$action     = GETPOST('action', 'aZ09');
+$cancel     = GETPOST('cancel', 'alpha');
+$backtopage = GETPOST('backtopage', 'alpha');
 
 $object = new SvcRequest($db);
 
@@ -59,7 +60,22 @@ $types_no_movement     = array('guidance', 'informational');
 /*
  * Actions
  */
-if ($cancel) { $action = ''; }
+$backurlforlist = DOL_URL_ROOT.'/custom/warrantysvc/list.php';
+
+if (empty($backtopage) || ($cancel && empty($id))) {
+	if (empty($backtopage) || ($cancel && strpos($backtopage, '__ID__'))) {
+		if (empty($id) && (($action != 'add' && $action != 'create') || $cancel)) {
+			$backtopage = $backurlforlist;
+		} else {
+			$backtopage = DOL_URL_ROOT.'/custom/warrantysvc/card.php?id='.(($id > 0) ? $id : '__ID__');
+		}
+	}
+}
+
+if ($cancel) {
+	header('Location: '.$backtopage);
+	exit;
+}
 
 if ($action == 'add' && $permwrite) {
 	$object->fk_soc            = GETPOST('fk_soc', 'int');
@@ -166,13 +182,17 @@ if ($action == 'confirm_close' && $permclose) {
 	exit;
 }
 
-if ($action == 'confirm_cancel' && $permwrite) {
-	$object->cancel($user);
+if ($action == 'confirm_cancel' && GETPOST('confirm', 'alpha') == 'yes' && $permwrite) {
+	$result = $object->cancel($user);
+	if ($result > 0 && !empty($object->fk_shipment)) {
+		$shipment_url = DOL_URL_ROOT.'/expedition/card.php?id='.((int) $object->fk_shipment);
+		setEventMessages($langs->trans('SvcRequestCancelledWithShipmentWarning', $object->fk_shipment, $shipment_url), null, 'warnings');
+	}
 	header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
 	exit;
 }
 
-if ($action == 'confirm_reopen' && $permclose) {
+if ($action == 'confirm_reopen' && GETPOST('confirm', 'alpha') == 'yes' && $permclose) {
 	$object->reopen($user);
 	header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
 	exit;
@@ -279,7 +299,7 @@ if ($action == 'deleteline' && $permwrite) {
 	exit;
 }
 
-if ($action == 'confirm_delete' && $permdelete) {
+if ($action == 'confirm_delete' && GETPOST('confirm', 'alpha') == 'yes' && $permdelete) {
 	$result = $object->delete($user);
 	if ($result > 0) {
 		header('Location: '.DOL_URL_ROOT.'/custom/warrantysvc/list.php');
@@ -294,17 +314,20 @@ if ($action == 'confirm_delete' && $permdelete) {
 $form = new Form($db);
 $formcompany = new FormCompany($db);
 
-// Build filtered product list: show products that have at least one warranty record.
-// When the serial/lot restriction setting is also on, further restrict to tobatch > 0.
-// Falls back to null (full Ajax select) only if no warranties exist yet.
+// Build filtered product list: show products that either have a warranty record OR
+// appear in at least one validated shipment. This covers units shipped but not yet
+// warranted — they should still be selectable on a service request.
+// Falls back to null (full Ajax select) only if neither source has any records yet.
 $filtered_product_list = array();
+$lot_filter = getDolGlobalString('WARRANTYSVC_WARRANTY_REQUIRES_LOTS') ? " AND p.tobatch > 0" : "";
 $sql_fp  = "SELECT DISTINCT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
-$sql_fp .= " INNER JOIN ".MAIN_DB_PREFIX."svc_warranty w ON w.fk_product = p.rowid";
-$sql_fp .= " AND w.entity IN (".getEntity('svcwarranty').")";
-$sql_fp .= " WHERE p.entity IN (".getEntity('product').")";
-if (getDolGlobalString('WARRANTYSVC_WARRANTY_REQUIRES_LOTS')) {
-	$sql_fp .= " AND p.tobatch > 0";
-}
+$sql_fp .= " WHERE p.entity IN (".getEntity('product').")".$lot_filter;
+$sql_fp .= " AND (";
+$sql_fp .= "   EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."svc_warranty w WHERE w.fk_product = p.rowid AND w.entity IN (".getEntity('svcwarranty')."))";
+$sql_fp .= "   OR EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."expeditiondet ed";
+$sql_fp .= "     JOIN ".MAIN_DB_PREFIX."expedition e ON e.rowid = ed.fk_expedition";
+$sql_fp .= "     WHERE ed.fk_product = p.rowid AND e.fk_statut >= 1 AND e.entity IN (".getEntity('expedition')."))";
+$sql_fp .= " )";
 $sql_fp .= " ORDER BY p.ref ASC";
 $res_fp = $db->query($sql_fp);
 if ($res_fp) {
@@ -323,13 +346,42 @@ if ($action == 'create') {
 	// CREATE FORM
 	// =====================================================================
 
+	$sr_mode = GETPOST('sr_mode', 'alpha');
+	if (!in_array($sr_mode, array('standard', 'override'))) {
+		$sr_mode = 'standard';
+	}
+
 	print load_fiche_titre($langs->trans('NewSvcRequest'), '', 'technic');
 
 	print '<form action="'.$_SERVER['PHP_SELF'].'" method="POST">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
 	print '<input type="hidden" name="action" value="add">';
+	print '<input type="hidden" name="backtopage" value="'.dol_escape_htmltag($backtopage).'">';
+	print '<input type="hidden" name="sr_mode" id="sr_mode_hidden" value="'.dol_escape_htmltag($sr_mode).'">';
 
 	print dol_get_fiche_head(array(), '', '', -1);
+
+	// Mode selector
+	print '<div class="tabsAction" style="margin-bottom:8px;padding:8px 0;">';
+	print '<label style="margin-right:16px;font-weight:bold;">'.$langs->trans('SrMode').'</label>';
+	print '<label style="margin-right:12px;cursor:pointer;">';
+	print '<input type="radio" name="_sr_mode_radio" value="standard"'.($sr_mode === 'standard' ? ' checked' : '').'> ';
+	print dol_escape_htmltag($langs->trans('SrModeStandard')).'</label>';
+	print '<label style="cursor:pointer;">';
+	print '<input type="radio" name="_sr_mode_radio" value="override"'.($sr_mode === 'override' ? ' checked' : '').'> ';
+	print dol_escape_htmltag($langs->trans('SrModeOverride')).'</label>';
+	print '</div>';
+
+	// Override warning banner
+	if ($sr_mode === 'override') {
+		print '<div class="warning" id="sr_override_warning" style="margin-bottom:8px;">'
+			.$langs->trans('SrModeOverrideWarning')
+			.'</div>';
+	} else {
+		print '<div class="warning" id="sr_override_warning" style="margin-bottom:8px;display:none;">'
+			.$langs->trans('SrModeOverrideWarning')
+			.'</div>';
+	}
 
 	print '<table class="border centpercent tableforfieldcreate">';
 
@@ -360,7 +412,8 @@ if ($action == 'create') {
 	// but not in expeditiondet_batch. Scope to customer if known.
 	$prefill_serials = array();
 	if ($prefill_product > 0) {
-		$sql_ser  = "SELECT DISTINCT w.serial_number";
+		// Serials from warranty records
+		$sql_ser  = "SELECT DISTINCT w.serial_number AS serial_number";
 		$sql_ser .= " FROM ".MAIN_DB_PREFIX."svc_warranty w";
 		$sql_ser .= " WHERE w.fk_product = ".((int) $prefill_product);
 		$sql_ser .= " AND w.serial_number IS NOT NULL AND w.serial_number != ''";
@@ -369,7 +422,20 @@ if ($action == 'create') {
 			$sql_ser .= " AND w.fk_soc = ".((int) $prefill_soc);
 		}
 		$sql_ser .= " AND w.entity IN (".getEntity('svcwarranty').")";
-		$sql_ser .= " ORDER BY w.serial_number ASC";
+		// UNION serials from validated shipments (covers units without a warranty record)
+		$sql_ser .= " UNION SELECT DISTINCT pl.batch AS serial_number";
+		$sql_ser .= " FROM ".MAIN_DB_PREFIX."expeditiondet_batch edl";
+		$sql_ser .= " JOIN ".MAIN_DB_PREFIX."product_lot pl ON pl.rowid = edl.fk_lot";
+		$sql_ser .= " JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.rowid = edl.fk_expeditiondet";
+		$sql_ser .= " JOIN ".MAIN_DB_PREFIX."expedition e ON e.rowid = ed.fk_expedition";
+		$sql_ser .= " WHERE ed.fk_product = ".((int) $prefill_product);
+		$sql_ser .= " AND e.fk_statut >= 1";
+		if ($prefill_soc > 0) {
+			$sql_ser .= " AND e.fk_soc = ".((int) $prefill_soc);
+		}
+		$sql_ser .= " AND e.entity IN (".getEntity('expedition').")";
+		$sql_ser .= " AND pl.batch IS NOT NULL AND pl.batch != ''";
+		$sql_ser .= " ORDER BY serial_number ASC";
 		$res_ser = $db->query($sql_ser);
 		if ($res_ser) {
 			while ($oser = $db->fetch_object($res_ser)) {
@@ -407,6 +473,23 @@ if ($action == 'create') {
 	$sql_w .= " ORDER BY ref ASC";
 	$res_w = $db->query($sql_w);
 	$prefill_warranty = (int) GETPOST('fk_warranty', 'int');
+
+	// Auto-select: if no explicit warranty is specified but product + customer context exists,
+	// find the single active warranty for that combination and pre-select it.
+	if ($prefill_warranty === 0 && $prefill_product > 0 && $prefill_soc > 0) {
+		$sql_aw  = "SELECT rowid FROM ".MAIN_DB_PREFIX."svc_warranty";
+		$sql_aw .= " WHERE fk_product = ".((int) $prefill_product);
+		$sql_aw .= " AND fk_soc = ".((int) $prefill_soc);
+		$sql_aw .= " AND status = 'active'";
+		$sql_aw .= " AND entity IN (".getEntity('svcwarranty').")";
+		$res_aw = $db->query($sql_aw);
+		if ($res_aw && $db->num_rows($res_aw) === 1) {
+			$row_aw = $db->fetch_object($res_aw);
+			$prefill_warranty = (int) $row_aw->rowid;
+		}
+		// 0 or >1 results → leave blank; user picks manually
+	}
+
 	print '<select name="fk_warranty" id="fk_warranty" class="minwidth300">';
 	print '<option value=""></option>';
 	if ($res_w) {
@@ -647,6 +730,43 @@ if ($action == 'create') {
 	$head = warrantysvc_prepare_head($object);
 	print dol_get_fiche_head($head, 'card', $langs->trans('SvcRequest'), -1, 'technic');
 
+	// Confirmation dialogs
+	$formconfirm = '';
+	if ($action == 'cancel') {
+		$formconfirm = $form->formconfirm(
+			$_SERVER['PHP_SELF'].'?id='.$object->id,
+			$langs->trans('CancelSvcRequest'),
+			$langs->trans('ConfirmCancelSvcRequest'),
+			'confirm_cancel',
+			'',
+			0,
+			1
+		);
+	}
+	if ($action == 'reopen') {
+		$formconfirm = $form->formconfirm(
+			$_SERVER['PHP_SELF'].'?id='.$object->id,
+			$langs->trans('ReopenSvcRequest'),
+			$langs->trans('ConfirmReopenSvcRequest'),
+			'confirm_reopen',
+			'',
+			0,
+			1
+		);
+	}
+	if ($action == 'delete') {
+		$formconfirm = $form->formconfirm(
+			$_SERVER['PHP_SELF'].'?id='.$object->id,
+			$langs->trans('DeleteSvcRequest'),
+			$langs->trans('ConfirmDeleteSvcRequest', $object->ref),
+			'confirm_delete',
+			'',
+			0,
+			1
+		);
+	}
+	print $formconfirm;
+
 	// Object banner
 	$linkback = '<a href="'.DOL_URL_ROOT.'/custom/warrantysvc/list.php">'
 		.img_picto($langs->trans('BackToList'), 'back', 'class="pictofixedwidth"')
@@ -779,7 +899,7 @@ if ($action == 'create') {
 				print '<a href="'.dol_buildpath('/pbxcalls/call_card.php', 1).'?id='.$object->fk_pbxcall.'">';
 				// Fetch call ref for display
 				$sql_cr  = "SELECT ref, caller_name, caller_number FROM ".MAIN_DB_PREFIX."pbxcalls_call";
-				$sql_cr .= " WHERE rowid = ".((int) $object->fk_pbxcall);
+				$sql_cr .= " WHERE rowid = ".((int) $object->fk_pbxcall)." AND entity = ".((int) $conf->entity);
 				$res_cr = $db->query($sql_cr);
 				if ($res_cr && ($cr = $db->fetch_object($res_cr))) {
 					print dol_escape_htmltag($cr->ref);
@@ -1075,6 +1195,15 @@ if ($action == 'create') {
 
 	print dol_get_fiche_end();
 
+	// ---- Linked objects block ----
+	if ($action != 'edit' && $object->id > 0) {
+		$tmparray = $form->showLinkToObjectBlock($object, array(), array('svcrequest'), 1);
+		$linktoelem = isset($tmparray['linktoelem']) ? $tmparray['linktoelem'] : '';
+		$htmltoenteralink = isset($tmparray['htmltoenteralink']) ? $tmparray['htmltoenteralink'] : '';
+		print $htmltoenteralink;
+		$somethingshown = $form->showLinkedObjectBlock($object, $linktoelem);
+	}
+
 	// =====================================================================
 	// ACTION BUTTONS — outside the fiche card per Dolibarr standard layout
 	// =====================================================================
@@ -1121,19 +1250,19 @@ if ($action == 'create') {
 			print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=confirm_close&token='.newToken().'" class="butAction">'.$langs->trans('CloseSvcRequest').'</a>';
 		}
 
-		// RESOLVED / CLOSED → Re-open
-		if (in_array($s, array(SvcRequest::STATUS_RESOLVED, SvcRequest::STATUS_CLOSED)) && $permclose) {
-			print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=confirm_reopen&token='.newToken().'" class="butActionDelete">'.$langs->trans('ReopenSvcRequest').'</a>';
+		// RESOLVED / CLOSED / CANCELLED → Re-open
+		if (in_array($s, array(SvcRequest::STATUS_RESOLVED, SvcRequest::STATUS_CLOSED, SvcRequest::STATUS_CANCELLED)) && $permclose) {
+			print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=reopen&token='.newToken().'" class="butActionDelete">'.$langs->trans('ReopenSvcRequest').'</a>';
 		}
 
-		// DRAFT / VALIDATED → Cancel
-		if (in_array($s, array(SvcRequest::STATUS_DRAFT, SvcRequest::STATUS_VALIDATED)) && $permwrite) {
-			print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=confirm_cancel&token='.newToken().'" class="butActionDelete">'.$langs->trans('CancelSvcRequest').'</a>';
+		// DRAFT / VALIDATED / IN_PROGRESS / AWAIT_RETURN → Cancel
+		if (in_array($s, array(SvcRequest::STATUS_DRAFT, SvcRequest::STATUS_VALIDATED, SvcRequest::STATUS_IN_PROGRESS, SvcRequest::STATUS_AWAIT_RETURN)) && $permwrite) {
+			print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=cancel&token='.newToken().'" class="butActionDelete">'.$langs->trans('CancelSvcRequest').'</a>';
 		}
 
-		// DRAFT → Delete
-		if ($s == SvcRequest::STATUS_DRAFT && $permdelete) {
-			print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=confirm_delete&token='.newToken().'" class="butActionDelete">'.$langs->trans('Delete').'</a>';
+		// DRAFT / CANCELLED → Delete
+		if (in_array($s, array(SvcRequest::STATUS_DRAFT, SvcRequest::STATUS_CANCELLED)) && $permdelete) {
+			print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=delete&token='.newToken().'" class="butActionDelete">'.$langs->trans('Delete').'</a>';
 		}
 	}
 

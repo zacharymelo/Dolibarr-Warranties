@@ -24,7 +24,7 @@ class SvcRequest extends CommonObject
 	public $TRIGGER_PREFIX = 'WARRANTYSVC';
 
 	/** @var string Element name */
-	public $element = 'warrantysvc';
+	public $element = 'svcrequest';
 
 	/** @var string Table name (without prefix) */
 	public $table_element = 'svc_request';
@@ -309,7 +309,7 @@ class SvcRequest extends CommonObject
 		$sql .= " t.note_private, t.note_public";
 		$sql .= " FROM ".MAIN_DB_PREFIX."svc_request as t";
 		if ($id) {
-			$sql .= " WHERE t.rowid = ".((int) $id);
+			$sql .= " WHERE t.rowid = ".((int) $id)." AND t.entity IN (".getEntity('svcrequest').")";
 		} elseif ($ref) {
 			$sql .= " WHERE t.ref = '".$this->db->escape($ref)."' AND t.entity = ".$conf->entity;
 		} else {

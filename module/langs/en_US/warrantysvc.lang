@@ -26,6 +26,8 @@ SvcRequests = Service Requests
 SvcWarranty = Warranty
 SvcWarranties = Warranties
 ServiceLog = Service Log
+LinkToWarranty = Link to warranty
+LinkToServiceRequest = Link to service request
 
 #
 # Status labels
@@ -157,6 +159,11 @@ MarkResolved = Mark Resolved
 CloseSvcRequest = Close
 ReopenSvcRequest = Re-open
 CancelSvcRequest = Cancel
+DeleteSvcRequest = Delete Service Request
+SvcRequestCancelledWithShipmentWarning = Service request cancelled. Linked shipment (ID: %s) still exists — <a href="%s">view it in the Shipments module</a> and cancel or delete it manually if no longer needed.
+ConfirmCancelSvcRequest = Are you sure you want to cancel this service request? This cannot be undone without re-opening.
+ConfirmReopenSvcRequest = Are you sure you want to re-open this service request?
+ConfirmDeleteSvcRequest = Are you sure you want to permanently delete service request %s? This action cannot be undone.
 SendReminder = Send Return Reminder
 InvoiceNonReturn = Invoice for Non-Return
 VoidWarranty = Void Warranty
@@ -419,3 +426,17 @@ WarrantyModeManual = Manual Entry
 WarrantyOverrideWarning = Override mode — only products with a validated shipment on record are shown. Serial number is entered manually and will not be validated against stock records. For special cases only (e.g. warranty transfers).
 WarrantyManualWarning = Manual entry mode — no module data is used. Both product and serial are entered freely. Use only when the Expedition or Stocks modules are not configured.
 SerialNumberOverridePlaceholder = Enter serial number manually...
+
+#
+# Product default warranty attributes
+#
+WarrantyDefaultType = Warranty Default Type
+WarrantyDefaultDays = Default Coverage Days
+WarrantyDefaultDaysPlaceholder = Leave blank to use type default
+WarrantyDefaultDaysFromType = days from type default
+WarrantyNoDefault = Not defined
+WarrantyInheritParent = Inherit from parent: %s
+WarrantyBlankInherits = Blank = inherit parent default (%s)
+WarrantyInheritDays = Inherit %d days from parent
+WarrantyInheritedFromParent = inherited from parent
+WarrantyVariantOverride = variant override

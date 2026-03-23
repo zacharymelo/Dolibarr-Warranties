@@ -33,7 +33,7 @@ The module integrates with native Dolibarr objects: Societe, Product, Expedition
 
 ## Installation
 
-1. Download the latest release zip (e.g. `warrantysvc-1.3.x.zip`).
+1. Download the latest release zip (e.g. `module_warrantysvc-1.15.0.zip`).
 2. Extract and copy the `warrantysvc/` folder into your Dolibarr `custom/` directory:
    ```
    htdocs/custom/warrantysvc/
@@ -189,7 +189,39 @@ Service request reference numbers follow the pattern `SVC-YYMM-XXXX` by default.
 
 ---
 
+## DoliStore Publication Checklist
+
+Before submitting to [DoliStore](https://www.dolistore.com):
+
+- [ ] **Register a module ID** in the `100000–499999` range on the [Dolibarr module ID wiki page](https://wiki.dolibarr.org/index.php?title=List_of_modules_id) and update `$this->numero` in `core/modules/modWarrantySvc.class.php`
+  - Current value `510000` is valid for private use only (`>500000` range)
+  - DoliStore requires a registered ID in `100000–499999`
+- [x] Zip named `module_warrantysvc-VERSION.zip` (DoliStore file validator requirement)
+- [x] `docs/LICENSE` present (GPL v3)
+- [x] `langs/en_US/warrantysvc.lang` present and complete
+- [x] `main.inc.php` loaded via multi-depth fallback (htdocs/custom + htdocs compatibility)
+- [ ] Test "Deploy an external module" via Dolibarr **Home → Setup → Modules** before submitting
+- [ ] English product description ready for DoliStore listing
+- [ ] Support contact email ready (required for paid modules)
+
+---
+
 ## Changelog
+
+### v1.16.0
+- Standards compliance audit and fixes (Dolibarr coding standards + DoliStore qualification)
+  - `svcrequest.class.php`: added entity filter to fetch-by-ID (was missing, fetch-by-ref was correct)
+  - `card.php`: added entity filter to PBX call display-mode query (edit-mode query was already correct)
+  - `svcservicelog.class.php`: migrated `CONDITION_*` constants from strings to integers (`SMALLINT`); updated SQL write points accordingly
+  - `sql/llx_svc_service_log.sql`: changed `condition_status` from `VARCHAR(50)` to `SMALLINT DEFAULT 0`; added `import_key VARCHAR(14)`
+  - `sql/llx_svc_service_log_upgrade.sql`: added migration for existing deployments
+  - `docs/LICENSE`: added GPL v3 license file (required for DoliStore)
+  - Build: zip naming changed to `module_warrantysvc-VERSION.zip` (required by DoliStore file validator)
+
+### v1.15.0
+- Cross-module linked objects integration: Warranty and Service Request records now appear in the native "Related objects" block on Order, Shipment, Invoice, Intervention, and Project cards, with the native "Link to..." hyperlink for manual linking
+- Added linked objects block to the Service Request card (`card.php`)
+- Fixed `SvcRequest::$element` type mismatch (`warrantysvc` → `svcrequest`) so links stored in `llx_element_element` resolve correctly; `warrantysvc` retained as backward-compat alias
 
 ### v1.3.x
 - Auto-create warranty from validated shipment (trigger-based)
@@ -223,7 +255,8 @@ To build an installable zip:
 
 ```sh
 # The archive root must be warrantysvc/ — not module/
-zip -r warrantysvc-x.y.z.zip warrantysvc/
+# The module_ prefix is required by DoliStore's file validator
+zip -r module_warrantysvc-x.y.z.zip warrantysvc/
 ```
 
 See `project_build.md` in the memory store for full build instructions.

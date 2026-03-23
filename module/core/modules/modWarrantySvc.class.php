@@ -30,7 +30,11 @@ class modWarrantySvc extends DolibarrModules
 
 		$this->db = $db;
 
-		// Module identifier (unique number > 500000 for custom modules)
+		// Module identifier — must be unique globally.
+		// Current value (510000) is valid for private/internal use (>500000 range).
+		// TODO (DoliStore pre-publication): reserve a block in the 100000–499999 range at
+		// https://wiki.dolibarr.org/index.php?title=List_of_modules_id
+		// then update this value to your registered ID before submitting to DoliStore.
 		$this->numero = 510000;
 
 		// Family: crm, financial, hr, projects, products, ecm, technic, interface, other
@@ -40,7 +44,7 @@ class modWarrantySvc extends DolibarrModules
 		// Module name (no spaces), used if translation string 'ModuleXXXName' not found
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
 		$this->description = "RMA (Return Merchandise Authorization) and Warranty Management for serialized equipment";
-		$this->version = '1.12.22';
+		$this->version = '1.17.1';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'technic';
 
@@ -50,7 +54,7 @@ class modWarrantySvc extends DolibarrModules
 			'login' => 0,
 			'substitutions' => 0,
 			'menus' => 0,
-			'hooks' => array('data' => array('globalcard', 'elementproperties'), 'entity' => '0'),
+			'hooks' => array('data' => array('globalcard', 'elementproperties', 'productcard', 'commonobject'), 'entity' => '0'),
 			'apis' => 1,      // api/ directory enabled (registers via Luracast)
 		);
 

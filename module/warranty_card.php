@@ -201,10 +201,13 @@ if ($action == 'create_from_shipment') {
 		$sql_ser .= " JOIN ".MAIN_DB_PREFIX."product p ON p.rowid = ed.fk_product";
 		$sql_ser .= " WHERE ed.fk_expedition = ".((int) $fk_expedition_src);
 		$sql_ser .= " AND edl.batch IS NOT NULL AND edl.batch != ''";
-		$sql_ser .= " AND edl.batch NOT IN (";
-		$sql_ser .= "   SELECT serial_number FROM ".MAIN_DB_PREFIX."svc_warranty";
-		$sql_ser .= "   WHERE serial_number IS NOT NULL AND serial_number != ''";
-		$sql_ser .= "   AND entity IN (".getEntity('svcwarranty').")";
+		$sql_ser .= " AND NOT EXISTS (";
+		$sql_ser .= "   SELECT 1 FROM ".MAIN_DB_PREFIX."svc_warranty w";
+		$sql_ser .= "   WHERE w.serial_number = edl.batch";
+		$sql_ser .= "   AND w.fk_product = ed.fk_product";
+		$sql_ser .= "   AND w.status != 'voided'";
+		$sql_ser .= "   AND w.serial_number IS NOT NULL AND w.serial_number != ''";
+		$sql_ser .= "   AND w.entity IN (".getEntity('svcwarranty').")";
 		$sql_ser .= " )";
 		$res_ser = $db->query($sql_ser);
 
@@ -358,7 +361,7 @@ if ($action == 'create') {
 	$prev_mode    = GETPOST('warranty_mode', 'alpha');
 	$prev_product = (int) GETPOST('fk_product', 'int');
 	$prev_serial  = GETPOST('serial_number', 'alpha');
-	$valid_modes  = array('standard', 'override', 'manual');
+	$valid_modes  = array('standard', 'override');
 	if (!in_array($prev_mode, $valid_modes)) {
 		$prev_mode = 'standard';
 	}
@@ -381,35 +384,14 @@ if ($action == 'create') {
 		}
 	}
 
-	// Manual mode: all active products — no module dependency
-	$sql_man  = "SELECT p.rowid, p.ref, p.label FROM ".MAIN_DB_PREFIX."product p";
-	$sql_man .= " WHERE p.entity IN (".getEntity('product').")";
-	$sql_man .= " AND p.tosell = 1";
-	$sql_man .= " ORDER BY p.ref ASC";
-	$res_man = $db->query($sql_man);
-	$manual_product_list = array();
-	if ($res_man) {
-		while ($row_man = $db->fetch_object($res_man)) {
-			$manual_product_list[$row_man->rowid] = $row_man->ref.($row_man->label ? ' — '.$row_man->label : '');
-		}
-	}
-
 	print load_fiche_titre($langs->trans('NewWarranty'), '', 'bill');
 	print '<p><a href="'.$_SERVER['PHP_SELF'].'?action=create_from_shipment">'.img_picto('', 'shipment', 'class="paddingright"').$langs->trans('CreateWarrantyFromShipment').'</a></p>';
-
-	// Guard: no products at all in the system
-	if (empty($manual_product_list)) {
-		print '<div class="info">'.img_picto('', 'info', 'class="paddingright"').$langs->trans('NoProductsWithUnassignedSerials').'</div>';
-		llxFooter();
-		$db->close();
-		exit;
-	}
 
 	print '<form action="'.$_SERVER['PHP_SELF'].'" method="POST">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
 	print '<input type="hidden" name="action" value="add">';
-	// 0 = standard, 1 = override, 2 = manual
-	$ovr_flag = ($prev_mode === 'override') ? '1' : (($prev_mode === 'manual') ? '2' : '0');
+	// 0 = standard, 1 = override
+	$ovr_flag = ($prev_mode === 'override') ? '1' : '0';
 	print '<input type="hidden" name="warranty_override" id="warranty_override_val" value="'.$ovr_flag.'">';
 
 	// Mode radio toggle
@@ -418,31 +400,26 @@ if ($action == 'create') {
 	print '<input type="radio" name="warranty_mode" value="standard"'.($prev_mode === 'standard' ? ' checked' : '').($std_disabled ? ' disabled' : '').'> ';
 	print dol_escape_htmltag($langs->trans('WarrantyModeStandard'));
 	print '</label>';
-	print '<label style="margin-right:24px; cursor:pointer">';
+	print '<label style="cursor:pointer">';
 	print '<input type="radio" name="warranty_mode" value="override"'.($prev_mode === 'override' ? ' checked' : '').($ovr_disabled ? ' disabled' : '').'> ';
 	print dol_escape_htmltag($langs->trans('WarrantyModeOverride'));
-	print '</label>';
-	print '<label style="cursor:pointer">';
-	print '<input type="radio" name="warranty_mode" value="manual"'.($prev_mode === 'manual' ? ' checked' : '').'> ';
-	print dol_escape_htmltag($langs->trans('WarrantyModeManual'));
 	print '</label>';
 	print '</div>';
 
 	print dol_get_fiche_head(array(), '', '', -1);
 	print '<table class="border centpercent tableforfieldcreate">';
 
-	// Override / Manual warning banner
-	$show_warn = in_array($prev_mode, array('override', 'manual'));
-	print '<tr id="row_warn"'.(!$show_warn ? ' style="display:none"' : '').'>';
+	// Override warning banner
+	print '<tr id="row_warn"'.($prev_mode !== 'override' ? ' style="display:none"' : '').'>';
 	print '<td colspan="2"><div class="warning" id="warn_msg">'.img_picto('', 'warning_white', 'class="paddingright"');
-	print ($prev_mode === 'manual' ? $langs->trans('WarrantyManualWarning') : $langs->trans('WarrantyOverrideWarning'));
+	print $langs->trans('WarrantyOverrideWarning');
 	print '</div></td>';
 	print '</tr>';
 
 	// Customer (shared across all modes)
 	print '<tr><td class="fieldrequired">'.$langs->trans('Customer').'</td>';
 	print '<td>';
-	print $formcompany->select_company(GETPOST('fk_soc', 'int'), 'fk_soc', '(s.client:IN:2,3)', $langs->trans('SelectThird'), 0, 0, null, 0, 'minwidth300 maxwidth500 widthcentpercentminusxx');
+	print $formcompany->select_company(GETPOST('fk_soc', 'int'), 'fk_soc', '(s.client:IN:1,3)', $langs->trans('SelectThird'), 0, 0, null, 0, 'minwidth300 maxwidth500 widthcentpercentminusxx');
 	print '</td></tr>';
 
 	// Product — Standard row (populated via AJAX after customer is selected)
@@ -464,17 +441,6 @@ if ($action == 'create') {
 	print '</select>';
 	print '</td></tr>';
 
-	// Product — Manual row (all active products — no module dependency)
-	print '<tr id="row_man_product"'.($prev_mode !== 'manual' ? ' style="display:none"' : '').'>';
-	print '<td class="fieldrequired">'.$langs->trans('Product').'</td><td>';
-	print '<select name="fk_product" id="fk_product_man" class="flat minwidth300"'.($prev_mode !== 'manual' ? ' disabled' : '').'>';
-	print '<option value="">— '.$langs->trans('SelectProduct').' —</option>';
-	foreach ($manual_product_list as $man_pid => $man_plabel) {
-		print '<option value="'.(int) $man_pid.'"'.($prev_product === (int) $man_pid ? ' selected' : '').'>'.dol_escape_htmltag($man_plabel).'</option>';
-	}
-	print '</select>';
-	print '</td></tr>';
-
 	// Serial — Standard row (select from product_lot)
 	print '<tr id="row_std_serial"'.($prev_mode !== 'standard' ? ' style="display:none"' : '').'>';
 	print '<td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td><td>';
@@ -483,8 +449,8 @@ if ($action == 'create') {
 	print '</select>';
 	print '</td></tr>';
 
-	// Serial — Override / Manual row (shared free-text input)
-	$show_free_ser = in_array($prev_mode, array('override', 'manual'));
+	// Serial — Override row (free-text input)
+	$show_free_ser = ($prev_mode === 'override');
 	print '<tr id="row_free_serial"'.(!$show_free_ser ? ' style="display:none"' : '').'>';
 	print '<td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td><td>';
 	print '<input type="text" name="serial_number" id="serial_number_free"';
@@ -495,7 +461,6 @@ if ($action == 'create') {
 	print '</td></tr>';
 
 	$warn_ovr_txt  = dol_escape_js($langs->trans('WarrantyOverrideWarning'));
-	$warn_man_txt  = dol_escape_js($langs->trans('WarrantyManualWarning'));
 	$ajax_base     = dol_escape_js(DOL_URL_ROOT.'/custom/warrantysvc/ajax/');
 	// Hidden FK fields must exist in DOM before the script block so getElementById finds them at load time.
 	// syncOrder() and the override order input handler both reference these by ID.
@@ -513,7 +478,6 @@ var selSerTxt  = "— '.dol_escape_js($langs->trans('SelectSerial')).' —";
 var noSerTxt   = "'.dol_escape_js($langs->trans('NoSerialsAvailable')).'";
 var autoOrdTxt = "'.dol_escape_js($langs->trans('AutoFilledFromSerial')).'";
 var warnOvr    = "'.$warn_ovr_txt.'";
-var warnMan    = "'.$warn_man_txt.'";
 var prevProduct = '.(int) $std_prev_prod.';
 var prevSerial  = "'.$std_prev_ser.'";
 
@@ -523,8 +487,6 @@ var stdProdRow = document.getElementById("row_std_product");
 var stdSerRow  = document.getElementById("row_std_serial");
 var ovrProdSel = document.getElementById("fk_product_ovr");
 var ovrProdRow = document.getElementById("row_ovr_product");
-var manProdSel = document.getElementById("fk_product_man");
-var manProdRow = document.getElementById("row_man_product");
 var freeSerInp = document.getElementById("serial_number_free");
 var freeSerRow = document.getElementById("row_free_serial");
 var warnRow    = document.getElementById("row_warn");
@@ -643,29 +605,26 @@ function loadWarrantyProducts(socid) {
 function setMode(mode) {
 	var isStd = (mode === "standard");
 	var isOvr = (mode === "override");
-	var isMan = (mode === "manual");
 	// Product rows
 	if (stdProdRow) stdProdRow.style.display = isStd ? "" : "none";
 	if (ovrProdRow) ovrProdRow.style.display = isOvr ? "" : "none";
-	if (manProdRow) manProdRow.style.display = isMan ? "" : "none";
 	// Serial rows
 	if (stdSerRow)  stdSerRow.style.display  = isStd ? "" : "none";
-	if (freeSerRow) freeSerRow.style.display  = (isOvr || isMan) ? "" : "none";
+	if (freeSerRow) freeSerRow.style.display  = isOvr ? "" : "none";
 	// Warning row
-	if (warnRow) warnRow.style.display = (isOvr || isMan) ? "" : "none";
-	if (warnMsg) warnMsg.innerHTML = isMan ? warnMan : warnOvr;
+	if (warnRow) warnRow.style.display = isOvr ? "" : "none";
+	if (warnMsg) warnMsg.innerHTML = warnOvr;
 	// Origin order rows
 	if (ordStdRow) ordStdRow.style.display = isStd ? "" : "none";
-	if (ordManRow) ordManRow.style.display = (isOvr || isMan) ? "" : "none";
+	if (ordManRow) ordManRow.style.display = isOvr ? "" : "none";
 	// Enable/disable (disabled fields do not submit)
 	if (!isStd && stdProdSel) stdProdSel.disabled = true;
 	if (!isStd && stdSerSel)  stdSerSel.disabled = true;
 	if (ovrProdSel) ovrProdSel.disabled = !isOvr;
-	if (manProdSel) manProdSel.disabled = !isMan;
 	if (freeSerInp) freeSerInp.disabled = isStd;
 	if (ordManInp)  ordManInp.disabled  = isStd;
 	// Hidden flag
-	if (ovrValInp) ovrValInp.value = isOvr ? "1" : (isMan ? "2" : "0");
+	if (ovrValInp) ovrValInp.value = isOvr ? "1" : "0";
 	// Entering standard: clear order if no serial selected
 	if (isStd) {
 		var socid = getCurrentSocid();
@@ -730,12 +689,61 @@ if (initMode === "standard") {
 	}
 	$wtype_defaults_js = rtrim($wtype_defaults_js, ',').'}';
 
-	$selected_wtype    = GETPOST('warranty_type', 'alpha');
+	// Pre-fill from product (or parent product) warranty default.
+	// Only applies on first GET load (no token = not a POST resubmit).
+	$pre_wtype              = '';
+	$default_coverage_days  = 0;
+	$default_coverage_terms = '';
+	$default_exclusions     = '';
+	if ($prev_product > 0 && !GETPOST('token', 'alpha')) {
+		$sql_pd  = "SELECT warranty_type, coverage_days FROM ".MAIN_DB_PREFIX."warrantysvc_product_default";
+		$sql_pd .= " WHERE fk_product = ".((int) $prev_product)." AND entity = ".((int) $conf->entity);
+		$res_pd  = $db->query($sql_pd);
+		$row_pd  = ($res_pd) ? $db->fetch_object($res_pd) : null;
+
+		// If not found on this product, cascade to parent (if variants module active)
+		if (!$row_pd && isModEnabled('variants')) {
+			$sql_par  = "SELECT fk_product_parent FROM ".MAIN_DB_PREFIX."product_attribute_combination";
+			$sql_par .= " WHERE fk_product_child = ".((int) $prev_product);
+			$sql_par .= " AND entity IN (".getEntity('product').")";
+			$res_par  = $db->query($sql_par);
+			if ($res_par && ($row_par = $db->fetch_object($res_par))) {
+				$parent_id = (int) $row_par->fk_product_parent;
+				$sql_pd2   = "SELECT warranty_type, coverage_days FROM ".MAIN_DB_PREFIX."warrantysvc_product_default";
+				$sql_pd2  .= " WHERE fk_product = ".((int) $parent_id)." AND entity = ".((int) $conf->entity);
+				$res_pd2   = $db->query($sql_pd2);
+				$row_pd    = ($res_pd2) ? $db->fetch_object($res_pd2) : null;
+			}
+		}
+
+		if ($row_pd) {
+			$pre_wtype = $row_pd->warranty_type;
+			// Pull coverage terms + exclusions from the warranty type record ($wtype_items already loaded)
+			foreach ($wtype_items as $wt) {
+				if ($wt->code === $pre_wtype) {
+					$default_coverage_days  = ($row_pd->coverage_days > 0)
+						? (int) $row_pd->coverage_days
+						: (int) $wt->default_coverage_days;
+					$default_coverage_terms = (string) $wt->coverage_terms;
+					$default_exclusions     = (string) $wt->exclusions;
+					break;
+				}
+			}
+		}
+	}
+
+	// POST value wins; fall back to product default type if GET navigation
+	$selected_wtype    = GETPOST('warranty_type', 'alpha') ?: $pre_wtype;
 	$initial_days      = GETPOST('coverage_days', 'int');
 	if (!$initial_days) {
-		$initial_days = 365;
-		foreach ($wtype_items as $wt) {
-			if ($wt->code === $selected_wtype) { $initial_days = (int) $wt->default_coverage_days; break; }
+		if ($default_coverage_days > 0) {
+			// Product-specific override: takes precedence over the type's default_coverage_days
+			$initial_days = $default_coverage_days;
+		} else {
+			$initial_days = 365;
+			foreach ($wtype_items as $wt) {
+				if ($wt->code === $selected_wtype) { $initial_days = (int) $wt->default_coverage_days; break; }
+			}
 		}
 	}
 
@@ -808,14 +816,14 @@ if (initMode === "standard") {
 	print '<tr><td class="tdtop">'.$form->textwithpicto($langs->trans('CoverageTerms'), $langs->trans('TooltipCoverageTerms')).'</td>';
 	print '<td>';
 	require_once DOL_DOCUMENT_ROOT.'/core/class/doleditor.class.php';
-	$doleditor = new DolEditor('coverage_terms', GETPOST('coverage_terms', 'restricthtml'), '', 100, 'dolibarr_notes', '', false, true, getDolGlobalInt('FCKEDITOR_ENABLE_DETAILS'), ROWS_4, '90%');
+	$doleditor = new DolEditor('coverage_terms', (GETPOST('coverage_terms', 'restricthtml') ?: $default_coverage_terms), '', 100, 'dolibarr_notes', '', false, true, getDolGlobalInt('FCKEDITOR_ENABLE_DETAILS'), ROWS_4, '90%');
 	$doleditor->Create();
 	print '</td></tr>';
 
 	// Exclusions
 	print '<tr><td class="tdtop">'.$form->textwithpicto($langs->trans('Exclusions'), $langs->trans('TooltipExclusions')).'</td>';
 	print '<td>';
-	$doleditor2 = new DolEditor('exclusions', GETPOST('exclusions', 'restricthtml'), '', 100, 'dolibarr_notes', '', false, true, getDolGlobalInt('FCKEDITOR_ENABLE_DETAILS'), ROWS_3, '90%');
+	$doleditor2 = new DolEditor('exclusions', (GETPOST('exclusions', 'restricthtml') ?: $default_exclusions), '', 100, 'dolibarr_notes', '', false, true, getDolGlobalInt('FCKEDITOR_ENABLE_DETAILS'), ROWS_3, '90%');
 	$doleditor2->Create();
 	print '</td></tr>';
 
@@ -910,7 +918,7 @@ print '<table class="border centpercent tableforfield">';
 print '<tr><td class="titlefield">'.$langs->trans('Customer').'</td>';
 print '<td>';
 if ($action == 'edit') {
-	print $formcompany->select_company($object->fk_soc, 'fk_soc', '(s.client:IN:2,3)', '', 0, 0, null, 0, 'minwidth200 maxwidth400');
+	print $formcompany->select_company($object->fk_soc, 'fk_soc', '(s.client:IN:1,3)', '', 0, 0, null, 0, 'minwidth200 maxwidth400');
 } else {
 	$soc = new Societe($db);
 	if ($soc->fetch($object->fk_soc) > 0) {
