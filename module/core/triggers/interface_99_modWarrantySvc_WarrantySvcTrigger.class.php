@@ -141,7 +141,7 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 			// llx_element_element and store fk_commande on the SR
 			// ------------------------------------------------------------------
 			case 'ORDER_CREATE':
-				if (!empty($object->origin) && $object->origin === 'svcrequest' && !empty($object->origin_id)) {
+				if (!empty($object->origin) && $object->origin === 'warrantysvc_svcrequest' && !empty($object->origin_id)) {
 					$this->_linkOrderToSvcRequest($object, $user);
 				}
 				return 0;
