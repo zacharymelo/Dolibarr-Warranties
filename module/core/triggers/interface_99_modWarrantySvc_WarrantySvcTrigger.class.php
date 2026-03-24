@@ -136,9 +136,49 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 				}
 				return 1;
 
+			// ------------------------------------------------------------------
+			// Sales order created — if origin is an SR, auto-link via
+			// llx_element_element and store fk_commande on the SR
+			// ------------------------------------------------------------------
+			case 'ORDER_CREATE':
+				if (!empty($object->origin) && $object->origin === 'svcrequest' && !empty($object->origin_id)) {
+					$this->_linkOrderToSvcRequest($object, $user);
+				}
+				return 0;
+
 			default:
 				return 0;
 		}
+	}
+
+	/**
+	 * Auto-link a newly created SO to its originating SvcRequest.
+	 * Inserts an llx_element_element row and stores fk_commande on the SR.
+	 *
+	 * @param  Commande $object  Newly created SO
+	 * @param  User     $user    Actor
+	 * @return void
+	 */
+	private function _linkOrderToSvcRequest($object, $user)
+	{
+		$so_id = (int) $object->id;
+		$sr_id = (int) $object->origin_id;
+
+		// Bidirectional link in Dolibarr's native element_element table
+		$sql = "INSERT INTO ".MAIN_DB_PREFIX."element_element"
+			." (fk_source, sourcetype, fk_target, targettype, entity)"
+			." VALUES (".$so_id.", 'commande', ".$sr_id.", 'svcrequest', ".((int) $object->entity).")";
+		$this->db->query($sql); // non-fatal if it fails (e.g. duplicate)
+
+		// Store on the SR so the action panel can display the link directly
+		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcrequest.class.php';
+		$sr = new SvcRequest($this->db);
+		if ($sr->fetch($sr_id) > 0 && empty($sr->fk_commande)) {
+			$sr->fk_commande = $so_id;
+			$sr->update($user);
+		}
+
+		dol_syslog('WarrantySvcTrigger: linked SO '.$so_id.' to SvcRequest '.$sr_id, LOG_DEBUG);
 	}
 
 

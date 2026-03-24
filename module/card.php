@@ -198,23 +198,6 @@ if ($action == 'confirm_reopen' && GETPOST('confirm', 'alpha') == 'yes' && $perm
 	exit;
 }
 
-// Step 1 — Create replacement SO (product + serial + warehouse chosen in inline form)
-if ($action == 'create_replacement_order' && $permwrite && isModEnabled('order')) {
-	if (in_array($object->resolution_type, $types_with_outbound) && empty($object->fk_commande)) {
-		$rpl_product   = GETPOST('rpl_product_id', 'int');
-		$rpl_serial    = GETPOST('rpl_serial', 'alpha');
-		$rpl_warehouse = GETPOST('rpl_warehouse', 'int');
-		$order_id = $object->createReplacementOrder($user, $rpl_product, $rpl_serial, $rpl_warehouse);
-		if ($order_id > 0) {
-			setEventMessages($langs->trans('ReplacementOrderCreated'), null, 'mesgs');
-		} else {
-			setEventMessages($object->error, $object->errors, 'errors');
-		}
-	}
-	header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
-	exit;
-}
-
 // Create return reception (warehouse chosen in inline form)
 if ($action == 'create_return_reception' && $permwrite && isModEnabled('reception')) {
 	if (in_array($object->resolution_type, $types_with_return) && empty($object->fk_reception)) {
@@ -1104,36 +1087,12 @@ if ($action == 'create') {
 					print ' &mdash; '.$langs->trans('Serial').': <strong>'.dol_escape_htmltag($object->serial_out).'</strong>';
 				}
 			} elseif ($active_status && $permwrite && isModEnabled('order')) {
-				$ajax_base = DOL_URL_ROOT.'/custom/warrantysvc/ajax/stock_serials.php';
-				$form_id   = 'form_rpl_order_'.$object->id;
-				print '<a href="#" onclick="document.getElementById(\''.$form_id.'\').style.display=\'block\';this.style.display=\'none\';return false;" class="butAction" style="margin:0;">'.$langs->trans('CreateReplacementOrder').'</a>';
-				print '<div id="'.$form_id.'" style="display:none; margin-top:8px;">';
-				print '<form action="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'" method="POST">';
-				print '<input type="hidden" name="token" value="'.newToken().'">';
-				print '<input type="hidden" name="action" value="create_replacement_order">';
-				print $form->select_produits(0, 'rpl_product_id', '', 0, 0, 1, 2, '', 1, array(), 0, '1', 0, 'minwidth200 maxwidth300', 1);
-				print ' <input type="text" name="rpl_serial" id="rpl_serial_'.$object->id.'" list="rpl_serial_list_'.$object->id.'" class="minwidth150" placeholder="'.$langs->trans('ReplacementSerial').'" required>';
-				print '<datalist id="rpl_serial_list_'.$object->id.'"></datalist>';
-				print ' ';
-				print $form->select_warehouse($object->fk_warehouse_source > 0 ? $object->fk_warehouse_source : 0, 'rpl_warehouse', 1, '', 1, 0, '', 0, 0, array(), 'minwidth150');
-				print ' <input type="submit" class="butAction" style="margin:0;" value="'.$langs->trans('Confirm').'">';
-				print '</form>';
-				print '</div>';
-				print '<script>';
-				print 'document.addEventListener("change", function(e) {';
-				print '  if (e.target && e.target.name === "rpl_product_id") {';
-				print '    var pid = e.target.value;';
-				print '    var wid = document.querySelector("[name=rpl_warehouse]") ? document.querySelector("[name=rpl_warehouse]").value : 0;';
-				print '    if (!pid) return;';
-				print '    fetch("'.dol_escape_js($ajax_base).'?fk_product=" + pid + "&fk_warehouse=" + wid + "&token=".concat(\''.newToken().'\'))';
-				print '      .then(r => r.json()).then(function(serials) {';
-				print '        var dl = document.getElementById("rpl_serial_list_'.$object->id.'");';
-				print '        dl.innerHTML = "";';
-				print '        serials.forEach(function(s) { var o = document.createElement("option"); o.value = s; dl.appendChild(o); });';
-				print '      });';
-				print '  }';
-				print '});';
-				print '</script>';
+				$create_so_url = DOL_URL_ROOT.'/commande/card.php?action=create'
+					.'&socid='.((int) $object->fk_soc)
+					.'&origin=svcrequest'
+					.'&origin_id='.((int) $object->id)
+					.'&backtopage='.urlencode(DOL_URL_ROOT.'/custom/warrantysvc/card.php?id='.$object->id);
+				print '<a href="'.dol_escape_htmltag($create_so_url).'" class="butAction" style="margin:0;">'.$langs->trans('CreateReplacementOrder').'</a>';
 			} else {
 				print '<span class="opacitymedium">'.$langs->trans('NoReplacementOrderYet').'</span>';
 			}
