@@ -1089,8 +1089,7 @@ if ($action == 'create') {
 			} elseif ($active_status && $permwrite && isModEnabled('order')) {
 				$create_so_url = DOL_URL_ROOT.'/commande/card.php?action=create'
 					.'&socid='.((int) $object->fk_soc)
-					.'&origin=warrantysvc_svcrequest'
-					.'&origin_id='.((int) $object->id)
+					.'&rma_sr_id='.((int) $object->id)
 					.'&backtopage='.urlencode(DOL_URL_ROOT.'/custom/warrantysvc/card.php?id='.$object->id);
 				print '<a href="'.dol_escape_htmltag($create_so_url).'" class="butAction" style="margin:0;">'.$langs->trans('CreateReplacementOrder').'</a>';
 			} else {

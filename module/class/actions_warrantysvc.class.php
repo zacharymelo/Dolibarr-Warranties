@@ -102,6 +102,20 @@ class ActionsWarrantySvc
 		if (!isModEnabled('warrantysvc')) return 0;
 
 		// ----------------------------------------------------------------
+		// Commande creation: inject hidden origin fields when rma_sr_id is
+		// present in GET so the SR ↔ SO link is created on form submit
+		// without rendering the origin section visually.
+		// ----------------------------------------------------------------
+		if (isset($object->element) && $object->element === 'commande' && $action === 'create') {
+			$rma_sr_id = GETPOSTINT('rma_sr_id');
+			if ($rma_sr_id > 0) {
+				$this->resprints  = '<input type="hidden" name="origin" value="warrantysvc_svcrequest">';
+				$this->resprints .= '<input type="hidden" name="originid" value="'.$rma_sr_id.'">';
+			}
+			return 0;
+		}
+
+		// ----------------------------------------------------------------
 		// Product card: inject "Warranty Default Type" row
 		// ----------------------------------------------------------------
 		if (isset($object->element) && $object->element === 'product' && !empty($object->id)) {
