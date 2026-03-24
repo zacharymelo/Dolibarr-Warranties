@@ -66,8 +66,9 @@ class ActionsWarrantySvc
 				'classfile'     => 'svcwarranty',
 				'classname'     => 'SvcWarranty',
 			);
-		} elseif ($elementType === 'svcrequest' || $elementType === 'warrantysvc') {
-			// 'warrantysvc' is a backward-compat alias for existing llx_element_element rows
+		} elseif ($elementType === 'svcrequest' || $elementType === 'warrantysvc' || $elementType === 'warrantysvc_svcrequest') {
+			// 'warrantysvc' and 'warrantysvc_svcrequest' are aliases — the prefixed
+			// form is what getElementType() returns and what llx_element_element stores
 			$this->results = array(
 				'module'        => 'warrantysvc',
 				'element'       => 'svcrequest',
