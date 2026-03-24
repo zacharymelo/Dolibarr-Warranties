@@ -959,21 +959,42 @@ class SvcRequest extends CommonObject
 			$this->error = 'ModuleReceptionNotEnabled';
 			return -1;
 		}
-		if (empty($this->fk_shipment)) {
-			$this->error = 'NoShipmentLinked';
-			return -1;
-		}
 
 		require_once DOL_DOCUMENT_ROOT.'/reception/class/reception.class.php';
-		require_once DOL_DOCUMENT_ROOT.'/expedition/class/expedition.class.php';
 
-		$shipment = new Expedition($this->db);
-		if ($shipment->fetch($this->fk_shipment) <= 0) {
-			$this->error = 'CannotLoadShipment';
-			return -1;
+		// Build lines to receive — prefer shipment lines, fall back to warranty product
+		$lines_to_receive = array();
+		if (!empty($this->fk_shipment)) {
+			require_once DOL_DOCUMENT_ROOT.'/expedition/class/expedition.class.php';
+			$shipment = new Expedition($this->db);
+			if ($shipment->fetch($this->fk_shipment) <= 0) {
+				$this->error = 'CannotLoadShipment';
+				return -1;
+			}
+			if (empty($shipment->lines)) {
+				$shipment->fetch_lines();
+			}
+			foreach ($shipment->lines as $exp_line) {
+				$fk_product = (int) $exp_line->fk_product;
+				$qty        = (float) $exp_line->qty;
+				if ($fk_product > 0 && $qty > 0) {
+					$lines_to_receive[] = array('fk_product' => $fk_product, 'qty' => $qty);
+				}
+			}
+		} else {
+			// No shipment — use warranty product (qty 1)
+			require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarranty.class.php';
+			$_war = new SvcWarranty($this->db);
+			if (empty($this->fk_warranty) || $_war->fetch($this->fk_warranty) <= 0 || empty($_war->fk_product)) {
+				$this->error = 'NoShipmentOrWarrantyProductToReceive';
+				return -1;
+			}
+			$lines_to_receive[] = array('fk_product' => (int) $_war->fk_product, 'qty' => 1);
 		}
-		if (empty($shipment->lines)) {
-			$shipment->fetch_lines();
+
+		if (empty($lines_to_receive)) {
+			$this->error = 'NoProductLinesToReceive';
+			return -1;
 		}
 
 		$this->db->begin();
@@ -992,20 +1013,14 @@ class SvcRequest extends CommonObject
 			return -1;
 		}
 
-		// Insert one reception line per expedition product (no PO line — fk_commandefourndet NULL)
-		foreach ($shipment->lines as $exp_line) {
-			$fk_product = (int) $exp_line->fk_product;
-			$qty        = (float) $exp_line->qty;
-			if ($fk_product <= 0 || $qty <= 0) {
-				continue;
-			}
-
+		// Insert reception lines (no PO line — fk_commandefourndet NULL)
+		foreach ($lines_to_receive as $line) {
 			$sql = "INSERT INTO ".MAIN_DB_PREFIX."receptiondet_batch"
 				." (fk_reception, fk_product, qty, fk_entrepot, fk_commandefourndet, comment, status)"
 				." VALUES ("
 				.$rec_id.", "
-				.$fk_product.", "
-				.$qty.", "
+				.$line['fk_product'].", "
+				.$line['qty'].", "
 				.((int) $fk_warehouse).", "
 				."NULL, "
 				."'".$this->db->escape('RMA '.$this->ref)."', "

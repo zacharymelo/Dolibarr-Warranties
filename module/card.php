@@ -215,38 +215,9 @@ if ($action == 'create_replacement_order' && $permwrite && isModEnabled('order')
 	exit;
 }
 
-// Step 2 — Create outbound shipment from the SO (warehouse chosen in inline form)
-if ($action == 'create_outbound_shipment' && $permwrite && isModEnabled('expedition')) {
-	if (in_array($object->resolution_type, $types_with_outbound) && !empty($object->fk_commande) && empty($object->fk_shipment)) {
-		$ship_warehouse = GETPOST('ship_warehouse', 'int');
-		$shipment_id = $object->createOutboundShipment($user, $ship_warehouse);
-		if ($shipment_id > 0) {
-			setEventMessages($langs->trans('ShipmentCreated'), null, 'mesgs');
-		} else {
-			setEventMessages($object->error, $object->errors, 'errors');
-		}
-	}
-	header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
-	exit;
-}
-
-// Step 3 — Validate outbound shipment
-if ($action == 'validate_outbound_shipment' && $permwrite && isModEnabled('expedition')) {
-	if (!empty($object->fk_shipment)) {
-		$result = $object->validateShipment($user);
-		if ($result > 0) {
-			setEventMessages($langs->trans('ShipmentValidated'), null, 'mesgs');
-		} else {
-			setEventMessages($object->error, $object->errors, 'errors');
-		}
-	}
-	header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
-	exit;
-}
-
-// Step 4 — Create return reception (warehouse chosen in inline form)
+// Create return reception (warehouse chosen in inline form)
 if ($action == 'create_return_reception' && $permwrite && isModEnabled('reception')) {
-	if (in_array($object->resolution_type, $types_with_return) && !empty($object->fk_shipment) && empty($object->fk_reception)) {
+	if (in_array($object->resolution_type, $types_with_return) && empty($object->fk_reception)) {
 		$rec_warehouse = GETPOST('rec_warehouse', 'int');
 		$object->serial_in = GETPOST('serial_in', 'alpha');
 		$rec_id = $object->createReturnReception($user, $rec_warehouse);
@@ -1077,7 +1048,7 @@ if ($action == 'create') {
 	print '<div class="clearboth"></div>'; // clear floated half-columns before movement panel
 
 	// =====================================================================
-	// MOVEMENT PANEL — resolution-type-aware, directional
+	// RMA ACTION PANEL — Replacement Order & Return Reception
 	// =====================================================================
 	$res_type = $object->resolution_type;
 	$s        = $object->status;
@@ -1088,54 +1059,42 @@ if ($action == 'create') {
 	$is_no_movement   = in_array($res_type, $types_no_movement);
 
 	if (!$is_no_movement) {
+		// Fetch warranty product + serial for pre-population of return reception
+		$warranty_product_id    = 0;
+		$warranty_product_label = '';
+		$warranty_serial        = '';
+		if (!empty($object->fk_warranty)) {
+			require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarranty.class.php';
+			$_war = new SvcWarranty($db);
+			if ($_war->fetch($object->fk_warranty) > 0) {
+				$warranty_product_id = (int) $_war->fk_product;
+				$warranty_serial     = $_war->serial;
+				if ($warranty_product_id > 0) {
+					require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
+					$_wprod = new Product($db);
+					if ($_wprod->fetch($warranty_product_id) > 0) {
+						$warranty_product_label = $_wprod->label;
+					}
+				}
+			}
+		}
+
+		$active_status = in_array($s, array(SvcRequest::STATUS_VALIDATED, SvcRequest::STATUS_IN_PROGRESS, SvcRequest::STATUS_AWAIT_RETURN));
+
 		print '<br>';
 		print '<div class="div-table-responsive">';
 		print '<table class="noborder centpercent">';
 		print '<tr class="liste_titre">';
-		print '<td colspan="4">'.img_picto('', 'truck', 'class="pictofixedwidth"').$langs->trans('MovementTracker').'</td>';
+		print '<td colspan="2">'.img_picto('', 'truck', 'class="pictofixedwidth"').$langs->trans('RMAActions').'</td>';
 		print '</tr>';
 
-		// --- OUTBOUND card — 3-step gated flow ---
+		// --- Replacement Order row ---
 		if ($has_outbound) {
-			$active_status  = in_array($s, array(SvcRequest::STATUS_VALIDATED, SvcRequest::STATUS_IN_PROGRESS));
-			$outbound_done  = !empty($object->fk_shipment);
-			$outbound_class = $outbound_done ? 'status4' : ($active_status ? 'status1' : 'status0');
-
-			// Check whether the linked shipment has been validated
-			$shipment_validated = false;
-			if (!empty($object->fk_shipment)) {
-				require_once DOL_DOCUMENT_ROOT.'/expedition/class/expedition.class.php';
-				$_exp = new Expedition($db);
-				if ($_exp->fetch($object->fk_shipment) > 0) {
-					$shipment_validated = ((int) $_exp->statut >= 1);
-				}
-			}
-
 			print '<tr class="oddeven">';
-			print '<td style="width:20px; padding:8px 4px;">';
-			print '<span class="badge '.$outbound_class.'" style="display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:middle;">&nbsp;</span>';
-			print '</td>';
-			print '<td style="padding:8px 12px; font-weight:bold;">'.img_picto('', 'rightarrow', 'class="pictofixedwidth"').$langs->trans('OutboundToCustomer').'</td>';
+			print '<td style="padding:8px 12px; font-weight:bold; width:220px;">'.img_picto('', 'rightarrow', 'class="pictofixedwidth"').$langs->trans('ReplacementOrder').'</td>';
 			print '<td style="padding:8px 12px;">';
 
-			if ($outbound_done) {
-				// Shipment exists — show link + details
-				print img_picto('', 'shipping', 'class="pictofixedwidth"');
-				print '<a href="'.DOL_URL_ROOT.'/expedition/card.php?id='.$object->fk_shipment.'">'
-					.$langs->trans('ShipmentRef').' #'.$object->fk_shipment.'</a>';
-				if ($shipment_validated) {
-					print ' <span class="badge status4">'.$langs->trans('Validated').'</span>';
-				}
-				if ($object->serial_out) {
-					print ' &mdash; '.$langs->trans('SerialOut').': <strong>'.dol_escape_htmltag($object->serial_out).'</strong>';
-				}
-				if ($object->outbound_carrier || $object->outbound_tracking) {
-					print '<br><span class="opacitymedium">'.dol_escape_htmltag($object->outbound_carrier);
-					if ($object->outbound_carrier && $object->outbound_tracking) print ' &mdash; ';
-					print dol_escape_htmltag($object->outbound_tracking).'</span>';
-				}
-			} elseif (!empty($object->fk_commande)) {
-				// SO exists, shipment not yet created
+			if (!empty($object->fk_commande)) {
 				require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
 				$_ord = new Commande($db);
 				$_ord_label = ($_ord->fetch($object->fk_commande) > 0 && $_ord->ref) ? $_ord->ref : '#'.$object->fk_commande;
@@ -1144,221 +1103,117 @@ if ($action == 'create') {
 				if ($object->serial_out) {
 					print ' &mdash; '.$langs->trans('Serial').': <strong>'.dol_escape_htmltag($object->serial_out).'</strong>';
 				}
+			} elseif ($active_status && $permwrite && isModEnabled('order')) {
+				$ajax_base = DOL_URL_ROOT.'/custom/warrantysvc/ajax/stock_serials.php';
+				$form_id   = 'form_rpl_order_'.$object->id;
+				print '<a href="#" onclick="document.getElementById(\''.$form_id.'\').style.display=\'block\';this.style.display=\'none\';return false;" class="butAction" style="margin:0;">'.$langs->trans('CreateReplacementOrder').'</a>';
+				print '<div id="'.$form_id.'" style="display:none; margin-top:8px;">';
+				print '<form action="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'" method="POST">';
+				print '<input type="hidden" name="token" value="'.newToken().'">';
+				print '<input type="hidden" name="action" value="create_replacement_order">';
+				print $form->select_produits(0, 'rpl_product_id', '', 0, 0, 1, 2, '', 1, array(), 0, '1', 0, 'minwidth200 maxwidth300', 1);
+				print ' <input type="text" name="rpl_serial" id="rpl_serial_'.$object->id.'" list="rpl_serial_list_'.$object->id.'" class="minwidth150" placeholder="'.$langs->trans('ReplacementSerial').'" required>';
+				print '<datalist id="rpl_serial_list_'.$object->id.'"></datalist>';
+				print ' ';
+				print $form->select_warehouse($object->fk_warehouse_source > 0 ? $object->fk_warehouse_source : 0, 'rpl_warehouse', 1, '', 1, 0, '', 0, 0, array(), 'minwidth150');
+				print ' <input type="submit" class="butAction" style="margin:0;" value="'.$langs->trans('Confirm').'">';
+				print '</form>';
+				print '</div>';
+				print '<script>';
+				print 'document.addEventListener("change", function(e) {';
+				print '  if (e.target && e.target.name === "rpl_product_id") {';
+				print '    var pid = e.target.value;';
+				print '    var wid = document.querySelector("[name=rpl_warehouse]") ? document.querySelector("[name=rpl_warehouse]").value : 0;';
+				print '    if (!pid) return;';
+				print '    fetch("'.dol_escape_js($ajax_base).'?fk_product=" + pid + "&fk_warehouse=" + wid + "&token=".concat(\''.newToken().'\'))';
+				print '      .then(r => r.json()).then(function(serials) {';
+				print '        var dl = document.getElementById("rpl_serial_list_'.$object->id.'");';
+				print '        dl.innerHTML = "";';
+				print '        serials.forEach(function(s) { var o = document.createElement("option"); o.value = s; dl.appendChild(o); });';
+				print '      });';
+				print '  }';
+				print '});';
+				print '</script>';
 			} else {
 				print '<span class="opacitymedium">'.$langs->trans('NoReplacementOrderYet').'</span>';
 			}
 
-			// Inline edit fields when in edit mode (carrier/tracking only — SO/shipment via action buttons)
-			if ($action == 'edit' && $permwrite && $outbound_done) {
-				print '<br>';
-				print '<input type="text" name="outbound_carrier" class="minwidth80" placeholder="'.$langs->trans('Carrier').'" value="'.dol_escape_htmltag($object->outbound_carrier).'">';
-				print ' <input type="text" name="outbound_tracking" class="minwidth120" placeholder="'.$langs->trans('TrackingNumber').'" value="'.dol_escape_htmltag($object->outbound_tracking).'">';
-			}
 			print '</td>';
-			print '<td style="padding:8px 12px; text-align:right; vertical-align:top;">';
+			print '</tr>';
+		}
 
-			if ($active_status && $permwrite) {
-				$ajax_base = DOL_URL_ROOT.'/custom/warrantysvc/ajax/stock_serials.php';
+		// --- Return Reception row ---
+		if ($has_return) {
+			print '<tr class="oddeven">';
+			print '<td style="padding:8px 12px; font-weight:bold; width:220px;">'.img_picto('', 'leftarrow', 'class="pictofixedwidth"').$langs->trans('ReturnReception').'</td>';
+			print '<td style="padding:8px 12px;">';
 
-				// Step 1: Create Replacement Order (no SO yet)
-				if (empty($object->fk_commande) && isModEnabled('order')) {
-					$form_id = 'form_rpl_order_'.$object->id;
-					print '<a href="#" onclick="document.getElementById(\''.$form_id.'\').style.display=\'block\';this.style.display=\'none\';return false;" class="butAction" style="margin:0;">'.$langs->trans('CreateReplacementOrder').'</a>';
-					print '<div id="'.$form_id.'" style="display:none; margin-top:6px;">';
-					print '<form action="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'" method="POST">';
-					print '<input type="hidden" name="token" value="'.newToken().'">';
-					print '<input type="hidden" name="action" value="create_replacement_order">';
-					// Product picker
-					print $form->select_produits(0, 'rpl_product_id', '', 0, 0, 1, 2, '', 1, array(), 0, '1', 0, 'minwidth200 maxwidth300', 1);
-					print '<br style="margin:4px 0;">';
-					// Serial input + datalist (populated by AJAX when product changes)
-					print '<input type="text" name="rpl_serial" id="rpl_serial_'.$object->id.'" list="rpl_serial_list_'.$object->id.'" class="minwidth150" placeholder="'.$langs->trans('ReplacementSerial').'" required>';
-					print '<datalist id="rpl_serial_list_'.$object->id.'"></datalist>';
+			if (!empty($object->fk_reception)) {
+				require_once DOL_DOCUMENT_ROOT.'/reception/class/reception.class.php';
+				$_rec = new Reception($db);
+				$_rec_label = ($_rec->fetch($object->fk_reception) > 0 && $_rec->ref) ? $_rec->ref : '#'.$object->fk_reception;
+				print img_picto('', 'reception', 'class="pictofixedwidth"');
+				print '<a href="'.DOL_URL_ROOT.'/reception/card.php?id='.$object->fk_reception.'">'.$langs->trans('Reception').' '.$_rec_label.'</a>';
+				if ($object->serial_in) {
+					print ' &mdash; '.$langs->trans('SerialIn').': <strong>'.dol_escape_htmltag($object->serial_in).'</strong>';
+				}
+			} elseif ($active_status && $permwrite && isModEnabled('reception')) {
+				$form_id2 = 'form_rec_'.$object->id;
+				print '<a href="#" onclick="document.getElementById(\''.$form_id2.'\').style.display=\'block\';this.style.display=\'none\';return false;" class="butAction" style="margin:0;">'.$langs->trans('CreateReturnReception').'</a>';
+				print '<div id="'.$form_id2.'" style="display:none; margin-top:8px;">';
+				print '<form action="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'" method="POST">';
+				print '<input type="hidden" name="token" value="'.newToken().'">';
+				print '<input type="hidden" name="action" value="create_return_reception">';
+				if ($warranty_product_id > 0) {
+					print '<input type="hidden" name="rec_product_id" value="'.$warranty_product_id.'">';
+					print '<strong>'.dol_escape_htmltag($warranty_product_label ?: $langs->trans('Product').' #'.$warranty_product_id).'</strong>';
 					print ' ';
-					// Warehouse picker
-					print $form->select_warehouse($object->fk_warehouse_source > 0 ? $object->fk_warehouse_source : 0, 'rpl_warehouse', 1, '', 1, 0, '', 0, 0, array(), 'minwidth150');
-					print ' <input type="submit" class="butAction" style="margin:0;" value="'.$langs->trans('Confirm').'">';
-					print '</form>';
-					print '</div>';
-					// JS: load serials when product changes
-					print '<script>';
-					print 'document.addEventListener("change", function(e) {';
-					print '  if (e.target && e.target.name === "rpl_product_id") {';
-					print '    var pid = e.target.value;';
-					print '    var wid = document.querySelector("[name=rpl_warehouse]") ? document.querySelector("[name=rpl_warehouse]").value : 0;';
-					print '    if (!pid) return;';
-					print '    fetch("'.dol_escape_js($ajax_base).'?fk_product=" + pid + "&fk_warehouse=" + wid + "&token=".concat(\''.newToken().'\'))';
-					print '      .then(r => r.json()).then(function(serials) {';
-					print '        var dl = document.getElementById("rpl_serial_list_'.$object->id.'");';
-					print '        dl.innerHTML = "";';
-					print '        serials.forEach(function(s) { var o = document.createElement("option"); o.value = s; dl.appendChild(o); });';
-					print '      });';
-					print '  }';
-					print '});';
-					print '</script>';
 				}
-
-				// Step 2: Create Shipment (SO exists, shipment not yet created)
-				if (!empty($object->fk_commande) && empty($object->fk_shipment) && isModEnabled('expedition')) {
-					$form_id2 = 'form_ship_'.$object->id;
-					print '<a href="#" onclick="document.getElementById(\''.$form_id2.'\').style.display=\'block\';this.style.display=\'none\';return false;" class="butAction" style="margin:0;">'.$langs->trans('CreateShipment').'</a>';
-					print '<div id="'.$form_id2.'" style="display:none; margin-top:6px;">';
-					print '<form action="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'" method="POST">';
-					print '<input type="hidden" name="token" value="'.newToken().'">';
-					print '<input type="hidden" name="action" value="create_outbound_shipment">';
-					print $form->select_warehouse($object->fk_warehouse_source > 0 ? $object->fk_warehouse_source : 0, 'ship_warehouse', 1, '', 1, 0, '', 0, 0, array(), 'minwidth150');
-					print ' <input type="submit" class="butAction" style="margin:0;" value="'.$langs->trans('Confirm').'">';
-					print '</form>';
-					print '</div>';
+				if ($warranty_serial) {
+					print '<input type="hidden" name="serial_in" value="'.dol_escape_htmltag($warranty_serial).'">';
+					print '<span class="opacitymedium">'.dol_escape_htmltag($warranty_serial).'</span>';
+					print ' ';
+				} else {
+					print '<input type="text" name="serial_in" class="minwidth120" placeholder="'.$langs->trans('SerialIn').'" value=""> ';
 				}
-
-				// Step 3: Validate Shipment (shipment exists, not yet validated)
-				if (!empty($object->fk_shipment) && !$shipment_validated && isModEnabled('expedition')) {
-					print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=validate_outbound_shipment&token='.newToken().'" class="butAction" style="margin:0;">'.$langs->trans('ValidateShipment').'</a>';
-				}
+				print $form->select_warehouse($object->fk_warehouse_return > 0 ? $object->fk_warehouse_return : 0, 'rec_warehouse', 1, '', 1, 0, '', 0, 0, array(), 'minwidth150');
+				print ' <input type="submit" class="butAction" style="margin:0;" value="'.$langs->trans('Confirm').'">';
+				print '</form>';
+				print '</div>';
+			} else {
+				print '<span class="opacitymedium">'.$langs->trans('NoReturnReceptionYet').'</span>';
 			}
 
 			print '</td>';
 			print '</tr>';
 		}
 
-		// --- INTERVENTION card ---
+		// --- Intervention row ---
 		if ($has_intervention) {
-			$inter_done     = !empty($object->fk_intervention);
-			$inter_class    = $inter_done ? 'status4' : ($s >= SvcRequest::STATUS_IN_PROGRESS ? 'status1' : 'status0');
-			$panel_label    = $langs->trans('OnSiteIntervention');
-			$btn_label      = $langs->trans('ScheduleIntervention');
-
+			$inter_done = !empty($object->fk_intervention);
 			print '<tr class="oddeven">';
-			print '<td style="width:20px; padding:8px 4px;">';
-			print '<span class="badge '.$inter_class.'" style="display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:middle;">&nbsp;</span>';
-			print '</td>';
-			print '<td style="padding:8px 12px; font-weight:bold;">'.img_picto('', 'intervention', 'class="pictofixedwidth"').$panel_label.'</td>';
+			print '<td style="padding:8px 12px; font-weight:bold; width:220px;">'.img_picto('', 'intervention', 'class="pictofixedwidth"').$langs->trans('OnSiteIntervention').'</td>';
 			print '<td style="padding:8px 12px;">';
 			if ($inter_done) {
 				print img_picto('', 'intervention', 'class="pictofixedwidth"');
-				print '<a href="'.DOL_URL_ROOT.'/fichinter/card.php?id='.$object->fk_intervention.'">'
-					.$langs->trans('Intervention').' #'.$object->fk_intervention.'</a>';
+				print '<a href="'.DOL_URL_ROOT.'/fichinter/card.php?id='.$object->fk_intervention.'">'.$langs->trans('Intervention').' #'.$object->fk_intervention.'</a>';
+			} elseif ($permwrite && in_array($s, array(SvcRequest::STATUS_VALIDATED, SvcRequest::STATUS_IN_PROGRESS)) && isModEnabled('ficheinter')) {
+				print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=create_intervention&token='.newToken().'" class="butAction" style="margin:0;">'.$langs->trans('ScheduleIntervention').'</a>';
 			} else {
 				print '<span class="opacitymedium">'.$langs->trans('NotYetScheduled').'</span>';
 			}
 			print '</td>';
-			print '<td style="padding:8px 12px; text-align:right;">';
-			if (!$inter_done && $permwrite && in_array($s, array(SvcRequest::STATUS_VALIDATED, SvcRequest::STATUS_IN_PROGRESS)) && isModEnabled('ficheinter')) {
-				print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=create_intervention&token='.newToken().'" class="butAction" style="margin:0;">'.$btn_label.'</a>';
-			}
-			print '</td>';
 			print '</tr>';
 		}
 
-		// --- RETURN card — 2-step gated reception flow ---
-		if ($has_return) {
-			$return_done  = !empty($object->fk_reception);
-			$return_class = $return_done ? 'status4' : (in_array($s, array(SvcRequest::STATUS_IN_PROGRESS, SvcRequest::STATUS_AWAIT_RETURN)) ? 'status1' : 'status0');
-
-			// Check reception validation status
-			$reception_validated = false;
-			if (!empty($object->fk_reception)) {
-				require_once DOL_DOCUMENT_ROOT.'/reception/class/reception.class.php';
-				$_rec = new Reception($db);
-				if ($_rec->fetch($object->fk_reception) > 0) {
-					$reception_validated = ((int) $_rec->statut >= 1);
-				}
-			}
-
-			$overdue = (!$return_done && $object->date_return_expected && dol_now() > $object->date_return_expected);
-
-			print '<tr class="oddeven">';
-			print '<td style="width:20px; padding:8px 4px;">';
-			$dot_class = $overdue ? 'status8' : $return_class;
-			print '<span class="badge '.$dot_class.'" style="display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:middle;">&nbsp;</span>';
-			print '</td>';
-			print '<td style="padding:8px 12px; font-weight:bold;">'.img_picto('', 'leftarrow', 'class="pictofixedwidth"').$langs->trans('ReturnFromCustomer');
-			if ($overdue) {
-				print ' <span class="badge status8">'.$langs->trans('Overdue').'</span>';
-			}
-			print '</td>';
-			print '<td style="padding:8px 12px;">';
-
-			if ($return_done) {
-				print img_picto('', 'reception', 'class="pictofixedwidth"');
-				print '<a href="'.DOL_URL_ROOT.'/reception/card.php?id='.$object->fk_reception.'">'
-					.$langs->trans('Reception').' #'.$object->fk_reception.'</a>';
-				if ($reception_validated) {
-					print ' <span class="badge status4">'.$langs->trans('Validated').'</span>';
-				}
-				if ($object->serial_in) {
-					print ' &mdash; '.$langs->trans('SerialIn').': <strong>'.dol_escape_htmltag($object->serial_in).'</strong>';
-				}
-				if ($object->date_return_received) {
-					print '<br><span class="opacitymedium">'.$langs->trans('Received').': '.dol_print_date($object->date_return_received, 'day').'</span>';
-				}
-				if ($object->return_carrier || $object->return_tracking) {
-					print '<br><span class="opacitymedium">'.dol_escape_htmltag($object->return_carrier);
-					if ($object->return_carrier && $object->return_tracking) print ' &mdash; ';
-					print dol_escape_htmltag($object->return_tracking).'</span>';
-				}
-			} else {
-				if ($action == 'edit' && $permwrite) {
-					print $form->selectDate($object->date_return_expected ? $object->date_return_expected : -1, 'date_return_expected', 0, 0, 1, '', 1, 1);
-				} elseif ($object->date_return_expected) {
-					print $langs->trans('ExpectedBy').': '.dol_print_date($object->date_return_expected, 'day');
-				} elseif (!$shipment_validated) {
-					print '<span class="opacitymedium">'.$langs->trans('WaitingForShipmentValidation').'</span>';
-				} else {
-					print '<span class="opacitymedium">'.$langs->trans('ReturnPending').'</span>';
-				}
-			}
-
-			print '</td>';
-			print '<td style="padding:8px 12px; text-align:right; vertical-align:top;">';
-
-			if ($permwrite && in_array($s, array(SvcRequest::STATUS_IN_PROGRESS, SvcRequest::STATUS_AWAIT_RETURN))) {
-				// Step 4: Create Return Reception (gated: shipment must be validated)
-				if (empty($object->fk_reception) && $shipment_validated && isModEnabled('reception')) {
-					$form_id3 = 'form_rec_'.$object->id;
-					print '<a href="#" onclick="document.getElementById(\''.$form_id3.'\').style.display=\'block\';this.style.display=\'none\';return false;" class="butAction" style="margin:0;">'.$langs->trans('CreateReturnReception').'</a>';
-					print '<div id="'.$form_id3.'" style="display:none; margin-top:6px;">';
-					print '<form action="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'" method="POST">';
-					print '<input type="hidden" name="token" value="'.newToken().'">';
-					print '<input type="hidden" name="action" value="create_return_reception">';
-					print '<input type="text" name="serial_in" class="minwidth120" placeholder="'.$langs->trans('SerialIn').'" value="">';
-					print ' <input type="text" name="return_carrier" class="minwidth80" placeholder="'.$langs->trans('Carrier').'" value="">';
-					print ' <input type="text" name="return_tracking" class="minwidth120" placeholder="'.$langs->trans('TrackingNumber').'" value="">';
-					print '<br style="margin:4px 0;">';
-					print $form->select_warehouse($object->fk_warehouse_return > 0 ? $object->fk_warehouse_return : 0, 'rec_warehouse', 1, '', 1, 0, '', 0, 0, array(), 'minwidth150');
-					print ' <input type="submit" class="butAction" style="margin:0;" value="'.$langs->trans('Confirm').'">';
-					print '</form>';
-					print '</div>';
-				}
-
-				// Step 5: Validate Reception (reception exists, not yet validated)
-				if (!empty($object->fk_reception) && !$reception_validated && isModEnabled('reception')) {
-					print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=validate_return_reception&token='.newToken().'" class="butAction" style="margin:0;">'.$langs->trans('ValidateReception').'</a>';
-				}
-
-				// Overdue helpers
-				if (!$return_done && $s == SvcRequest::STATUS_AWAIT_RETURN) {
-					print '<br>';
-					print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=send_reminder&token='.newToken().'" class="butActionDelete" style="margin:2px 0 0 0;">'.$langs->trans('SendReminder').'</a>';
-					if (isModEnabled('facture')) {
-						print '<br><a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=invoice_nonreturn&token='.newToken().'" class="butActionDelete" style="margin:2px 0 0 0;">'.$langs->trans('InvoiceNonReturn').'</a>';
-					}
-				}
-			}
-
-			print '</td>';
-			print '</tr>';
-		}
-
-		// --- Invoice link (if created) ---
+		// --- Invoice link ---
 		if ($object->fk_facture) {
 			print '<tr class="oddeven">';
-			print '<td style="width:20px; padding:8px 4px;"><span class="badge status4" style="display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:middle;">&nbsp;</span></td>';
-			print '<td style="padding:8px 12px; font-weight:bold;">'.img_picto('', 'bill', 'class="pictofixedwidth"').$langs->trans('Invoice').'</td>';
+			print '<td style="padding:8px 12px; font-weight:bold; width:220px;">'.img_picto('', 'bill', 'class="pictofixedwidth"').$langs->trans('Invoice').'</td>';
 			print '<td style="padding:8px 12px;">';
 			print '<a href="'.DOL_URL_ROOT.'/compta/facture/card.php?id='.$object->fk_facture.'">'.$langs->trans('Invoice').' #'.$object->fk_facture.'</a>';
-			print '</td><td></td></tr>';
+			print '</td>';
+			print '</tr>';
 		}
 
 		print '</table>';
