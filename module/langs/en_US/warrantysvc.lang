@@ -5,7 +5,7 @@
 #
 # Module
 #
-WarrantySvc = Warranty & Service Management
+WarrantySvc = Warranty
 WarrantySvcDescription = Manage service requests, warranties, and RMA workflows for serialized equipment.
 
 #
