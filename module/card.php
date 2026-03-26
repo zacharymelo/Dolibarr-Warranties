@@ -1102,44 +1102,87 @@ if ($action == 'create') {
 
 		// --- Return Reception row ---
 		if ($has_return) {
+			$use_customerreturn = getDolGlobalString('WARRANTYSVC_USE_CUSTOMERRETURN') && isModEnabled('customerreturn');
+
 			print '<tr class="oddeven">';
 			print '<td style="padding:8px 12px; font-weight:bold; width:220px;">'.img_picto('', 'leftarrow', 'class="pictofixedwidth"').$langs->trans('ReturnReception').'</td>';
 			print '<td style="padding:8px 12px;">';
 
-			if (!empty($object->fk_reception)) {
-				require_once DOL_DOCUMENT_ROOT.'/reception/class/reception.class.php';
-				$_rec = new Reception($db);
-				$_rec_label = ($_rec->fetch($object->fk_reception) > 0 && $_rec->ref) ? $_rec->ref : '#'.$object->fk_reception;
-				print img_picto('', 'reception', 'class="pictofixedwidth"');
-				print '<a href="'.DOL_URL_ROOT.'/reception/card.php?id='.$object->fk_reception.'">'.$langs->trans('Reception').' '.$_rec_label.'</a>';
-				if ($object->serial_in) {
-					print ' &mdash; '.$langs->trans('SerialIn').': <strong>'.dol_escape_htmltag($object->serial_in).'</strong>';
+			if ($use_customerreturn) {
+				// --- Customer Returns module integration ---
+				// Check if a customerreturn is already linked via element_element
+				$linked_return_id = 0;
+				$linked_return_ref = '';
+				$sql_cr = "SELECT fk_target FROM ".MAIN_DB_PREFIX."element_element"
+					." WHERE fk_source = ".((int) $object->id)
+					." AND sourcetype = 'warrantysvc_svcrequest'"
+					." AND targettype IN ('customerreturn', 'customerreturn_customerreturn')"
+					." LIMIT 1";
+				$res_cr = $db->query($sql_cr);
+				if ($res_cr && ($row_cr = $db->fetch_object($res_cr))) {
+					$linked_return_id = (int) $row_cr->fk_target;
+					dol_include_once('/customerreturn/class/customerreturn.class.php');
+					$_cr = new CustomerReturn($db);
+					if ($_cr->fetch($linked_return_id) > 0) {
+						$linked_return_ref = $_cr->ref;
+					}
 				}
-			} elseif ($active_status && $permwrite && isModEnabled('reception')) {
-				$form_id2 = 'form_rec_'.$object->id;
-				print '<a href="#" onclick="document.getElementById(\''.$form_id2.'\').style.display=\'block\';this.style.display=\'none\';return false;" class="butAction" style="margin:0;">'.$langs->trans('CreateReturnReception').'</a>';
-				print '<div id="'.$form_id2.'" style="display:none; margin-top:8px;">';
-				print '<form action="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'" method="POST">';
-				print '<input type="hidden" name="token" value="'.newToken().'">';
-				print '<input type="hidden" name="action" value="create_return_reception">';
-				if ($warranty_product_id > 0) {
-					print '<input type="hidden" name="rec_product_id" value="'.$warranty_product_id.'">';
-					print '<strong>'.dol_escape_htmltag($warranty_product_label ?: $langs->trans('Product').' #'.$warranty_product_id).'</strong>';
-					print ' ';
-				}
-				if ($warranty_serial) {
-					print '<input type="hidden" name="serial_in" value="'.dol_escape_htmltag($warranty_serial).'">';
-					print '<span class="opacitymedium">'.dol_escape_htmltag($warranty_serial).'</span>';
-					print ' ';
+
+				if ($linked_return_id > 0) {
+					print img_picto('', 'dollyrevert', 'class="pictofixedwidth"');
+					print '<a href="'.DOL_URL_ROOT.'/custom/customerreturn/customerreturn_card.php?id='.$linked_return_id.'">'
+						.$langs->trans('CustomerReturn').' '.($linked_return_ref ?: '#'.$linked_return_id).'</a>';
+				} elseif ($active_status && $permwrite) {
+					// Build URL to customerreturn creation with SR origin
+					$cr_url = DOL_URL_ROOT.'/custom/customerreturn/customerreturn_card.php?action=create'
+						.'&socid='.((int) $object->fk_soc)
+						.'&from_svcrequest='.((int) $object->id);
+					// Add shipment origin if available
+					if (!empty($object->fk_shipment)) {
+						$cr_url .= '&fk_expedition='.((int) $object->fk_shipment);
+					}
+					print '<a href="'.dol_escape_htmltag($cr_url).'" class="butAction" style="margin:0;">'
+						.$langs->trans('CreateCustomerReturn').'</a>';
 				} else {
-					print '<input type="text" name="serial_in" class="minwidth120" placeholder="'.$langs->trans('SerialIn').'" value=""> ';
+					print '<span class="opacitymedium">'.$langs->trans('NoReturnReceptionYet').'</span>';
 				}
-				print $form->select_warehouse($object->fk_warehouse_return > 0 ? $object->fk_warehouse_return : 0, 'rec_warehouse', 1, '', 1, 0, '', 0, 0, array(), 'minwidth150');
-				print ' <input type="submit" class="butAction" style="margin:0;" value="'.$langs->trans('Confirm').'">';
-				print '</form>';
-				print '</div>';
 			} else {
-				print '<span class="opacitymedium">'.$langs->trans('NoReturnReceptionYet').'</span>';
+				// --- Fallback: native Reception flow ---
+				if (!empty($object->fk_reception)) {
+					require_once DOL_DOCUMENT_ROOT.'/reception/class/reception.class.php';
+					$_rec = new Reception($db);
+					$_rec_label = ($_rec->fetch($object->fk_reception) > 0 && $_rec->ref) ? $_rec->ref : '#'.$object->fk_reception;
+					print img_picto('', 'reception', 'class="pictofixedwidth"');
+					print '<a href="'.DOL_URL_ROOT.'/reception/card.php?id='.$object->fk_reception.'">'.$langs->trans('Reception').' '.$_rec_label.'</a>';
+					if ($object->serial_in) {
+						print ' &mdash; '.$langs->trans('SerialIn').': <strong>'.dol_escape_htmltag($object->serial_in).'</strong>';
+					}
+				} elseif ($active_status && $permwrite && isModEnabled('reception')) {
+					$form_id2 = 'form_rec_'.$object->id;
+					print '<a href="#" onclick="document.getElementById(\''.$form_id2.'\').style.display=\'block\';this.style.display=\'none\';return false;" class="butAction" style="margin:0;">'.$langs->trans('CreateReturnReception').'</a>';
+					print '<div id="'.$form_id2.'" style="display:none; margin-top:8px;">';
+					print '<form action="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'" method="POST">';
+					print '<input type="hidden" name="token" value="'.newToken().'">';
+					print '<input type="hidden" name="action" value="create_return_reception">';
+					if ($warranty_product_id > 0) {
+						print '<input type="hidden" name="rec_product_id" value="'.$warranty_product_id.'">';
+						print '<strong>'.dol_escape_htmltag($warranty_product_label ?: $langs->trans('Product').' #'.$warranty_product_id).'</strong>';
+						print ' ';
+					}
+					if ($warranty_serial) {
+						print '<input type="hidden" name="serial_in" value="'.dol_escape_htmltag($warranty_serial).'">';
+						print '<span class="opacitymedium">'.dol_escape_htmltag($warranty_serial).'</span>';
+						print ' ';
+					} else {
+						print '<input type="text" name="serial_in" class="minwidth120" placeholder="'.$langs->trans('SerialIn').'" value=""> ';
+					}
+					print $form->select_warehouse($object->fk_warehouse_return > 0 ? $object->fk_warehouse_return : 0, 'rec_warehouse', 1, '', 1, 0, '', 0, 0, array(), 'minwidth150');
+					print ' <input type="submit" class="butAction" style="margin:0;" value="'.$langs->trans('Confirm').'">';
+					print '</form>';
+					print '</div>';
+				} else {
+					print '<span class="opacitymedium">'.$langs->trans('NoReturnReceptionYet').'</span>';
+				}
 			}
 
 			print '</td>';

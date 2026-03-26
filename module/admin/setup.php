@@ -46,6 +46,7 @@ if ($action == 'update') {
 		'WARRANTYSVC_DEFAULT_COVERAGE_DAYS',
 		'WARRANTYSVC_NOTIFY_WARRANTY_CREATED',
 		'WARRANTYSVC_WARRANTY_REQUIRES_LOTS',
+		'WARRANTYSVC_USE_CUSTOMERRETURN',
 	);
 
 	foreach ($settings as $key) {
@@ -195,6 +196,21 @@ print '<td>'.$langs->trans('WarrantyRequiresLots').'<br><span class="opacitymedi
 print '<td>';
 $chk4 = getDolGlobalString('WARRANTYSVC_WARRANTY_REQUIRES_LOTS') ? ' checked' : '';
 print '<input type="checkbox" name="WARRANTYSVC_WARRANTY_REQUIRES_LOTS" value="1"'.$chk4.'>';
+print '</td></tr>';
+
+// Use Customer Returns module for inbound returns (optional integration)
+$customerreturn_available = isModEnabled('customerreturn');
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans('UseCustomerReturns').'<br><span class="opacitymedium">'
+	.$langs->trans('UseCustomerReturnsDesc').'</span>';
+if (!$customerreturn_available) {
+	print '<br><span class="warning">'.$langs->trans('CustomerReturnModuleNotInstalled').'</span>';
+}
+print '</td>';
+print '<td>';
+$chk5 = getDolGlobalString('WARRANTYSVC_USE_CUSTOMERRETURN') ? ' checked' : '';
+$disabled = $customerreturn_available ? '' : ' disabled';
+print '<input type="checkbox" name="WARRANTYSVC_USE_CUSTOMERRETURN" value="1"'.$chk5.$disabled.'>';
 print '</td></tr>';
 
 print '</table>';

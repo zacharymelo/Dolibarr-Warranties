@@ -339,6 +339,10 @@ NotifyWarrantyCreated = Email customer on warranty creation
 NotifyWarrantyCreatedDesc = Send an email notification to the customer when a new warranty record is created for their unit.
 WarrantyRequiresLots = Restrict service requests to serialized products
 WarrantyRequiresLotsDesc = When enabled, the product selector on service request forms will only show products that have serial number or lot tracking enabled in the Stocks module.
+UseCustomerReturns = Use Customer Returns module for inbound returns
+UseCustomerReturnsDesc = When enabled, the "Create Return" button on service requests will open the Customer Returns module instead of creating a native Reception. This provides stock movement tracking, credit note generation, and a dedicated return document.
+CustomerReturnModuleNotInstalled = The Customer Returns module is not installed or enabled. Install it from the Modules page to use this feature.
+CreateCustomerReturn = Create Customer Return
 NumberingModule = Reference Numbering Module
 
 # Movement tracker panel

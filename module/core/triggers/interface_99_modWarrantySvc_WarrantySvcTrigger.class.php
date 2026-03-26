@@ -146,6 +146,16 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 				}
 				return 0;
 
+			// ------------------------------------------------------------------
+			// Customer Return validated — if linked to an SR, auto-advance the SR
+			// ------------------------------------------------------------------
+			case 'CUSTOMERRETURN_CUSTOMERRETURN_VALIDATE':
+				if (!getDolGlobalString('WARRANTYSVC_USE_CUSTOMERRETURN')) {
+					return 0;
+				}
+				$this->_handleCustomerReturnValidated($object, $user);
+				return 0;
+
 			default:
 				return 0;
 		}
@@ -181,6 +191,51 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 		dol_syslog('WarrantySvcTrigger: linked SO '.$so_id.' to SvcRequest '.$sr_id, LOG_DEBUG);
 	}
 
+	/**
+	 * When a Customer Return is validated, check if it was linked to an SR.
+	 * If so, set date_return_received and advance the SR status.
+	 *
+	 * @param  object $object  The validated CustomerReturn
+	 * @param  User   $user    Actor
+	 * @return void
+	 */
+	private function _handleCustomerReturnValidated($object, $user)
+	{
+		$cr_id = (int) $object->id;
+
+		// Look for an SR linked as source → this customerreturn as target
+		$sql = "SELECT fk_source FROM ".MAIN_DB_PREFIX."element_element"
+			." WHERE fk_target = ".$cr_id
+			." AND targettype IN ('customerreturn', 'customerreturn_customerreturn')"
+			." AND sourcetype = 'warrantysvc_svcrequest'"
+			." LIMIT 1";
+		$res = $this->db->query($sql);
+		if (!$res) {
+			return;
+		}
+		$row = $this->db->fetch_object($res);
+		if (!$row || empty($row->fk_source)) {
+			return;
+		}
+
+		$sr_id = (int) $row->fk_source;
+		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcrequest.class.php';
+		$sr = new SvcRequest($this->db);
+		if ($sr->fetch($sr_id) <= 0) {
+			return;
+		}
+
+		// Update return-received date
+		$sr->date_return_received = dol_now();
+		$sr->update($user);
+
+		// Advance SR: if awaiting return → in progress; if in progress → resolve
+		if ($sr->status == SvcRequest::STATUS_AWAIT_RETURN) {
+			$sr->setInProgress($user);
+		}
+
+		dol_syslog('WarrantySvcTrigger: CustomerReturn '.$cr_id.' validated, updated SR '.$sr_id, LOG_DEBUG);
+	}
 
 	// -----------------------------------------------------------------
 	// Private notification helpers

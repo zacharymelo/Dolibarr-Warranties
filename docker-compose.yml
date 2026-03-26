@@ -38,6 +38,8 @@ services:
       - dolibarr_docs:/var/www/documents
       # Your RMA module mounted directly into Dolibarr's custom modules directory
       - ./module:/var/www/html/custom/warrantysvc
+      # ReturnMgmt module
+      - ../returnmgmt/module:/var/www/html/custom/returnmgmt
 
 volumes:
   db_data:
