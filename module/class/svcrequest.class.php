@@ -728,25 +728,48 @@ class SvcRequest extends CommonObject
 		}
 
 		$target_type = $this->getElementType(); // 'warrantysvc_svcrequest'
+		$bare_target = $this->element;           // 'svcrequest'
 
 		// Use prefixed element types for custom objects so showLinkedObjectBlock
 		// can resolve the template path (warrantysvc_svcwarranty → warrantysvc/svcwarranty/tpl/).
 		// Core objects (commande, shipping, etc.) use their native unprefixed names.
+		// The 'stale' key lists unprefixed aliases to clean up from older versions.
 		$links = array(
-			'warrantysvc_svcwarranty' => $this->fk_warranty,
-			'commande'    => $this->fk_commande,
-			'shipping'    => $this->fk_shipment,
-			'facture'     => $this->fk_facture,
-			'reception'   => $this->fk_reception,
-			'fichinter'   => $this->fk_intervention,
+			array('type' => 'warrantysvc_svcwarranty', 'fk' => $this->fk_warranty,      'stale' => array('svcwarranty')),
+			array('type' => 'commande',                'fk' => $this->fk_commande,       'stale' => array()),
+			array('type' => 'shipping',                'fk' => $this->fk_shipment,       'stale' => array()),
+			array('type' => 'facture',                 'fk' => $this->fk_facture,        'stale' => array()),
+			array('type' => 'reception',               'fk' => $this->fk_reception,      'stale' => array()),
+			array('type' => 'fichinter',               'fk' => $this->fk_intervention,   'stale' => array()),
 		);
 
-		foreach ($links as $source_type => $fk_id) {
+		foreach ($links as $link) {
+			$source_type = $link['type'];
+			$fk_id       = $link['fk'];
+
 			if (empty($fk_id) || $fk_id <= 0) {
 				continue;
 			}
 
-			// Check if this link already exists (in either direction)
+			// Clean up stale rows with unprefixed types from older versions
+			foreach ($link['stale'] as $stale_type) {
+				$sql_del = "DELETE FROM ".MAIN_DB_PREFIX."element_element WHERE"
+					." ((fk_source = ".((int) $fk_id)." AND sourcetype = '".$this->db->escape($stale_type)."'"
+					."   AND fk_target = ".((int) $this->id).")"
+					." OR (fk_target = ".((int) $fk_id)." AND targettype = '".$this->db->escape($stale_type)."'"
+					."   AND fk_source = ".((int) $this->id)."))";
+				$this->db->query($sql_del);
+			}
+
+			// Also clean up rows where our target type is unprefixed
+			if ($bare_target !== $target_type) {
+				$sql_del2 = "DELETE FROM ".MAIN_DB_PREFIX."element_element WHERE"
+					." fk_target = ".((int) $this->id)
+					." AND targettype = '".$this->db->escape($bare_target)."'";
+				$this->db->query($sql_del2);
+			}
+
+			// Check if the correct prefixed link already exists
 			$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."element_element WHERE"
 				." ((fk_source = ".((int) $fk_id)." AND sourcetype = '".$this->db->escape($source_type)."'"
 				."   AND fk_target = ".((int) $this->id)." AND targettype = '".$this->db->escape($target_type)."')"
