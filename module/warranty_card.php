@@ -911,6 +911,14 @@ if ($action == 'delete') {
 	);
 }
 
+// Open form BEFORE the card content so all edit fields are inside it
+if ($action == 'edit') {
+	print '<form action="'.$_SERVER['PHP_SELF'].'" method="POST">';
+	print '<input type="hidden" name="token" value="'.newToken().'">';
+	print '<input type="hidden" name="action" value="update">';
+	print '<input type="hidden" name="id" value="'.$object->id.'">';
+}
+
 print dol_get_fiche_head($head, 'card', $langs->trans('Warranty'), -1, 'bill');
 
 $linkback = '<a href="'.DOL_URL_ROOT.'/custom/warrantysvc/warranty_list.php">'.$langs->trans('BackToList').'</a>';
@@ -1223,16 +1231,12 @@ if ($action != 'edit' && $object->id > 0) {
 
 // ---- Action buttons ----
 if ($action == 'edit') {
-	print '<form action="'.$_SERVER['PHP_SELF'].'" method="POST">';
-	print '<input type="hidden" name="token" value="'.newToken().'">';
-	print '<input type="hidden" name="action" value="update">';
-	print '<input type="hidden" name="id" value="'.$object->id.'">';
 	print '<div class="center">';
 	print '<input type="submit" class="button button-save" name="save" value="'.$langs->trans('Save').'">';
 	print ' &nbsp; ';
 	print '<input type="submit" class="button button-cancel" name="cancel" value="'.$langs->trans('Cancel').'">';
 	print '</div>';
-	print '</form>';
+	print '</form>'; // Close form opened before dol_get_fiche_head
 } else {
 	// View mode buttons
 	print "\n".'<div class="tabsAction">'."\n";
