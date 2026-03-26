@@ -23,6 +23,9 @@ class SvcRequest extends CommonObject
 	/** @var string Trigger prefix */
 	public $TRIGGER_PREFIX = 'WARRANTYSVC';
 
+	/** @var string Module name (used by getElementType() for prefixing) */
+	public $module = 'warrantysvc';
+
 	/** @var string Element name */
 	public $element = 'svcrequest';
 

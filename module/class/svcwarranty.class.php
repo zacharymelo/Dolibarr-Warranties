@@ -17,6 +17,9 @@ class SvcWarranty extends CommonObject
 	/** @var string Trigger prefix */
 	public $TRIGGER_PREFIX = 'SVCWARRANTY';
 
+	/** @var string Module name (used by getElementType() for prefixing) */
+	public $module = 'warrantysvc';
+
 	/** @var string Element name */
 	public $element = 'svcwarranty';
 

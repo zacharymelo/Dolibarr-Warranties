@@ -56,7 +56,7 @@ class ActionsWarrantySvc
 	{
 		$elementType = isset($parameters['elementType']) ? $parameters['elementType'] : '';
 
-		if ($elementType === 'svcwarranty') {
+		if ($elementType === 'svcwarranty' || $elementType === 'warrantysvc_svcwarranty') {
 			$this->results = array(
 				'module'        => 'warrantysvc',
 				'element'       => 'svcwarranty',
