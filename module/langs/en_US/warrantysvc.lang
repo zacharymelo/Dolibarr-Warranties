@@ -475,3 +475,7 @@ ConditionGood = Good
 ConditionFair = Fair
 ConditionPoor = Poor
 ConditionScrap = Scrap
+
+# Debug
+DebugMode = Debug Mode
+DebugModeDesc = Exposes diagnostic endpoints at /custom/warrantysvc/ajax/debug.php for troubleshooting linked objects, element properties, triggers, hooks, and module configuration. Admin-only access.

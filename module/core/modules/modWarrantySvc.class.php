@@ -44,7 +44,7 @@ class modWarrantySvc extends DolibarrModules
 		// Module name (no spaces), used if translation string 'ModuleXXXName' not found
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
 		$this->description = "RMA (Return Merchandise Authorization) and Warranty Management for serialized equipment";
-		$this->version = '1.23.4';
+		$this->version = '1.24.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'technic';
 

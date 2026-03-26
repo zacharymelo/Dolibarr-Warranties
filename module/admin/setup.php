@@ -47,6 +47,7 @@ if ($action == 'update') {
 		'WARRANTYSVC_NOTIFY_WARRANTY_CREATED',
 		'WARRANTYSVC_WARRANTY_REQUIRES_LOTS',
 		'WARRANTYSVC_USE_CUSTOMERRETURN',
+		'WARRANTYSVC_DEBUG_MODE',
 	);
 
 	foreach ($settings as $key) {
@@ -211,6 +212,14 @@ print '<td>';
 $chk5 = getDolGlobalString('WARRANTYSVC_USE_CUSTOMERRETURN') ? ' checked' : '';
 $disabled = $customerreturn_available ? '' : ' disabled';
 print '<input type="checkbox" name="WARRANTYSVC_USE_CUSTOMERRETURN" value="1"'.$chk5.$disabled.'>';
+print '</td></tr>';
+
+// Debug mode
+print '<tr class="oddeven"><td>'.$langs->trans('DebugMode').'</td>';
+print '<td class="opacitymedium">'.$langs->trans('DebugModeDesc').'</td>';
+print '<td>';
+$chk_debug = getDolGlobalString('WARRANTYSVC_DEBUG_MODE') ? ' checked' : '';
+print '<input type="checkbox" name="WARRANTYSVC_DEBUG_MODE" value="1"'.$chk_debug.'>';
 print '</td></tr>';
 
 print '</table>';
