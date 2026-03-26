@@ -178,10 +178,16 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 		$sr_id = (int) $object->origin_id;
 
 		// Bidirectional link in Dolibarr's native element_element table
-		$sql = "INSERT INTO ".MAIN_DB_PREFIX."element_element"
-			." (fk_source, sourcetype, fk_target, targettype, entity)"
-			." VALUES (".$so_id.", 'commande', ".$sr_id.", 'svcrequest', ".((int) $object->entity).")";
-		$this->db->query($sql); // non-fatal if it fails (e.g. duplicate)
+		// Direction 1: SO as source → SR as target
+		$sql1 = "INSERT INTO ".MAIN_DB_PREFIX."element_element"
+			." (fk_source, sourcetype, fk_target, targettype)"
+			." VALUES (".$so_id.", 'commande', ".$sr_id.", 'warrantysvc_svcrequest')";
+		$this->db->query($sql1); // non-fatal if it fails (e.g. duplicate)
+		// Direction 2: SR as source → SO as target
+		$sql2 = "INSERT INTO ".MAIN_DB_PREFIX."element_element"
+			." (fk_source, sourcetype, fk_target, targettype)"
+			." VALUES (".$sr_id.", 'warrantysvc_svcrequest', ".$so_id.", 'commande')";
+		$this->db->query($sql2); // non-fatal if it fails (e.g. duplicate)
 
 		// Store on the SR so the action panel can display the link directly
 		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcrequest.class.php';
@@ -512,7 +518,15 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 			// expiry_date auto-computed in create() from coverage_days + start_date
 
 			$result = $warranty->create($user);
-			if ($result < 0) {
+			if ($result > 0) {
+				// Link warranty to shipment and order in element_element
+				if ($warranty->fk_expedition > 0) {
+					$warranty->add_object_linked('expedition', $warranty->fk_expedition);
+				}
+				if ($warranty->fk_commande > 0) {
+					$warranty->add_object_linked('commande', $warranty->fk_commande);
+				}
+			} else {
 				dol_syslog(
 					'WarrantySvcTrigger: failed to create warranty for serial '.$line->serial_number.': '.$warranty->error,
 					LOG_WARNING

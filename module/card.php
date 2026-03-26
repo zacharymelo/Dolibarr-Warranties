@@ -105,6 +105,10 @@ if ($action == 'add' && $permwrite) {
 
 	$result = $object->create($user);
 	if ($result > 0) {
+		// Link SR to warranty in element_element so linked objects panel shows it
+		if ($object->fk_warranty > 0) {
+			$object->add_object_linked('svcwarranty', $object->fk_warranty);
+		}
 		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$result);
 		exit;
 	} else {
