@@ -48,7 +48,14 @@ if (!$permread) { accessforbidden(); }
 /*
  * Actions
  */
-if ($cancel) { $action = ''; }
+if ($cancel) {
+	if ($id > 0) {
+		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$id);
+	} else {
+		header('Location: '.dol_buildpath('/warrantysvc/warranty_list.php', 1));
+	}
+	exit;
+}
 
 // ---- CREATE ----
 if ($action == 'add' && $permwrite) {
