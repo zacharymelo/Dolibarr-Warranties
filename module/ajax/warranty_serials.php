@@ -33,12 +33,11 @@ if ($socid <= 0 || $fk_product <= 0) {
 }
 
 // Unassigned serials for this customer + product, with source shipment and order.
-// Note: batch/serial is in product_lot.batch, referenced via expeditiondet_batch.fk_lot
-$sql  = "SELECT pl.batch AS serial_number,";
+// Serial string is stored directly on expeditiondet_batch.batch
+$sql  = "SELECT edb.batch AS serial_number,";
 $sql .= " e.rowid AS fk_expedition, e.ref AS expedition_ref,";
 $sql .= " ee.fk_source AS fk_commande, c.ref AS commande_ref";
 $sql .= " FROM ".MAIN_DB_PREFIX."expeditiondet_batch edb";
-$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product_lot pl ON pl.rowid = edb.fk_lot";
 $sql .= " INNER JOIN ".MAIN_DB_PREFIX."expeditiondet ed ON ed.rowid = edb.fk_expeditiondet";
 $sql .= " INNER JOIN ".MAIN_DB_PREFIX."expedition e ON e.rowid = ed.fk_expedition";
 $sql .= " LEFT JOIN ".MAIN_DB_PREFIX."element_element ee";
@@ -48,16 +47,16 @@ $sql .= " WHERE e.fk_soc = ".((int) $socid);
 $sql .= " AND ed.fk_product = ".((int) $fk_product);
 $sql .= " AND e.fk_statut >= 1";
 $sql .= " AND e.entity IN (".getEntity('expedition').")";
-$sql .= " AND pl.batch IS NOT NULL AND pl.batch != ''";
+$sql .= " AND edb.batch IS NOT NULL AND edb.batch != ''";
 $sql .= " AND NOT EXISTS (";
 $sql .= "   SELECT 1 FROM ".MAIN_DB_PREFIX."svc_warranty w";
-$sql .= "   WHERE w.serial_number = pl.batch";
+$sql .= "   WHERE w.serial_number = edb.batch";
 $sql .= "   AND w.fk_product = ed.fk_product";
 $sql .= "   AND w.status != 'voided'";
 $sql .= "   AND w.serial_number IS NOT NULL AND w.serial_number != ''";
 $sql .= "   AND w.entity IN (".getEntity('svcwarranty').")";
 $sql .= " )";
-$sql .= " ORDER BY e.rowid DESC, pl.batch ASC";
+$sql .= " ORDER BY e.rowid DESC, edb.batch ASC";
 
 $resql = $db->query($sql);
 $serials = array();
