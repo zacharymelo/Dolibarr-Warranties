@@ -769,6 +769,28 @@ class SvcRequest extends CommonObject
 	}
 
 	/**
+	 * Return a clickable link to this SR (used by showLinkedObjectBlock)
+	 *
+	 * @param  int    $withpicto  0=no picto, 1=include picto
+	 * @param  string $option     Unused
+	 * @param  int    $notooltip  1=disable tooltip
+	 * @return string             HTML link
+	 */
+	public function getNomUrl($withpicto = 0, $option = '', $notooltip = 0)
+	{
+		$url = DOL_URL_ROOT.'/custom/warrantysvc/card.php?id='.$this->id;
+		$label = $this->ref;
+		$link = '<a href="'.$url.'" title="'.dol_escape_htmltag($label).'">';
+		$linkend = '</a>';
+		$result = $link;
+		if ($withpicto) {
+			$result .= img_picto('', 'technic', 'class="pictofixedwidth"');
+		}
+		$result .= $label.$linkend;
+		return $result;
+	}
+
+	/**
 	 * Create a return reception (Reception) for equipment coming back from the customer.
 	 *
 	 * The reception is created without a source PO. Product lines are derived from

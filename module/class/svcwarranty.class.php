@@ -301,6 +301,28 @@ class SvcWarranty extends CommonObject
 	}
 
 	/**
+	 * Return a clickable link to this warranty (used by showLinkedObjectBlock)
+	 *
+	 * @param  int    $withpicto  0=no picto, 1=include picto
+	 * @param  string $option     Unused
+	 * @param  int    $notooltip  1=disable tooltip
+	 * @return string             HTML link
+	 */
+	public function getNomUrl($withpicto = 0, $option = '', $notooltip = 0)
+	{
+		$url = DOL_URL_ROOT.'/custom/warrantysvc/warranty_card.php?id='.$this->id;
+		$label = $this->ref;
+		$link = '<a href="'.$url.'" title="'.dol_escape_htmltag($label).'">';
+		$linkend = '</a>';
+		$result = $link;
+		if ($withpicto) {
+			$result .= img_picto('', 'bill', 'class="pictofixedwidth"');
+		}
+		$result .= $label.$linkend;
+		return $result;
+	}
+
+	/**
 	 * Sync status field based on expiry date (called after fetch)
 	 *
 	 * @return void
