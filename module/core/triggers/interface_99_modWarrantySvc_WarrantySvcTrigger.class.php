@@ -66,18 +66,18 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 			// ------------------------------------------------------------------
 			// Service Request: new record created (draft)
 			// ------------------------------------------------------------------
-			case 'SVCREQUEST_CREATE':
+			case 'WARRANTYSVC_CREATE':
 				// Increment claim_count on the linked warranty
 				if (!empty($object->fk_warranty)) {
 					$this->_incrementWarrantyClaimCount($object->fk_warranty, $user);
 				}
-				dol_syslog('WarrantySvcTrigger: SVCREQUEST_CREATE ref='.$object->ref, LOG_DEBUG);
+				dol_syslog('WarrantySvcTrigger: WARRANTYSVC_CREATE ref='.$object->ref, LOG_DEBUG);
 				return 1;
 
 			// ------------------------------------------------------------------
 			// Service Request validated — notify assigned technician
 			// ------------------------------------------------------------------
-			case 'SVCREQUEST_VALIDATE':
+			case 'WARRANTYSVC_VALIDATE':
 				if (!empty($object->fk_user_assigned)) {
 					$this->_notifyTechnician($object, $user, $langs, $conf, 'validate');
 				}
@@ -86,7 +86,7 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 			// ------------------------------------------------------------------
 			// Service Request set in progress
 			// ------------------------------------------------------------------
-			case 'SVCREQUEST_SETINPROGRESS':
+			case 'WARRANTYSVC_SETINPROGRESS':
 				if (!empty($object->fk_user_assigned)) {
 					$this->_notifyTechnician($object, $user, $langs, $conf, 'inprogress');
 				}
@@ -95,22 +95,22 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 			// ------------------------------------------------------------------
 			// Awaiting return — notify customer to ship back
 			// ------------------------------------------------------------------
-			case 'SVCREQUEST_AWAITRETURN':
+			case 'WARRANTYSVC_AWAITRETURN':
 				$this->_notifyCustomer($object, $user, $langs, $conf, 'awaitreturn');
 				return 1;
 
 			// ------------------------------------------------------------------
 			// Resolved — notify customer
 			// ------------------------------------------------------------------
-			case 'SVCREQUEST_RESOLVE':
+			case 'WARRANTYSVC_RESOLVE':
 				$this->_notifyCustomer($object, $user, $langs, $conf, 'resolved');
 				return 1;
 
 			// ------------------------------------------------------------------
 			// Closed
 			// ------------------------------------------------------------------
-			case 'SVCREQUEST_CLOSE':
-				dol_syslog('WarrantySvcTrigger: SVCREQUEST_CLOSE ref='.$object->ref, LOG_DEBUG);
+			case 'WARRANTYSVC_CLOSE':
+				dol_syslog('WarrantySvcTrigger: WARRANTYSVC_CLOSE ref='.$object->ref, LOG_DEBUG);
 				return 1;
 
 			// ------------------------------------------------------------------

@@ -310,7 +310,7 @@ if ($action == 'create_from_shipment') {
 			print '<div class="center">';
 			print '<input type="submit" id="btn_save_ship" class="button button-save" name="add" value="'.$langs->trans('Save').'" disabled>';
 			print ' &nbsp; ';
-			print '<a class="button button-cancel" href="'.$_SERVER['PHP_SELF'].'?action=create_from_shipment">'.$langs->trans('Cancel').'</a>';
+			print '<a class="button button-cancel" href="'.dol_buildpath('/warrantysvc/warranty_list.php', 1).'">'.$langs->trans('Cancel').'</a>';
 			print '</div>';
 
 			print '</form>';
@@ -1153,6 +1153,62 @@ print '</div>';
 
 print '</div>'; // fichecenter
 print '<div class="clearboth"></div>';
+
+// ---- Unit Service History ----
+if ($action != 'edit' && !empty($object->serial_number)) {
+	require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcservicelog.class.php';
+	$svclog = new SvcServiceLog($db);
+	$log_found = $svclog->fetchBySerial($object->serial_number, $conf->entity);
+
+	print '<br>';
+	print '<div class="div-table-responsive">';
+	print '<table class="noborder centpercent">';
+	print '<tr class="liste_titre">';
+	print '<td colspan="2">'.img_picto('', 'technic', 'class="pictofixedwidth"').$langs->trans('UnitServiceHistory').'</td>';
+	print '</tr>';
+
+	if ($log_found > 0) {
+		$condition_labels = array(
+			SvcServiceLog::CONDITION_GOOD => $langs->trans('ConditionGood'),
+			SvcServiceLog::CONDITION_FAIR => $langs->trans('ConditionFair'),
+			SvcServiceLog::CONDITION_POOR => $langs->trans('ConditionPoor'),
+			SvcServiceLog::CONDITION_SCRAP => $langs->trans('ConditionScrap'),
+		);
+		$condition_badges = array(
+			SvcServiceLog::CONDITION_GOOD => 'status4',
+			SvcServiceLog::CONDITION_FAIR => 'status1',
+			SvcServiceLog::CONDITION_POOR => 'status8',
+			SvcServiceLog::CONDITION_SCRAP => 'status8',
+		);
+
+		print '<tr class="oddeven"><td style="width:220px;">'.$langs->trans('ServiceCount').'</td>';
+		print '<td><strong>'.((int) $svclog->service_count).'</strong></td></tr>';
+
+		print '<tr class="oddeven"><td>'.$langs->trans('ServiceHours').'</td>';
+		print '<td>'.((float) $svclog->service_hours).' hrs</td></tr>';
+
+		print '<tr class="oddeven"><td>'.$langs->trans('ConditionStatus').'</td>';
+		print '<td><span class="badge '.($condition_badges[$svclog->condition_status] ?? 'status0').'">'
+			.($condition_labels[$svclog->condition_status] ?? $langs->trans('Unknown')).'</span></td></tr>';
+
+		print '<tr class="oddeven"><td>'.$langs->trans('ConditionScore').'</td>';
+		print '<td>'.((int) $svclog->condition_score).' <span class="opacitymedium">('.$langs->trans('LowerIsBetter').')</span></td></tr>';
+
+		if ($svclog->last_service_date) {
+			print '<tr class="oddeven"><td>'.$langs->trans('LastServiceDate').'</td>';
+			print '<td>'.dol_print_date($svclog->last_service_date, 'day').'</td></tr>';
+		}
+		if ($svclog->condition_notes) {
+			print '<tr class="oddeven"><td>'.$langs->trans('ConditionNotes').'</td>';
+			print '<td>'.dol_escape_htmltag($svclog->condition_notes).'</td></tr>';
+		}
+	} else {
+		print '<tr class="oddeven"><td colspan="2"><span class="opacitymedium">'.$langs->trans('NoServiceHistory').'</span></td></tr>';
+	}
+
+	print '</table>';
+	print '</div>';
+}
 
 print dol_get_fiche_end();
 

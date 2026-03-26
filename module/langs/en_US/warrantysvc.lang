@@ -460,3 +460,18 @@ WarrantyBlankInherits = Blank = inherit parent default (%s)
 WarrantyInheritDays = Inherit %d days from parent
 WarrantyInheritedFromParent = inherited from parent
 WarrantyVariantOverride = variant override
+
+# Unit Service History
+UnitServiceHistory = Unit Service History
+ServiceCount = Times Serviced
+ServiceHours = Total Service Hours
+ConditionStatus = Condition
+ConditionScore = Condition Score
+ConditionNotes = Condition Notes
+LastServiceDate = Last Service Date
+LowerIsBetter = lower is better
+NoServiceHistory = No service history recorded for this serial.
+ConditionGood = Good
+ConditionFair = Fair
+ConditionPoor = Poor
+ConditionScrap = Scrap
