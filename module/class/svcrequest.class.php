@@ -729,8 +729,11 @@ class SvcRequest extends CommonObject
 
 		$target_type = $this->getElementType(); // 'warrantysvc_svcrequest'
 
+		// Use prefixed element types for custom objects so showLinkedObjectBlock
+		// can resolve the template path (warrantysvc_svcwarranty → warrantysvc/svcwarranty/tpl/).
+		// Core objects (commande, shipping, etc.) use their native unprefixed names.
 		$links = array(
-			'svcwarranty' => $this->fk_warranty,
+			'warrantysvc_svcwarranty' => $this->fk_warranty,
 			'commande'    => $this->fk_commande,
 			'shipping'    => $this->fk_shipment,
 			'facture'     => $this->fk_facture,
