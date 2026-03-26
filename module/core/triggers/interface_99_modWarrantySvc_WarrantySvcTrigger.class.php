@@ -67,7 +67,10 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 			// Service Request: new record created (draft)
 			// ------------------------------------------------------------------
 			case 'SVCREQUEST_CREATE':
-				// No outbound email on creation — just log the event internally
+				// Increment claim_count on the linked warranty
+				if (!empty($object->fk_warranty)) {
+					$this->_incrementWarrantyClaimCount($object->fk_warranty, $user);
+				}
 				dol_syslog('WarrantySvcTrigger: SVCREQUEST_CREATE ref='.$object->ref, LOG_DEBUG);
 				return 1;
 
@@ -235,6 +238,22 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 		}
 
 		dol_syslog('WarrantySvcTrigger: CustomerReturn '.$cr_id.' validated, updated SR '.$sr_id, LOG_DEBUG);
+	}
+
+	/**
+	 * Increment claim_count on a warranty record.
+	 *
+	 * @param  int  $fk_warranty  Warranty ID
+	 * @param  User $user         Actor
+	 * @return void
+	 */
+	private function _incrementWarrantyClaimCount($fk_warranty, $user)
+	{
+		$sql = "UPDATE ".MAIN_DB_PREFIX."svc_warranty"
+			." SET claim_count = claim_count + 1"
+			." WHERE rowid = ".((int) $fk_warranty);
+		$this->db->query($sql);
+		dol_syslog('WarrantySvcTrigger: incremented claim_count on warranty '.$fk_warranty, LOG_DEBUG);
 	}
 
 	// -----------------------------------------------------------------
