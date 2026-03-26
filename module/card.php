@@ -105,10 +105,8 @@ if ($action == 'add' && $permwrite) {
 
 	$result = $object->create($user);
 	if ($result > 0) {
-		// Link SR to warranty in element_element so linked objects panel shows it
-		if ($object->fk_warranty > 0) {
-			$object->add_object_linked('svcwarranty', $object->fk_warranty);
-		}
+		// Sync all FK-based links into element_element
+		$object->syncLinkedObjects();
 		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$result);
 		exit;
 	} else {
@@ -147,6 +145,8 @@ if ($action == 'update' && $permwrite) {
 
 	$result = $object->update($user);
 	if ($result >= 0) {
+		// Sync all FK-based links into element_element (catches manual FK changes)
+		$object->syncLinkedObjects();
 		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
 		exit;
 	} else {

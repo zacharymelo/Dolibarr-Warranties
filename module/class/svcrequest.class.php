@@ -712,6 +712,50 @@ class SvcRequest extends CommonObject
 	}
 
 	/**
+	 * Ensure element_element links exist for all populated FK fields.
+	 * Idempotent — safe to call after every create/update. Skips links
+	 * that already exist to avoid duplicates.
+	 *
+	 * @return void
+	 */
+	public function syncLinkedObjects()
+	{
+		if (empty($this->id)) {
+			return;
+		}
+
+		$target_type = $this->getElementType(); // 'warrantysvc_svcrequest'
+
+		$links = array(
+			'svcwarranty' => $this->fk_warranty,
+			'commande'    => $this->fk_commande,
+			'shipping'    => $this->fk_shipment,
+			'facture'     => $this->fk_facture,
+			'reception'   => $this->fk_reception,
+			'fichinter'   => $this->fk_intervention,
+		);
+
+		foreach ($links as $source_type => $fk_id) {
+			if (empty($fk_id) || $fk_id <= 0) {
+				continue;
+			}
+
+			// Check if this link already exists (in either direction)
+			$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."element_element WHERE"
+				." ((fk_source = ".((int) $fk_id)." AND sourcetype = '".$this->db->escape($source_type)."'"
+				."   AND fk_target = ".((int) $this->id)." AND targettype = '".$this->db->escape($target_type)."')"
+				."  OR (fk_source = ".((int) $this->id)." AND sourcetype = '".$this->db->escape($target_type)."'"
+				."   AND fk_target = ".((int) $fk_id)." AND targettype = '".$this->db->escape($source_type)."'))"
+				." LIMIT 1";
+
+			$res = $this->db->query($sql);
+			if ($res && $this->db->num_rows($res) == 0) {
+				$this->add_object_linked($source_type, $fk_id);
+			}
+		}
+	}
+
+	/**
 	 * Whether this RMA is covered under active warranty
 	 *
 	 * @return bool
@@ -820,6 +864,7 @@ class SvcRequest extends CommonObject
 			return -1;
 		}
 
+		$this->syncLinkedObjects();
 		$this->db->commit();
 		return $rec_id;
 	}
@@ -927,6 +972,7 @@ class SvcRequest extends CommonObject
 
 		$this->fk_intervention = $fichinter_id;
 		$this->update($user);
+		$this->syncLinkedObjects();
 
 		return $fichinter_id;
 	}
@@ -1051,6 +1097,7 @@ class SvcRequest extends CommonObject
 		$this->fk_facture = $invoice_id;
 		$this->billable   = 1;
 		$this->update($user);
+		$this->syncLinkedObjects();
 
 		return $invoice_id;
 	}
