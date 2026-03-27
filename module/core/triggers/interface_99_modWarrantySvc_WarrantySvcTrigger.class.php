@@ -67,9 +67,9 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 			// Service Request: new record created (draft)
 			// ------------------------------------------------------------------
 			case 'WARRANTYSVC_CREATE':
-				// Increment claim_count on the linked warranty
+				// Sync claim_count on the linked warranty
 				if (!empty($object->fk_warranty)) {
-					$this->_incrementWarrantyClaimCount($object->fk_warranty, $user);
+					$this->_syncWarrantyClaimCount($object->fk_warranty);
 				}
 				dol_syslog('WarrantySvcTrigger: WARRANTYSVC_CREATE ref='.$object->ref, LOG_DEBUG);
 				return 1;
@@ -78,6 +78,10 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 			// Service Request validated — notify assigned technician
 			// ------------------------------------------------------------------
 			case 'WARRANTYSVC_VALIDATE':
+				// Sync claim_count — warranty may have been linked during validation
+				if (!empty($object->fk_warranty)) {
+					$this->_syncWarrantyClaimCount($object->fk_warranty);
+				}
 				if (!empty($object->fk_user_assigned)) {
 					$this->_notifyTechnician($object, $user, $langs, $conf, 'validate');
 				}
@@ -247,19 +251,21 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 	}
 
 	/**
-	 * Increment claim_count on a warranty record.
+	 * Sync claim_count on a warranty record from actual linked service requests.
+	 * Idempotent — safe to call from any trigger without risk of double-counting.
 	 *
 	 * @param  int  $fk_warranty  Warranty ID
-	 * @param  User $user         Actor
 	 * @return void
 	 */
-	private function _incrementWarrantyClaimCount($fk_warranty, $user)
+	private function _syncWarrantyClaimCount($fk_warranty)
 	{
-		$sql = "UPDATE ".MAIN_DB_PREFIX."svc_warranty"
-			." SET claim_count = claim_count + 1"
-			." WHERE rowid = ".((int) $fk_warranty);
+		$fk = (int) $fk_warranty;
+		$sql = "UPDATE ".MAIN_DB_PREFIX."svc_warranty SET claim_count = ("
+			."SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."svc_request"
+			." WHERE fk_warranty = ".$fk
+			.") WHERE rowid = ".$fk;
 		$this->db->query($sql);
-		dol_syslog('WarrantySvcTrigger: incremented claim_count on warranty '.$fk_warranty, LOG_DEBUG);
+		dol_syslog('WarrantySvcTrigger: synced claim_count on warranty '.$fk, LOG_DEBUG);
 	}
 
 	// -----------------------------------------------------------------

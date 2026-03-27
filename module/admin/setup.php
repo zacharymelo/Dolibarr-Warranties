@@ -217,8 +217,9 @@ print '<input type="checkbox" name="WARRANTYSVC_USE_CUSTOMERRETURN" value="1"'.$
 print '</td></tr>';
 
 // Debug mode
-print '<tr class="oddeven"><td>'.$langs->trans('DebugMode').'</td>';
-print '<td class="opacitymedium">'.$langs->trans('DebugModeDesc').'</td>';
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans('DebugMode').'<br><span class="opacitymedium">'
+	.$langs->trans('DebugModeDesc').'</span></td>';
 print '<td>';
 $chk_debug = getDolGlobalString('WARRANTYSVC_DEBUG_MODE') ? ' checked' : '';
 print '<input type="checkbox" name="WARRANTYSVC_DEBUG_MODE" value="1"'.$chk_debug.'>';

@@ -1278,6 +1278,17 @@ class SvcRequest extends CommonObject
 	}
 
 	/**
+	 * Return label of a status (wrapper for LibStatut)
+	 *
+	 * @param  int    $mode   0=long label, 1=short, 3=picto
+	 * @return string         Label
+	 */
+	public function getLibStatut($mode = 0)
+	{
+		return $this->LibStatut($this->status, $mode);
+	}
+
+	/**
 	 * Return label for a status code
 	 *
 	 * @param  int    $status Status code

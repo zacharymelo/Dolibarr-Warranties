@@ -1034,9 +1034,18 @@ print '</td></tr>';
 print '<tr><td>'.$langs->trans('Status').'</td>';
 print '<td>'.svcwarranty_status_badge($display_status).'</td></tr>';
 
-// Claim summary
+// Claim summary — live count from svc_request to avoid stale denormalized counter
+$sql_cc = "SELECT COUNT(*) as cnt FROM ".MAIN_DB_PREFIX."svc_request"
+	." WHERE fk_warranty = ".((int) $object->id)
+	." AND entity IN (".getEntity('svcrequest').")";
+$res_cc = $db->query($sql_cc);
+$live_claim_count = 0;
+if ($res_cc) {
+	$row_cc = $db->fetch_object($res_cc);
+	$live_claim_count = (int) $row_cc->cnt;
+}
 print '<tr><td>'.$langs->trans('Claims').'</td>';
-print '<td>'.((int) $object->claim_count);
+print '<td>'.((int) $live_claim_count);
 if ($object->total_claimed_value > 0) {
 	print ' &mdash; '.price($object->total_claimed_value, 0, $langs, 1, -1, -1, $conf->currency);
 }

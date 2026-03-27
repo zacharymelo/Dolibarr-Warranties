@@ -336,6 +336,19 @@ if ($action == 'confirm_delete' && GETPOST('confirm', 'alpha') == 'yes' && $perm
 	setEventMessages($object->error, $object->errors, 'errors');
 }
 
+// Remove orphaned customer return link from element_element
+if ($action == 'remove_orphan_return_link' && $permwrite) {
+	$link_id = GETPOSTINT('link_id');
+	if ($link_id > 0) {
+		$sql = "DELETE FROM ".MAIN_DB_PREFIX."element_element WHERE rowid = ".((int) $link_id);
+		if ($db->query($sql)) {
+			setEventMessages($langs->trans('LinkRemoved'), null, 'mesgs');
+		}
+		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+		exit;
+	}
+}
+
 /*
  * View
  */
@@ -1138,7 +1151,9 @@ if ($action == 'create') {
 				// Check if a customerreturn is already linked via element_element
 				$linked_return_id = 0;
 				$linked_return_ref = '';
-				$sql_cr = "SELECT fk_target FROM ".MAIN_DB_PREFIX."element_element"
+				$linked_return_exists = false;
+				$linked_ee_rowid = 0;
+				$sql_cr = "SELECT rowid, fk_target FROM ".MAIN_DB_PREFIX."element_element"
 					." WHERE fk_source = ".((int) $object->id)
 					." AND sourcetype = 'warrantysvc_svcrequest'"
 					." AND targettype IN ('customerreturn', 'customerreturn_customerreturn')"
@@ -1146,23 +1161,46 @@ if ($action == 'create') {
 				$res_cr = $db->query($sql_cr);
 				if ($res_cr && ($row_cr = $db->fetch_object($res_cr))) {
 					$linked_return_id = (int) $row_cr->fk_target;
+					$linked_ee_rowid = (int) $row_cr->rowid;
 					dol_include_once('/customerreturn/class/customerreturn.class.php');
 					$_cr = new CustomerReturn($db);
 					if ($_cr->fetch($linked_return_id) > 0) {
 						$linked_return_ref = $_cr->ref;
+						$linked_return_exists = true;
 					}
 				}
 
-				if ($linked_return_id > 0) {
+				if ($linked_return_id > 0 && $linked_return_exists) {
+					// Linked and record exists — show clickable link
 					print img_picto('', 'dollyrevert', 'class="pictofixedwidth"');
 					print '<a href="'.DOL_URL_ROOT.'/custom/customerreturn/customerreturn_card.php?id='.$linked_return_id.'">'
-						.$langs->trans('CustomerReturn').' '.($linked_return_ref ?: '#'.$linked_return_id).'</a>';
+						.$langs->trans('CustomerReturn').' '.$linked_return_ref.'</a>';
+				} elseif ($linked_return_id > 0 && !$linked_return_exists) {
+					// Orphaned link — record was deleted
+					print '<span class="opacitymedium" style="text-decoration:line-through;">'
+						.img_picto('', 'dollyrevert', 'class="pictofixedwidth"')
+						.$langs->trans('CustomerReturn').' #'.$linked_return_id
+						.' ('.$langs->trans('Deleted').')</span>';
+					if ($permwrite && $linked_ee_rowid > 0) {
+						print ' <a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=remove_orphan_return_link&token='.newToken().'&link_id='.$linked_ee_rowid.'" class="butActionDelete" style="margin-left:8px;">'.$langs->trans('RemoveLink').'</a>';
+					}
+					// Show create button again since the return no longer exists
+					if ($active_status && $permwrite) {
+						print '<br>';
+						$cr_url = DOL_URL_ROOT.'/custom/customerreturn/customerreturn_card.php?action=create'
+							.'&socid='.((int) $object->fk_soc)
+							.'&from_svcrequest='.((int) $object->id);
+						if (!empty($object->fk_shipment)) {
+							$cr_url .= '&fk_expedition='.((int) $object->fk_shipment);
+						}
+						print '<a href="'.dol_escape_htmltag($cr_url).'" class="butAction" style="margin:0;">'
+							.$langs->trans('CreateCustomerReturn').'</a>';
+					}
 				} elseif ($active_status && $permwrite) {
-					// Build URL to customerreturn creation with SR origin
+					// No link — show create button
 					$cr_url = DOL_URL_ROOT.'/custom/customerreturn/customerreturn_card.php?action=create'
 						.'&socid='.((int) $object->fk_soc)
 						.'&from_svcrequest='.((int) $object->id);
-					// Add shipment origin if available
 					if (!empty($object->fk_shipment)) {
 						$cr_url .= '&fk_expedition='.((int) $object->fk_shipment);
 					}
