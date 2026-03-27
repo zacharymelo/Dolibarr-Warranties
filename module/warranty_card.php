@@ -30,6 +30,8 @@ $action = GETPOST('action', 'aZ09');
 $cancel = GETPOST('cancel', 'alpha');
 
 $object = new SvcWarranty($db);
+$extrafields = new ExtraFields($db);
+$extrafields->fetch_name_optionals_label($object->table_element);
 
 if ($id > 0 || $ref) {
 	$result = $object->fetch($id, $ref);
@@ -78,6 +80,9 @@ if ($action == 'add' && $permwrite) {
 		$object->expiry_date = $manual_expiry;
 	}
 
+	// Retrieve extrafields from POST
+	$extrafields->setOptionalsFromPost(null, $object);
+
 	$result = $object->create($user);
 	if ($result > 0) {
 		if ($object->fk_expedition > 0) {
@@ -115,6 +120,9 @@ if ($action == 'update' && $permwrite) {
 	} elseif ($object->coverage_days && $object->start_date) {
 		$object->expiry_date = dol_time_plus_duree($object->start_date, $object->coverage_days, 'd');
 	}
+
+	// Retrieve extrafields from POST
+	$extrafields->setOptionalsFromPost(null, $object);
 
 	$result = $object->update($user);
 	if ($result > 0) {
@@ -303,6 +311,9 @@ if ($action == 'create_from_shipment') {
 			// Notes
 			print '<tr><td>'.$form->textwithpicto($langs->trans('NotePublic'), $langs->trans('TooltipNotePublic')).'</td>';
 			print '<td><textarea name="note_public" class="flat" rows="3" style="width:90%" placeholder="'.$langs->trans('NotePublicPlaceholder').'"></textarea></td></tr>';
+
+			// Extrafields on create
+			print $object->showOptionals($extrafields, 'create');
 
 			print '</table>';
 			print dol_get_fiche_end();
@@ -848,6 +859,9 @@ if (initMode === "standard") {
 	print '<tr><td>'.$form->textwithpicto($langs->trans('NotePublic'), $langs->trans('TooltipNotePublic')).'</td>';
 	print '<td><textarea name="note_public" class="flat" rows="3" style="width:90%" placeholder="'.$langs->trans('NotePublicPlaceholder').'">'.dol_escape_htmltag(GETPOST('note_public', 'restricthtml'), 1).'</textarea></td></tr>';
 
+	// Extrafields on manual create
+	print $object->showOptionals($extrafields, 'create');
+
 	print '</table>';
 
 	print dol_get_fiche_end();
@@ -1216,6 +1230,17 @@ if ($action != 'edit' && !empty($object->serial_number)) {
 
 	print '</table>';
 	print '</div>';
+}
+
+// Extrafields in view/edit
+if ($object->id > 0 && $action != 'create' && $action != 'create_from_shipment') {
+	print '<div class="div-table-responsive"><table class="border centpercent tableforfield">';
+	if ($action == 'edit' && $permwrite) {
+		print $object->showOptionals($extrafields, 'edit');
+	} else {
+		print $object->showOptionals($extrafields, 'view');
+	}
+	print '</table></div>';
 }
 
 print dol_get_fiche_end();

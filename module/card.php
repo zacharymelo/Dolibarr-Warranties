@@ -30,6 +30,8 @@ $cancel     = GETPOST('cancel', 'alpha');
 $backtopage = GETPOST('backtopage', 'alpha');
 
 $object = new SvcRequest($db);
+$extrafields = new ExtraFields($db);
+$extrafields->fetch_name_optionals_label($object->table_element);
 
 // Load existing object
 if ($id > 0 || $ref) {
@@ -103,6 +105,12 @@ if ($action == 'add' && $permwrite) {
 		}
 	}
 
+	// Retrieve extrafields from POST
+	$ret = $extrafields->setOptionalsFromPost(null, $object);
+	if ($ret < 0) {
+		$error++;
+	}
+
 	$result = $object->create($user);
 	if ($result > 0) {
 		// Sync all FK-based links into element_element
@@ -142,6 +150,9 @@ if ($action == 'update' && $permwrite) {
 	$object->date_return_expected = dol_mktime(12, 0, 0, GETPOST('date_return_expectedmonth', 'int'), GETPOST('date_return_expectedday', 'int'), GETPOST('date_return_expectedyear', 'int'));
 	$object->note_private        = GETPOST('note_private', 'restricthtml');
 	$object->note_public         = GETPOST('note_public', 'restricthtml');
+
+	// Retrieve extrafields from POST
+	$extrafields->setOptionalsFromPost(null, $object);
 
 	$result = $object->update($user);
 	if ($result >= 0) {
@@ -527,6 +538,9 @@ if ($action == 'create') {
 		print '</select>';
 		print '</td></tr>';
 	}
+
+	// Extrafields on create
+	print $object->showOptionals($extrafields, 'create');
 
 	print '</table>';
 	print dol_get_fiche_end();
@@ -1027,6 +1041,13 @@ if ($action == 'create') {
 			print dol_nl2br(dol_escape_htmltag($object->resolution_notes, 0, 1));
 		}
 		print '</td></tr>';
+	}
+
+	// Extrafields in view/edit
+	if ($action == 'edit' && $permwrite) {
+		print $object->showOptionals($extrafields, 'edit');
+	} else {
+		print $object->showOptionals($extrafields, 'view');
 	}
 
 	print '</table>';

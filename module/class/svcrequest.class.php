@@ -267,6 +267,14 @@ class SvcRequest extends CommonObject
 		if (!$error) {
 			$this->id = $this->db->last_insert_id(MAIN_DB_PREFIX.'svc_request');
 
+			// Insert extrafields
+			if (!$error) {
+				$result = $this->insertExtraFields();
+				if ($result < 0) {
+					$error++;
+				}
+			}
+
 			if (!$notrigger) {
 				$result = $this->call_trigger('WARRANTYSVC_CREATE', $user);
 				if ($result < 0) {
@@ -379,6 +387,9 @@ class SvcRequest extends CommonObject
 				// Fetch lines
 				$this->fetchLines();
 
+				// Fetch extrafields
+				$this->fetch_optionals();
+
 				return 1;
 			}
 			return 0;
@@ -482,6 +493,14 @@ class SvcRequest extends CommonObject
 			$this->errors[] = $this->db->lasterror();
 		}
 
+		// Update extrafields
+		if (!$error) {
+			$result = $this->insertExtraFields();
+			if ($result < 0) {
+				$error++;
+			}
+		}
+
 		if (!$error && !$notrigger) {
 			$result = $this->call_trigger('WARRANTYSVC_MODIFY', $user);
 			if ($result < 0) {
@@ -524,6 +543,14 @@ class SvcRequest extends CommonObject
 			if (!$this->db->query($sql)) {
 				$error++;
 				$this->errors[] = $this->db->lasterror();
+			}
+		}
+
+		if (!$error) {
+			// Delete extrafields
+			$result = $this->deleteExtraFields();
+			if ($result < 0) {
+				$error++;
 			}
 		}
 

@@ -138,6 +138,13 @@ class SvcWarranty extends CommonObject
 
 		$this->id = $this->db->last_insert_id(MAIN_DB_PREFIX.'svc_warranty');
 
+		// Insert extrafields
+		$result = $this->insertExtraFields();
+		if ($result < 0) {
+			$this->db->rollback();
+			return -1;
+		}
+
 		if (!$notrigger) {
 			$this->call_trigger('SVCWARRANTY_CREATE', $user);
 		}
@@ -204,6 +211,9 @@ class SvcWarranty extends CommonObject
 
 				// Sync status based on expiry date
 				$this->syncStatus();
+
+				// Fetch extrafields
+				$this->fetch_optionals();
 
 				return 1;
 			}
@@ -273,6 +283,9 @@ class SvcWarranty extends CommonObject
 
 		$resql = $this->db->query($sql);
 		if ($resql) {
+			// Update extrafields
+			$this->insertExtraFields();
+
 			if (!$notrigger) {
 				$this->call_trigger('SVCWARRANTY_MODIFY', $user);
 			}
@@ -291,6 +304,8 @@ class SvcWarranty extends CommonObject
 	 */
 	public function delete($user)
 	{
+		$this->deleteExtraFields();
+
 		$sql = "DELETE FROM ".MAIN_DB_PREFIX."svc_warranty WHERE rowid = ".((int) $this->id);
 		if ($this->db->query($sql)) {
 			return 1;

@@ -212,3 +212,36 @@ function svcrequest_resolution_types()
 		'informational'    => $langs->trans('ResolutionInformational'),
 	);
 }
+
+
+/**
+ * Return array of tabs for the admin setup pages
+ *
+ * @return array Tab array for dol_get_fiche_head()
+ */
+function warrantysvc_admin_prepare_head()
+{
+	global $langs, $conf;
+
+	$head = array();
+	$h = 0;
+
+	$head[$h][0] = DOL_URL_ROOT.'/custom/warrantysvc/admin/setup.php';
+	$head[$h][1] = $langs->trans('Settings');
+	$head[$h][2] = 'settings';
+	$h++;
+
+	$head[$h][0] = DOL_URL_ROOT.'/custom/warrantysvc/admin/svcrequest_extrafields.php';
+	$head[$h][1] = $langs->trans('ServiceRequestExtraFields');
+	$head[$h][2] = 'svcrequest_extrafields';
+	$h++;
+
+	$head[$h][0] = DOL_URL_ROOT.'/custom/warrantysvc/admin/svcwarranty_extrafields.php';
+	$head[$h][1] = $langs->trans('WarrantyExtraFields');
+	$head[$h][2] = 'svcwarranty_extrafields';
+	$h++;
+
+	complete_head_from_modules($conf, $langs, null, $head, $h, 'warrantysvc_admin');
+
+	return $head;
+}
