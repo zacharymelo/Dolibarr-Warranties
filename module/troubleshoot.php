@@ -15,8 +15,8 @@
  */
 
 $res = 0;
-if (!$res && file_exists("../main.inc.php"))       { $res = @include "../main.inc.php"; }
-if (!$res && file_exists("../../main.inc.php"))    { $res = @include "../../main.inc.php"; }
+if (!$res && file_exists("../main.inc.php")) { $res = @include "../main.inc.php"; }
+if (!$res && file_exists("../../main.inc.php")) { $res = @include "../../main.inc.php"; }
 if (!$res && file_exists("../../../main.inc.php")) { $res = @include "../../../main.inc.php"; }
 if (!$res) { die("Include of main fails"); }
 
@@ -119,7 +119,7 @@ if ($object->fk_product) {
 	$product = new Product($db);
 	$product->fetch($object->fk_product);
 	print '<strong>'.$langs->trans('Product').':</strong> '.$product->getNomUrl(1);
-	print ' &nbsp; <strong>'.$langs->trans('SerialNumber').':</strong> '.dol_escape_htmltag($object->serial_number);
+	print ' &nbsp; <strong>'.$langs->trans('SvcSerialNumber').':</strong> '.dol_escape_htmltag($object->serial_number);
 }
 print '</div>';
 
@@ -127,7 +127,7 @@ $steps = warrantysvc_checklist_steps($object->fk_product);
 
 print '<table class="border centpercent tableforfieldcreate" style="margin-top:12px">';
 print '<tr class="liste_titre">';
-print '<th style="width:36px">'.$langs->trans('Done').'</th>';
+print '<th style="width:36px">'.$langs->trans('SvcDone').'</th>';
 print '<th>'.$langs->trans('DiagnosticStep').'</th>';
 print '<th>'.$langs->trans('Finding').'</th>';
 print '</tr>';

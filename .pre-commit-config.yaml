@@ -1,0 +1,43 @@
+---
+repos:
+  # Basic file checks and fixes
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: trailing-whitespace
+        exclude_types: [markdown]
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+        stages: [pre-rebase, pre-commit, pre-merge-commit]
+      - id: check-yaml
+        args: [--unsafe]
+      - id: check-json
+      - id: check-xml
+      - id: fix-byte-order-marker
+      - id: check-case-conflict
+
+  # Secret detection
+  - repo: https://github.com/gitleaks/gitleaks.git
+    rev: v8.24.0
+    hooks:
+      - id: gitleaks
+
+  # PHP syntax and coding standards
+  - repo: https://github.com/mdeweerd/pre-commit-php
+    rev: v1.6.8
+    hooks:
+      - id: php-cbf
+        files: \.(php)$
+        args: [--standard=/Users/zacharymelo/.dolibarr-dev/codesniffer/ruleset.xml]
+      - id: php-cs
+        files: \.(php)$
+        args:
+          [
+            --standard=/Users/zacharymelo/.dolibarr-dev/codesniffer/ruleset.xml,
+            --report=emacs,
+            --severity=5,
+            --no-colors,
+          ]
+      - id: php-lint

@@ -24,13 +24,13 @@ function warrantysvc_prepare_head($object)
 	$head = array();
 
 	$head[$h][0] = DOL_URL_ROOT.'/custom/warrantysvc/card.php?id='.$object->id;
-	$head[$h][1] = $langs->trans('Details');
+	$head[$h][1] = $langs->trans('SvcDetails');
 	$head[$h][2] = 'card';
 	$h++;
 
 	// Notes tab
 	$head[$h][0] = DOL_URL_ROOT.'/custom/warrantysvc/note.php?id='.$object->id;
-	$head[$h][1] = $langs->trans('Notes');
+	$head[$h][1] = $langs->trans('SvcNotes');
 	// Append count badge if notes exist
 	if (!empty($object->note_private) || !empty($object->note_public)) {
 		$head[$h][1] .= '<span class="badge marginleftonlyshort">!</span>';
@@ -59,7 +59,7 @@ function warrantysvc_prepare_head($object)
 	}
 
 	$head[$h][0] = DOL_URL_ROOT.'/custom/warrantysvc/document.php?id='.$object->id;
-	$head[$h][1] = $langs->trans('Documents');
+	$head[$h][1] = $langs->trans('SvcDocuments');
 	if ($nbFiles > 0) {
 		$head[$h][1] .= '<span class="badge marginleftonlyshort">'.$nbFiles.'</span>';
 	}
@@ -88,12 +88,12 @@ function svcwarranty_prepare_head($object)
 	$head = array();
 
 	$head[$h][0] = DOL_URL_ROOT.'/custom/warrantysvc/warranty_card.php?id='.$object->id;
-	$head[$h][1] = $langs->trans('Details');
+	$head[$h][1] = $langs->trans('SvcDetails');
 	$head[$h][2] = 'card';
 	$h++;
 
 	$head[$h][0] = DOL_URL_ROOT.'/custom/warrantysvc/warranty_note.php?id='.$object->id;
-	$head[$h][1] = $langs->trans('Notes');
+	$head[$h][1] = $langs->trans('SvcNotes');
 	$head[$h][2] = 'note';
 	$h++;
 
@@ -116,13 +116,13 @@ function svcrequest_status_badge($status, $mode = 0)
 	$langs->loadLangs(array('warrantysvc@warrantysvc'));
 
 	$map = array(
-		0 => array('label' => 'Draft',         'color' => 'status0'),
-		1 => array('label' => 'Validated',      'color' => 'status1'),
-		2 => array('label' => 'InProgress',     'color' => 'status3'),
+		0 => array('label' => 'SvcDraft',         'color' => 'status0'),
+		1 => array('label' => 'SvcValidated',      'color' => 'status1'),
+		2 => array('label' => 'SvcInProgress',     'color' => 'status3'),
 		3 => array('label' => 'AwaitingReturn', 'color' => 'status4'),
-		4 => array('label' => 'Resolved',       'color' => 'status6'),
-		5 => array('label' => 'Closed',         'color' => 'status6'),
-		9 => array('label' => 'Cancelled',      'color' => 'status9'),
+		4 => array('label' => 'SvcResolved',       'color' => 'status6'),
+		5 => array('label' => 'SvcClosed',         'color' => 'status6'),
+		9 => array('label' => 'SvcCancelled',      'color' => 'status9'),
 	);
 
 	$s     = isset($map[$status]) ? $map[$status] : array('label' => 'Unknown', 'color' => 'status0');
@@ -149,9 +149,9 @@ function svcwarranty_status_badge($status, $mode = 0)
 	$langs->loadLangs(array('warrantysvc@warrantysvc'));
 
 	$map = array(
-		'active'  => array('label' => 'Active',     'color' => 'status1'),
-		'expired' => array('label' => 'Expired',    'color' => 'status8'),
-		'voided'  => array('label' => 'Voided',     'color' => 'status9'),
+		'active'  => array('label' => 'SvcActive',     'color' => 'status1'),
+		'expired' => array('label' => 'SvcExpired',    'color' => 'status8'),
+		'voided'  => array('label' => 'SvcVoided',     'color' => 'status9'),
 		'none'    => array('label' => 'NoCoverage', 'color' => 'status0'),
 	);
 

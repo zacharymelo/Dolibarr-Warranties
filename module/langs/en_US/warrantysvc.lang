@@ -32,13 +32,13 @@ LinkToServiceRequest = Link to service request
 #
 # Status labels
 #
-Draft = Draft
-Validated = Validated
-InProgress = In Progress
+SvcDraft = Draft
+SvcValidated = Validated
+SvcInProgress = In Progress
 AwaitingReturn = Awaiting Return
-Resolved = Resolved
-Closed = Closed
-Cancelled = Cancelled
+SvcResolved = Resolved
+SvcClosed = Closed
+SvcCancelled = Cancelled
 
 #
 # Resolution types
@@ -63,7 +63,7 @@ ResolutionInformationalDesc = Customer call with no fault found. Machine operati
 #
 # Field labels
 #
-SerialNumber = Serial Number
+SvcSerialNumber = Serial Number
 SerialIn = Returning Serial
 SerialOut = Replacement Serial
 IssueDescription = Issue Description
@@ -81,8 +81,8 @@ ReturnTracking = Return Tracking
 DateReturnExpected = Return Expected By
 DateReturnReceived = Return Received
 ReturnReminderCount = Reminders Sent
-WarehouseSource = Replacement From Warehouse
-WarehouseReturn = Return To Warehouse
+SvcWarehouseSource = Replacement From Warehouse
+SvcWarehouseReturn = Return To Warehouse
 AssignedTo = Assigned To
 ConditionScore = Condition Score
 ConditionStatus = Condition
@@ -126,9 +126,9 @@ TotalClaimedValue = Total Claimed Value
 #
 # Warranty status badges
 #
-Active = Active
-Expired = Expired
-Voided = Voided
+SvcActive = Active
+SvcExpired = Expired
+SvcVoided = Voided
 NoCoverage = No Coverage
 
 #
@@ -197,7 +197,7 @@ DatePrinted = Printed
 ComponentLines = Component Lines
 TrackingInfo = Tracking Information
 LineType = Type
-Shipped = Shipped
+SvcShipped = Shipped
 LineTypeComponentOut = Outbound Part
 LineTypeComponentIn = Return Part
 LineTypeConsumedSite = Consumed On-Site
@@ -216,9 +216,9 @@ ResolutionNotes = Resolution Notes
 #
 # Tabs
 #
-Details = Details
-Notes = Notes
-Documents = Documents
+SvcDetails = Details
+SvcNotes = Notes
+SvcDocuments = Documents
 Troubleshoot = Troubleshoot
 
 #
@@ -233,7 +233,7 @@ TroubleshootOutcome_no_fault = No fault found — machine operating correctly
 TroubleshootOutcome_escalate = Escalate to senior technician
 TroubleshootOutcome_parts_needed = Parts needed — follow up with component shipment
 TroubleshootOutcome_intervention = On-site service required
-Done = Done
+SvcDone = Done
 DiagnosticStep = Diagnostic Step
 Finding = Finding
 FindingOptional = Optional note
@@ -317,11 +317,11 @@ ErrorWarrantySerialRequired = A serial number is required to create a warranty r
 #
 # Admin / Setup page
 #
-Setup = Setup
+SvcSetup = Setup
 SetupSaved = Settings saved.
-SelectWarehouse = Select a warehouse
-WarehouseRefurbDesc = Warehouse where refurbished units available for swap are stored.
-WarehouseReturnDesc = Warehouse where returned / in-repair units are received.
+SvcSelectWarehouse = Select a warehouse
+SvcWarehouseRefurbDesc = Warehouse where refurbished units available for swap are stored.
+SvcWarehouseReturnDesc = Warehouse where returned / in-repair units are received.
 ReturnGraceDays = Return reminder delay
 ReturnGraceDaysDesc = Days after the expected return date before the first reminder email is sent.
 ReturnInvoiceDays = Auto-invoice after
@@ -330,11 +330,16 @@ ReplacementStrategy = Default replacement selection strategy
 ReplacementStrategyDesc = How the system suggests a serial number when creating a unit swap.
 AutoWarrantyCheck = Auto-check warranty on creation
 AutoWarrantyCheckDesc = Automatically look up warranty coverage when a service request is created.
-AutoWarrantyOnShipment = Auto-create warranty on shipment validation
-AutoWarrantyOnShipmentDesc = When a shipment is validated, automatically register a standard warranty for each serialized product line that does not already have one.
+AutoWarrantyOnShipment = Auto-create warranty on shipment
+AutoWarrantyOnShipmentDesc = Automatically register a warranty for each serialized product line that does not already have one, using the configured trigger event below.
+WarrantyTriggerEvent = Warranty creation trigger
+WarrantyTriggerEventDesc = Which shipment event triggers automatic warranty creation.
+OnShipmentValidate = On shipment validation (confirmed for dispatch)
+OnShipmentClose = On shipment close (delivery confirmed)
+OnShipmentBoth = On both validate and close
 DefaultCoverageDays = Default warranty coverage (days)
-DefaultCoverageDaysDesc = Coverage period in days used when auto-creating warranties from validated shipments.
-Days = days
+DefaultCoverageDaysDesc = Fallback coverage period in days when no product-specific or warranty type default is configured.
+SvcDays = days
 NotifyWarrantyCreated = Email customer on warranty creation
 NotifyWarrantyCreatedDesc = Send an email notification to the customer when a new warranty record is created for their unit.
 WarrantyRequiresLots = Restrict service requests to serialized products
@@ -365,7 +370,7 @@ ShipmentRef = Shipment
 ComponentLines = Component Lines
 ScheduleIntervention = Schedule Intervention
 Overdue = Overdue
-Confirm = Confirm
+SvcConfirm = Confirm
 ReplacementSerial = Replacement Serial #
 CreateReplacementOrder = Create Replacement Order
 ReplacementOrderCreated = Replacement order created.

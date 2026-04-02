@@ -8,8 +8,8 @@
  */
 
 $res = 0;
-if (!$res && file_exists("../main.inc.php"))       { $res = @include "../main.inc.php"; }
-if (!$res && file_exists("../../main.inc.php"))    { $res = @include "../../main.inc.php"; }
+if (!$res && file_exists("../main.inc.php")) { $res = @include "../main.inc.php"; }
+if (!$res && file_exists("../../main.inc.php")) { $res = @include "../../main.inc.php"; }
 if (!$res && file_exists("../../../main.inc.php")) { $res = @include "../../../main.inc.php"; }
 if (!$res) { die("Include of main fails"); }
 
@@ -170,7 +170,7 @@ if ($action == 'confirm_validate' && $permvalidate) {
 	if ($result < 0) {
 		setEventMessages($object->error, $object->errors, 'errors');
 	} else {
-		setEventMessages($langs->trans('Validated'), null, 'mesgs');
+		setEventMessages($langs->trans('SvcValidated'), null, 'mesgs');
 	}
 	header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
 	exit;
@@ -442,7 +442,7 @@ if ($action == 'create') {
 		$prefill_serials = array_values(array_unique($prefill_serials));
 		sort($prefill_serials);
 	}
-	print '<tr><td>'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipSerialNumber')).'</td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('SvcSerialNumber'), $langs->trans('TooltipSerialNumber')).'</td>';
 	print '<td>';
 	if ($prefill_product > 0) {
 		print '<select name="serial_number" id="serial_number" class="minwidth200">';
@@ -499,9 +499,7 @@ if ($action == 'create') {
 			}
 			$label .= ' ('.dol_escape_htmltag($ow->status).')';
 			$sel = ($prefill_warranty === (int) $ow->rowid) ? ' selected' : '';
-			print '<option value="'.(int) $ow->rowid.'"'
-				.' data-serial="'.dol_escape_htmltag($ow->serial_number).'"'
-				.' data-product="'.(int) $ow->fk_product.'"'
+			print '<option value="'.(int) $ow->rowid.'" data-serial="'.dol_escape_htmltag($ow->serial_number).'" data-product="'.(int) $ow->fk_product.'"'
 				.$sel.'>'.$label.'</option>';
 		}
 	}
@@ -569,8 +567,8 @@ if ($action == 'create') {
 	print '<script>(function(){
 	var serialAjaxUrl    = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/serials.php?mode=svcrequest"';
 	print ';
-	var srProductAjaxUrl = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/sr_products.php'.'";
-	var projectAjaxUrl   = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/projects.php'.'";
+	var srProductAjaxUrl = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/sr_products.php";
+	var projectAjaxUrl   = "'.DOL_URL_ROOT.'/custom/warrantysvc/ajax/projects.php";
 	var selSer  = document.getElementById("serial_number");
 	var selProj = document.getElementById("fk_project");
 	var noSerial  = "'.dol_escape_js($langs->trans('NoSerialsAvailable')).'";
@@ -767,7 +765,6 @@ if ($action == 'create') {
 	loadSrProducts();
 	loadProjects();
 })();</script>';
-
 } else {
 	// =====================================================================
 	// VIEW / EDIT
@@ -877,10 +874,9 @@ if ($action == 'create') {
 	print '</td></tr>';
 
 	// Serial number (customer's defective unit)
-	print '<tr><td>'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipSerialNumber')).'</td><td>';
+	print '<tr><td>'.$form->textwithpicto($langs->trans('SvcSerialNumber'), $langs->trans('TooltipSerialNumber')).'</td><td>';
 	if ($action == 'edit' && $permwrite) {
-		print '<input type="text" name="serial_number" id="serial_number" class="minwidth200"'
-			.' value="'.dol_escape_htmltag($object->serial_number).'" list="serial_suggestions">';
+		print '<input type="text" name="serial_number" id="serial_number" class="minwidth200" value="'.dol_escape_htmltag($object->serial_number).'" list="serial_suggestions">';
 		$serials = $object->getCustomerSerials($object->fk_soc, $object->fk_product);
 		if ($serials) {
 			print '<datalist id="serial_suggestions">';
@@ -1125,10 +1121,7 @@ if ($action == 'create') {
 					print ' &mdash; '.$langs->trans('Serial').': <strong>'.dol_escape_htmltag($object->serial_out).'</strong>';
 				}
 			} elseif ($active_status && $permwrite && isModEnabled('order')) {
-				$create_so_url = DOL_URL_ROOT.'/commande/card.php?action=create'
-					.'&socid='.((int) $object->fk_soc)
-					.'&rma_sr_id='.((int) $object->id)
-					.'&backtopage='.urlencode(DOL_URL_ROOT.'/custom/warrantysvc/card.php?id='.$object->id);
+				$create_so_url = DOL_URL_ROOT.'/commande/card.php?action=create&socid='.((int) $object->fk_soc).'&rma_sr_id='.((int) $object->id).'&backtopage='.urlencode(DOL_URL_ROOT.'/custom/warrantysvc/card.php?id='.$object->id);
 				print '<a href="'.dol_escape_htmltag($create_so_url).'" class="butAction" style="margin:0;">'.$langs->trans('CreateReplacementOrder').'</a>';
 			} else {
 				print '<span class="opacitymedium">'.$langs->trans('NoReplacementOrderYet').'</span>';
@@ -1153,11 +1146,7 @@ if ($action == 'create') {
 				$linked_return_ref = '';
 				$linked_return_exists = false;
 				$linked_ee_rowid = 0;
-				$sql_cr = "SELECT rowid, fk_target FROM ".MAIN_DB_PREFIX."element_element"
-					." WHERE fk_source = ".((int) $object->id)
-					." AND sourcetype = 'warrantysvc_svcrequest'"
-					." AND targettype IN ('customerreturn', 'customerreturn_customerreturn')"
-					." LIMIT 1";
+				$sql_cr = "SELECT rowid, fk_target FROM ".MAIN_DB_PREFIX."element_element WHERE fk_source = ".((int) $object->id)." AND sourcetype = 'warrantysvc_svcrequest' AND targettype IN ('customerreturn', 'customerreturn_customerreturn') LIMIT 1";
 				$res_cr = $db->query($sql_cr);
 				if ($res_cr && ($row_cr = $db->fetch_object($res_cr))) {
 					$linked_return_id = (int) $row_cr->fk_target;
@@ -1187,9 +1176,7 @@ if ($action == 'create') {
 					// Show create button again since the return no longer exists
 					if ($active_status && $permwrite) {
 						print '<br>';
-						$cr_url = DOL_URL_ROOT.'/custom/customerreturn/customerreturn_card.php?action=create'
-							.'&socid='.((int) $object->fk_soc)
-							.'&from_svcrequest='.((int) $object->id);
+						$cr_url = DOL_URL_ROOT.'/custom/customerreturn/customerreturn_card.php?action=create&socid='.((int) $object->fk_soc).'&from_svcrequest='.((int) $object->id);
 						if (!empty($object->fk_shipment)) {
 							$cr_url .= '&fk_expedition='.((int) $object->fk_shipment);
 						}
@@ -1198,9 +1185,7 @@ if ($action == 'create') {
 					}
 				} elseif ($active_status && $permwrite) {
 					// No link — show create button
-					$cr_url = DOL_URL_ROOT.'/custom/customerreturn/customerreturn_card.php?action=create'
-						.'&socid='.((int) $object->fk_soc)
-						.'&from_svcrequest='.((int) $object->id);
+					$cr_url = DOL_URL_ROOT.'/custom/customerreturn/customerreturn_card.php?action=create&socid='.((int) $object->fk_soc).'&from_svcrequest='.((int) $object->id);
 					if (!empty($object->fk_shipment)) {
 						$cr_url .= '&fk_expedition='.((int) $object->fk_shipment);
 					}
@@ -1240,7 +1225,7 @@ if ($action == 'create') {
 						print '<input type="text" name="serial_in" class="minwidth120" placeholder="'.$langs->trans('SerialIn').'" value=""> ';
 					}
 					print $form->select_warehouse($object->fk_warehouse_return > 0 ? $object->fk_warehouse_return : 0, 'rec_warehouse', 1, '', 1, 0, '', 0, 0, array(), 'minwidth150');
-					print ' <input type="submit" class="butAction" style="margin:0;" value="'.$langs->trans('Confirm').'">';
+					print ' <input type="submit" class="butAction" style="margin:0;" value="'.$langs->trans('SvcConfirm').'">';
 					print '</form>';
 					print '</div>';
 				} else {
@@ -1389,7 +1374,7 @@ if ($action == 'create') {
 				$prod = new Product($db);
 				$prod->fetch($line->fk_product);
 				$shipped_badge = $line->shipped
-					? '<span class="badge status6">'.$langs->trans('Shipped').'</span>'
+					? '<span class="badge status6">'.$langs->trans('SvcShipped').'</span>'
 					: '<span class="badge status0">'.$langs->trans('Pending').'</span>';
 				print '<tr class="oddeven">';
 				print '<td><a href="'.DOL_URL_ROOT.'/product/card.php?id='.$prod->id.'">'.dol_escape_htmltag($prod->ref).'</a></td>';

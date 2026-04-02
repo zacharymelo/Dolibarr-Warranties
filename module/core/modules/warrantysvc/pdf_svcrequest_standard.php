@@ -174,7 +174,7 @@ class pdf_svcrequest_standard extends ModelePDFWarrantySvc
 		$leftcol = array(
 			array($outputlangs->transnoentities('Customer'),     $this->_getCustomerName($object)),
 			array($outputlangs->transnoentities('Product'),      $this->_getProductLabel($object)),
-			array($outputlangs->transnoentities('SerialNumber'), $object->serial_number),
+			array($outputlangs->transnoentities('SvcSerialNumber'), $object->serial_number),
 			array($outputlangs->transnoentities('IssueDate'),    dol_print_date($object->issue_date, 'day', false, $outputlangs)),
 		);
 		// Right column: Resolution / Warranty / Assigned / Status
@@ -247,7 +247,7 @@ class pdf_svcrequest_standard extends ModelePDFWarrantySvc
 			$pdf->Cell($col_desc, $heightrow, $outputlangs->transnoentities('Product'), 1, 0, 'L', 1);
 			$pdf->Cell($col_type, $heightrow, $outputlangs->transnoentities('LineType'), 1, 0, 'C', 1);
 			$pdf->Cell($col_qty,  $heightrow, $outputlangs->transnoentities('Qty'),      1, 0, 'C', 1);
-			$pdf->Cell($col_ship, $heightrow, $outputlangs->transnoentities('Shipped'),  1, 1, 'C', 1);
+			$pdf->Cell($col_ship, $heightrow, $outputlangs->transnoentities('SvcShipped'),  1, 1, 'C', 1);
 			$curY += $heightrow;
 
 			$pdf->SetFont('', '', $default_font_size - 1);
@@ -319,7 +319,7 @@ class pdf_svcrequest_standard extends ModelePDFWarrantySvc
 
 		// ---- DRAFT WATERMARK ----
 		if ($object->status == SvcRequest::STATUS_DRAFT && getDolGlobalString('WARRANTYSVC_DRAFT_WATERMARK')) {
-			pdf_watermark($pdf, $outputlangs, 0, $this->page_format, $this->marge_gauche, $outputlangs->transnoentities('Draft'));
+			pdf_watermark($pdf, $outputlangs, 0, $this->page_format, $this->marge_gauche, $outputlangs->transnoentities('SvcDraft'));
 		}
 
 		// ---- PAGE FOOTER ----

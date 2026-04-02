@@ -47,8 +47,8 @@ class ActionsWarrantySvc
 	 * any existing llx_element_element rows written before the $element fix.
 	 *
 	 * @param  array      $parameters  Hook parameters, including $parameters['elementType']
-	 * @param  object     &$object     Current page object (not used)
-	 * @param  string     &$action     Current action (not used)
+	 * @param  object     $object      Current page object
+	 * @param  string     $action      Current action
 	 * @param  HookManager $hookmanager Hook manager instance
 	 * @return int                     0 = merge results via array_replace
 	 */
@@ -91,8 +91,8 @@ class ActionsWarrantySvc
 	 * edit mode) into $this->resprints for the hook manager to append.
 	 *
 	 * @param  array      $parameters  Hook parameters (includes 'colspan')
-	 * @param  object     &$object     Current page object (product)
-	 * @param  string     &$action     Current action
+	 * @param  object     $object      Current page object
+	 * @param  string     $action      Current action
 	 * @param  HookManager $hookmanager Hook manager instance
 	 * @return int                     0 = continue other hooks
 	 */
@@ -223,7 +223,6 @@ class ActionsWarrantySvc
 				print 'if(!td2.value&&td[this.value])td2.value=td[this.value];';
 				print '});}';
 				print '})();</script>';
-
 			} else {
 				// View mode
 				print '<tr>';
@@ -234,7 +233,7 @@ class ActionsWarrantySvc
 					if (empty($lbl)) $lbl = $effective_wtype;
 					print dol_escape_htmltag($lbl);
 					if ($effective_days !== null) {
-						print ' / '.(int) $effective_days.' '.$langs->trans('Days');
+						print ' / '.(int) $effective_days.' '.$langs->trans('SvcDays');
 					} else {
 						print ' <span class="opacitymedium">('.$langs->trans('WarrantyDefaultDaysFromType').')</span>';
 					}
@@ -266,8 +265,8 @@ class ActionsWarrantySvc
 	 * Returning 0 merges our entries into the existing array.
 	 *
 	 * @param  array       $parameters  Hook parameters (includes listofidcompanytoscan)
-	 * @param  object      &$object     Current page object
-	 * @param  string      &$action     Current action
+	 * @param  object      $object      Current page object
+	 * @param  string      $action      Current action
 	 * @param  HookManager $hookmanager Hook manager instance
 	 * @return int                      0 = merge results into possiblelinks
 	 */
@@ -317,12 +316,7 @@ class ActionsWarrantySvc
 	 */
 	private function buildLinkToObjectSQL($table, $element, $sanitized)
 	{
-		return "SELECT s.rowid as socid, s.nom as name, s.client, t.rowid, t.ref"
-		     . " FROM ".MAIN_DB_PREFIX."societe as s, ".MAIN_DB_PREFIX.$table." as t"
-		     . " WHERE t.fk_soc = s.rowid"
-		     . " AND t.fk_soc IN (".$sanitized.")"
-		     . " AND t.entity IN (".getEntity($element).")"
-		     . " ORDER BY t.ref";
+		return "SELECT s.rowid as socid, s.nom as name, s.client, t.rowid, t.ref FROM ".MAIN_DB_PREFIX."societe as s, ".MAIN_DB_PREFIX.$table." as t WHERE t.fk_soc = s.rowid AND t.fk_soc IN (".$sanitized.") AND t.entity IN (".getEntity($element).") ORDER BY t.ref";
 	}
 
 	/**
@@ -335,8 +329,8 @@ class ActionsWarrantySvc
 	 * variant products to revert to inheriting from their parent.
 	 *
 	 * @param  array      $parameters  Hook parameters
-	 * @param  object     &$object     Current product object (id must be set)
-	 * @param  string     &$action     Current action ('update')
+	 * @param  object     $object      Current page object
+	 * @param  string     $action      Current action
 	 * @param  HookManager $hookmanager Hook manager instance
 	 * @return int                     0 = continue normal product save
 	 */
@@ -354,24 +348,13 @@ class ActionsWarrantySvc
 
 		// Clean slate — delete any existing default for this product+entity
 		$this->db->query(
-			"DELETE FROM ".MAIN_DB_PREFIX."warrantysvc_product_default"
-			." WHERE fk_product = ".((int) $object->id)
-			." AND entity = ".((int) $conf->entity)
+			"DELETE FROM ".MAIN_DB_PREFIX."warrantysvc_product_default WHERE fk_product = ".((int) $object->id)." AND entity = ".((int) $conf->entity)
 		);
 
 		if (!empty($wtype)) {
 			$days_val = ($days > 0) ? ((int) $days) : 'NULL';
 			$this->db->query(
-				"INSERT INTO ".MAIN_DB_PREFIX."warrantysvc_product_default"
-				." (fk_product, entity, warranty_type, coverage_days, date_creation, fk_user_creat)"
-				." VALUES ("
-				.((int) $object->id).", "
-				.((int) $conf->entity).", "
-				."'".$this->db->escape($wtype)."', "
-				.$days_val.", "
-				."'".$this->db->idate(dol_now())."', "
-				.((int) $user->id)
-				.")"
+				"INSERT INTO ".MAIN_DB_PREFIX."warrantysvc_product_default (fk_product, entity, warranty_type, coverage_days, date_creation, fk_user_creat) VALUES (".((int) $object->id).", ".((int) $conf->entity).", '".$this->db->escape($wtype)."', ".$days_val.", '".$this->db->idate(dol_now())."', ".((int) $user->id).")"
 			);
 		}
 		// Empty $wtype = variant clearing override to inherit from parent → row stays deleted

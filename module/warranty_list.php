@@ -8,9 +8,9 @@
  */
 
 $res = 0;
-if (!$res && file_exists("../main.inc.php"))        { $res = @include "../main.inc.php"; }
-if (!$res && file_exists("../../main.inc.php"))     { $res = @include "../../main.inc.php"; }
-if (!$res && file_exists("../../../main.inc.php"))  { $res = @include "../../../main.inc.php"; }
+if (!$res && file_exists("../main.inc.php")) { $res = @include "../main.inc.php"; }
+if (!$res && file_exists("../../main.inc.php")) { $res = @include "../../main.inc.php"; }
+if (!$res && file_exists("../../../main.inc.php")) { $res = @include "../../../main.inc.php"; }
 if (!$res) { die("Include of main fails"); }
 
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
@@ -70,8 +70,7 @@ $offset    = $limit * $page;
 
 // Reusable SQL expression: effective expiry = stored date, or start_date + type duration if not stored.
 // This is the canonical end-date for all status logic, filters, and display.
-$eff_exp = "COALESCE(t.expiry_date, IF(t.start_date IS NOT NULL AND wt.default_coverage_days > 0,"
-	." DATE_ADD(t.start_date, INTERVAL wt.default_coverage_days DAY), NULL))";
+$eff_exp = "COALESCE(t.expiry_date, IF(t.start_date IS NOT NULL AND wt.default_coverage_days > 0, DATE_ADD(t.start_date, INTERVAL wt.default_coverage_days DAY), NULL))";
 
 // Build query
 $sql  = "SELECT t.rowid, t.ref, t.fk_soc, t.fk_product, t.serial_number,";
@@ -178,9 +177,9 @@ print '<style>.warranty-row-expired { background-color: rgba(220,53,69,0.07) !im
 
 // Quick filter presets
 print '<div class="divsearchfield">';
-print '<a class="btnTitle'.($preset == 'active' ? ' btnTitleSelected' : '').'" href="'.$_SERVER['PHP_SELF'].'?preset=active">'.$langs->trans('Active').'</a> &nbsp;';
+print '<a class="btnTitle'.($preset == 'active' ? ' btnTitleSelected' : '').'" href="'.$_SERVER['PHP_SELF'].'?preset=active">'.$langs->trans('SvcActive').'</a> &nbsp;';
 print '<a class="btnTitle'.($preset == 'expiring' ? ' btnTitleSelected' : '').'" href="'.$_SERVER['PHP_SELF'].'?preset=expiring">'.$langs->trans('ExpiringSoon').'</a> &nbsp;';
-print '<a class="btnTitle'.($preset == 'expired' ? ' btnTitleSelected' : '').'" href="'.$_SERVER['PHP_SELF'].'?preset=expired">'.$langs->trans('Expired').'</a>';
+print '<a class="btnTitle'.($preset == 'expired' ? ' btnTitleSelected' : '').'" href="'.$_SERVER['PHP_SELF'].'?preset=expired">'.$langs->trans('SvcExpired').'</a>';
 print '</div>';
 
 print '<form method="GET" id="searchFormList" action="'.$_SERVER['PHP_SELF'].'">';
@@ -210,10 +209,10 @@ print '</td>';
 // Status filter
 $statuses = array(
 	-1        => '',
-	'active'  => $langs->trans('Active'),
+	'active'  => $langs->trans('SvcActive'),
 	'expiring'=> $langs->trans('ExpiringSoon'),
-	'expired' => $langs->trans('Expired'),
-	'voided'  => $langs->trans('Voided'),
+	'expired' => $langs->trans('SvcExpired'),
+	'voided'  => $langs->trans('SvcVoided'),
 );
 print '<td class="liste_titre">';
 print Form::selectarray('search_status', $statuses, $search_status, 0, 0, 0, '', 0, 0, 0, '', 'flat maxwidth100');
@@ -240,8 +239,8 @@ print '<tr class="liste_titre">';
 print getTitleFieldOfList('Ref',           0, $_SERVER['PHP_SELF'], 't.ref',          '', '', '',       '', $sortfield, $sortorder);
 print getTitleFieldOfList('Company',       0, $_SERVER['PHP_SELF'], 's.nom',          '', '', '',       '', $sortfield, $sortorder);
 print getTitleFieldOfList('Product',       0, $_SERVER['PHP_SELF'], 'p.ref',          '', '', '',       '', $sortfield, $sortorder);
-print getTitleFieldOfList('SerialNumber',  0, $_SERVER['PHP_SELF'], 't.serial_number','', '', '',       '', $sortfield, $sortorder);
-print getTitleFieldOfList('WarrantyType',  0, $_SERVER['PHP_SELF'], 't.warranty_type','', '', '',       '', $sortfield, $sortorder);
+print getTitleFieldOfList('SerialNumber',  0, $_SERVER['PHP_SELF'], 't.serial_number', '', '', '',       '', $sortfield, $sortorder);
+print getTitleFieldOfList('WarrantyType',  0, $_SERVER['PHP_SELF'], 't.warranty_type', '', '', '',       '', $sortfield, $sortorder);
 print getTitleFieldOfList('Status',        0, $_SERVER['PHP_SELF'], 't.status',       '', '', 'center', '', $sortfield, $sortorder);
 print getTitleFieldOfList('StartDate',     0, $_SERVER['PHP_SELF'], 't.start_date',   '', '', '',       '', $sortfield, $sortorder);
 print getTitleFieldOfList('ExpiryDate',    0, $_SERVER['PHP_SELF'], 't.expiry_date',  '', '', '',       '', $sortfield, $sortorder);
@@ -327,10 +326,7 @@ if ($resql) {
 		// Quick-action: New Service Request for this warranty
 		print '<td class="center">';
 		if ($user->hasRight('warrantysvc', 'svcrequest', 'write') && $display_status !== 'voided') {
-			$new_sr_url = DOL_URL_ROOT.'/custom/warrantysvc/card.php?action=create'
-				.'&fk_warranty='.$obj->rowid
-				.'&fk_soc='.$obj->fk_soc
-				.'&serial_number='.urlencode($obj->serial_number)
+			$new_sr_url = DOL_URL_ROOT.'/custom/warrantysvc/card.php?action=create&fk_warranty='.$obj->rowid.'&fk_soc='.$obj->fk_soc.'&serial_number='.urlencode($obj->serial_number)
 				.($obj->fk_product ? '&fk_product='.(int) $obj->fk_product : '');
 			print '<a href="'.$new_sr_url.'" title="'.dol_escape_htmltag($langs->trans('NewSvcRequest')).'">'.img_picto($langs->trans('NewSvcRequest'), 'add', 'class="size15"').'</a>';
 		}

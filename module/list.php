@@ -8,9 +8,9 @@
  */
 
 $res = 0;
-if (!$res && file_exists("../main.inc.php"))        { $res = @include "../main.inc.php"; }
-if (!$res && file_exists("../../main.inc.php"))     { $res = @include "../../main.inc.php"; }
-if (!$res && file_exists("../../../main.inc.php"))  { $res = @include "../../../main.inc.php"; }
+if (!$res && file_exists("../main.inc.php")) { $res = @include "../main.inc.php"; }
+if (!$res && file_exists("../../main.inc.php")) { $res = @include "../../main.inc.php"; }
+if (!$res && file_exists("../../../main.inc.php")) { $res = @include "../../../main.inc.php"; }
 if (!$res) { die("Include of main fails"); }
 
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
@@ -193,13 +193,13 @@ print '</td>';
 print '<td class="liste_titre">';
 $statuses = array(
 	-1 => '',
-	0  => $langs->trans('Draft'),
-	1  => $langs->trans('Validated'),
-	2  => $langs->trans('InProgress'),
+	0  => $langs->trans('SvcDraft'),
+	1  => $langs->trans('SvcValidated'),
+	2  => $langs->trans('SvcInProgress'),
 	3  => $langs->trans('AwaitingReturn'),
-	4  => $langs->trans('Resolved'),
-	5  => $langs->trans('Closed'),
-	9  => $langs->trans('Cancelled'),
+	4  => $langs->trans('SvcResolved'),
+	5  => $langs->trans('SvcClosed'),
+	9  => $langs->trans('SvcCancelled'),
 );
 print Form::selectarray('search_status', $statuses, $search_status, 0, 0, 0, '', 0, 0, 0, '', 'flat maxwidth100');
 print '</td>';
@@ -217,9 +217,9 @@ print '<tr class="liste_titre">';
 print getTitleFieldOfList('Ref',            0, $_SERVER['PHP_SELF'], 't.ref',            '', '', '',     '', $sortfield, $sortorder);
 print getTitleFieldOfList('Company',        0, $_SERVER['PHP_SELF'], 's.nom',            '', '', '',     '', $sortfield, $sortorder);
 print getTitleFieldOfList('SerialNumber',   0, $_SERVER['PHP_SELF'], 't.serial_number',  '', '', '',     '', $sortfield, $sortorder);
-print getTitleFieldOfList('ResolutionType', 0, $_SERVER['PHP_SELF'], 't.resolution_type','', '', '',     '', $sortfield, $sortorder);
-print getTitleFieldOfList('Status',         0, $_SERVER['PHP_SELF'], 't.status',         '', '', 'center','', $sortfield, $sortorder);
-print getTitleFieldOfList('AssignedTo',     0, $_SERVER['PHP_SELF'], 't.fk_user_assigned','','','',     '', $sortfield, $sortorder);
+print getTitleFieldOfList('ResolutionType', 0, $_SERVER['PHP_SELF'], 't.resolution_type', '', '', '',     '', $sortfield, $sortorder);
+print getTitleFieldOfList('Status',         0, $_SERVER['PHP_SELF'], 't.status',         '', '', 'center', '', $sortfield, $sortorder);
+print getTitleFieldOfList('AssignedTo',     0, $_SERVER['PHP_SELF'], 't.fk_user_assigned', '', '', '',     '', $sortfield, $sortorder);
 print getTitleFieldOfList('DateCreation',   0, $_SERVER['PHP_SELF'], 't.date_creation',  '', '', '',     '', $sortfield, $sortorder);
 print getTitleFieldOfList('',               0, $_SERVER['PHP_SELF'], '',                 '', '', '',     '', $sortfield, $sortorder); // warranty badge
 print '</tr>';

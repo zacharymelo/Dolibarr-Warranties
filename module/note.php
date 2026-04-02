@@ -8,8 +8,8 @@
  */
 
 $res = 0;
-if (!$res && file_exists("../main.inc.php"))       { $res = @include "../main.inc.php"; }
-if (!$res && file_exists("../../main.inc.php"))    { $res = @include "../../main.inc.php"; }
+if (!$res && file_exists("../main.inc.php")) { $res = @include "../main.inc.php"; }
+if (!$res && file_exists("../../main.inc.php")) { $res = @include "../../main.inc.php"; }
 if (!$res && file_exists("../../../main.inc.php")) { $res = @include "../../../main.inc.php"; }
 if (!$res) { die("Include of main fails"); }
 
@@ -62,7 +62,7 @@ if ($action == 'update' && $permwrite) {
  */
 $form = new Form($db);
 
-llxHeader('', $object->ref.' - '.$langs->trans('Notes'), '');
+llxHeader('', $object->ref.' - '.$langs->trans('SvcNotes'), '');
 
 $head = warrantysvc_prepare_head($object);
 print dol_get_fiche_head($head, 'note', $langs->trans('SvcRequest'), -1, 'technic');

@@ -44,6 +44,7 @@ if ($action == 'update') {
 		'WARRANTYSVC_REPLACEMENT_STRATEGY',
 		'WARRANTYSVC_AUTO_WARRANTY_CHECK',
 		'WARRANTYSVC_AUTO_WARRANTY_ON_SHIPMENT',
+		'WARRANTYSVC_WARRANTY_TRIGGER_EVENT',
 		'WARRANTYSVC_DEFAULT_COVERAGE_DAYS',
 		'WARRANTYSVC_NOTIFY_WARRANTY_CREATED',
 		'WARRANTYSVC_WARRANTY_REQUIRES_LOTS',
@@ -68,7 +69,7 @@ $warehouses = $entrepot->list_array();
  */
 
 $wikihelp = '';
-llxHeader('', $langs->trans('WarrantySvc').' - '.$langs->trans('Setup'), $wikihelp);
+llxHeader('', $langs->trans('WarrantySvc').' - '.$langs->trans('SvcSetup'), $wikihelp);
 
 $linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1">'
 	.$langs->trans('BackToModuleList').'</a>';
@@ -90,11 +91,11 @@ print '</tr>';
 
 // Refurbished stock warehouse
 print '<tr class="oddeven">';
-print '<td>'.$langs->trans('WarehouseSource').'<br><span class="opacitymedium">'
-	.$langs->trans('WarehouseRefurbDesc').'</span></td>';
+print '<td>'.$langs->trans('SvcWarehouseSource').'<br><span class="opacitymedium">'
+	.$langs->trans('SvcWarehouseRefurbDesc').'</span></td>';
 print '<td>';
 print '<select name="WARRANTYSVC_WAREHOUSE_REFURB" class="flat minwidth300">';
-print '<option value="">--- '.$langs->trans('SelectWarehouse').' ---</option>';
+print '<option value="">--- '.$langs->trans('SvcSelectWarehouse').' ---</option>';
 foreach ($warehouses as $id => $label) {
 	$sel = (getDolGlobalString('WARRANTYSVC_WAREHOUSE_REFURB') == $id) ? ' selected' : '';
 	print '<option value="'.$id.'"'.$sel.'>'.dol_escape_htmltag($label).'</option>';
@@ -104,11 +105,11 @@ print '</td></tr>';
 
 // RMA return / repair warehouse
 print '<tr class="oddeven">';
-print '<td>'.$langs->trans('WarehouseReturn').'<br><span class="opacitymedium">'
-	.$langs->trans('WarehouseReturnDesc').'</span></td>';
+print '<td>'.$langs->trans('SvcWarehouseReturn').'<br><span class="opacitymedium">'
+	.$langs->trans('SvcWarehouseReturnDesc').'</span></td>';
 print '<td>';
 print '<select name="WARRANTYSVC_WAREHOUSE_RETURN" class="flat minwidth300">';
-print '<option value="">--- '.$langs->trans('SelectWarehouse').' ---</option>';
+print '<option value="">--- '.$langs->trans('SvcSelectWarehouse').' ---</option>';
 foreach ($warehouses as $id => $label) {
 	$sel = (getDolGlobalString('WARRANTYSVC_WAREHOUSE_RETURN') == $id) ? ' selected' : '';
 	print '<option value="'.$id.'"'.$sel.'>'.dol_escape_htmltag($label).'</option>';
@@ -121,8 +122,7 @@ print '<tr class="oddeven">';
 print '<td>'.$langs->trans('ReturnGraceDays').'<br><span class="opacitymedium">'
 	.$langs->trans('ReturnGraceDaysDesc').'</span></td>';
 print '<td>';
-print '<input type="number" name="WARRANTYSVC_RETURN_GRACE_DAYS" class="flat" min="1" max="90"'
-	.' value="'.dol_escape_htmltag(getDolGlobalString('WARRANTYSVC_RETURN_GRACE_DAYS', '7')).'">';
+print '<input type="number" name="WARRANTYSVC_RETURN_GRACE_DAYS" class="flat" min="1" max="90" value="'.dol_escape_htmltag(getDolGlobalString('WARRANTYSVC_RETURN_GRACE_DAYS', '7')).'">';
 print ' '.$langs->trans('days');
 print '</td></tr>';
 
@@ -131,8 +131,7 @@ print '<tr class="oddeven">';
 print '<td>'.$langs->trans('ReturnInvoiceDays').'<br><span class="opacitymedium">'
 	.$langs->trans('ReturnInvoiceDaysDesc').'</span></td>';
 print '<td>';
-print '<input type="number" name="WARRANTYSVC_RETURN_INVOICE_DAYS" class="flat" min="1" max="180"'
-	.' value="'.dol_escape_htmltag(getDolGlobalString('WARRANTYSVC_RETURN_INVOICE_DAYS', '30')).'">';
+print '<input type="number" name="WARRANTYSVC_RETURN_INVOICE_DAYS" class="flat" min="1" max="180" value="'.dol_escape_htmltag(getDolGlobalString('WARRANTYSVC_RETURN_INVOICE_DAYS', '30')).'">';
 print ' '.$langs->trans('days');
 print '</td></tr>';
 
@@ -165,7 +164,7 @@ $chk = getDolGlobalString('WARRANTYSVC_AUTO_WARRANTY_CHECK', '1') ? ' checked' :
 print '<input type="checkbox" name="WARRANTYSVC_AUTO_WARRANTY_CHECK" value="1"'.$chk.'>';
 print '</td></tr>';
 
-// Auto-create warranty on shipment validation (STRETCH #14)
+// Auto-create warranty on shipment
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans('AutoWarrantyOnShipment').'<br><span class="opacitymedium">'
 	.$langs->trans('AutoWarrantyOnShipmentDesc').'</span></td>';
@@ -174,13 +173,26 @@ $chk2 = getDolGlobalString('WARRANTYSVC_AUTO_WARRANTY_ON_SHIPMENT') ? ' checked'
 print '<input type="checkbox" name="WARRANTYSVC_AUTO_WARRANTY_ON_SHIPMENT" value="1"'.$chk2.'>';
 print '</td></tr>';
 
+// Warranty trigger event (only shown when auto-create is enabled)
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans('WarrantyTriggerEvent').'<br><span class="opacitymedium">'
+	.$langs->trans('WarrantyTriggerEventDesc').'</span></td>';
+print '<td>';
+$trigger_event = getDolGlobalString('WARRANTYSVC_WARRANTY_TRIGGER_EVENT', 'close');
+print '<select name="WARRANTYSVC_WARRANTY_TRIGGER_EVENT" class="flat minwidth200">';
+print '<option value="validate"'.($trigger_event == 'validate' ? ' selected' : '').'>'.$langs->trans('OnShipmentValidate').'</option>';
+print '<option value="close"'.($trigger_event == 'close' ? ' selected' : '').'>'.$langs->trans('OnShipmentClose').'</option>';
+print '<option value="both"'.($trigger_event == 'both' ? ' selected' : '').'>'.$langs->trans('OnShipmentBoth').'</option>';
+print '</select>';
+print '</td></tr>';
+
 // Default warranty coverage months
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans('DefaultCoverageDays').'<br><span class="opacitymedium">'
 	.$langs->trans('DefaultCoverageDaysDesc').'</span></td>';
 print '<td>';
 print '<input type="number" name="WARRANTYSVC_DEFAULT_COVERAGE_DAYS" value="'.((int) getDolGlobalInt('WARRANTYSVC_DEFAULT_COVERAGE_DAYS', 365)).'" class="flat width75" min="1" max="3650">';
-print ' '.$langs->trans('Days');
+print ' '.$langs->trans('SvcDays');
 print '</td></tr>';
 
 // Notify customer when warranty created

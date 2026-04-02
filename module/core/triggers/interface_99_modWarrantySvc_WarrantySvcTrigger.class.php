@@ -11,28 +11,16 @@
  * Also listens on FICHINTER_CLOSE to update SvcServiceLog.
  */
 
-require_once DOL_DOCUMENT_ROOT.'/core/class/commonhookactions.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/triggers/dolibarrtriggers.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/CMailFile.class.php';
 require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarrantytype.class.php';
 
 
 /**
- * Class WarrantySvcTrigger
+ * Class InterfaceWarrantySvcTrigger
  */
-class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
+class InterfaceWarrantySvcTrigger extends DolibarrTriggers
 {
-	/** @var string Trigger name */
-	public $name        = 'WarrantySvcTrigger';
-
-	/** @var string Description */
-	public $description = 'Email notifications for Warranty & Service module events';
-
-	/** @var string Version */
-	public $version     = '1.0';
-
-	/** @var string Family */
-	public $picto       = 'email';
-
 	/**
 	 * Constructor
 	 *
@@ -41,6 +29,31 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 	public function __construct($db)
 	{
 		$this->db = $db;
+		$this->name        = preg_replace('/^Interface/i', '', get_class($this));
+		$this->description = 'Email notifications and automation for Warranty & Service module events';
+		$this->version     = '1.0.0';
+		$this->picto       = 'email';
+		$this->family      = 'warrantysvc';
+	}
+
+	/**
+	 * Return name of trigger file
+	 *
+	 * @return string
+	 */
+	public function getName()
+	{
+		return 'WarrantySvcTrigger';
+	}
+
+	/**
+	 * Return description of trigger file
+	 *
+	 * @return string
+	 */
+	public function getDesc()
+	{
+		return $this->description;
 	}
 
 	/**
@@ -62,7 +75,6 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 		$langs->loadLangs(array('warrantysvc@warrantysvc', 'mails'));
 
 		switch ($action) {
-
 			// ------------------------------------------------------------------
 			// Service Request: new record created (draft)
 			// ------------------------------------------------------------------
@@ -134,12 +146,26 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 				return 1;
 
 			// ------------------------------------------------------------------
-			// Shipment validated — auto-create warranty records
-			// for each shipped serialized product line (gated by config flag)
+			// Shipment closed or validated — auto-create warranty records
+			// for each shipped serialized product line.
+			// Gated by WARRANTYSVC_AUTO_WARRANTY_ON_SHIPMENT (master switch)
+			// and WARRANTYSVC_WARRANTY_TRIGGER_EVENT (validate|close|both).
 			// ------------------------------------------------------------------
+			case 'SHIPPING_CLOSED':
 			case 'SHIPPING_VALIDATE':
 				if (getDolGlobalInt('WARRANTYSVC_AUTO_WARRANTY_ON_SHIPMENT')) {
-					$this->_autoCreateWarrantiesFromShipment($object, $user, $langs);
+					$trigger_setting = getDolGlobalString('WARRANTYSVC_WARRANTY_TRIGGER_EVENT', 'close');
+					$fire = false;
+					if ($trigger_setting === 'both') {
+						$fire = true;
+					} elseif ($trigger_setting === 'close' && $action === 'SHIPPING_CLOSED') {
+						$fire = true;
+					} elseif ($trigger_setting === 'validate' && $action === 'SHIPPING_VALIDATE') {
+						$fire = true;
+					}
+					if ($fire) {
+						$this->_autoCreateWarrantiesFromShipment($object, $user, $langs);
+					}
 				}
 				return 1;
 
@@ -183,14 +209,10 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 
 		// Bidirectional link in Dolibarr's native element_element table
 		// Direction 1: SO as source → SR as target
-		$sql1 = "INSERT INTO ".MAIN_DB_PREFIX."element_element"
-			." (fk_source, sourcetype, fk_target, targettype)"
-			." VALUES (".$so_id.", 'commande', ".$sr_id.", 'warrantysvc_svcrequest')";
+		$sql1 = "INSERT INTO ".MAIN_DB_PREFIX."element_element (fk_source, sourcetype, fk_target, targettype) VALUES (".$so_id.", 'commande', ".$sr_id.", 'warrantysvc_svcrequest')";
 		$this->db->query($sql1); // non-fatal if it fails (e.g. duplicate)
 		// Direction 2: SR as source → SO as target
-		$sql2 = "INSERT INTO ".MAIN_DB_PREFIX."element_element"
-			." (fk_source, sourcetype, fk_target, targettype)"
-			." VALUES (".$sr_id.", 'warrantysvc_svcrequest', ".$so_id.", 'commande')";
+		$sql2 = "INSERT INTO ".MAIN_DB_PREFIX."element_element (fk_source, sourcetype, fk_target, targettype) VALUES (".$sr_id.", 'warrantysvc_svcrequest', ".$so_id.", 'commande')";
 		$this->db->query($sql2); // non-fatal if it fails (e.g. duplicate)
 
 		// Store on the SR so the action panel can display the link directly
@@ -217,11 +239,7 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 		$cr_id = (int) $object->id;
 
 		// Look for an SR linked as source → this customerreturn as target
-		$sql = "SELECT fk_source FROM ".MAIN_DB_PREFIX."element_element"
-			." WHERE fk_target = ".$cr_id
-			." AND targettype IN ('customerreturn', 'customerreturn_customerreturn')"
-			." AND sourcetype = 'warrantysvc_svcrequest'"
-			." LIMIT 1";
+		$sql = "SELECT fk_source FROM ".MAIN_DB_PREFIX."element_element WHERE fk_target = ".$cr_id." AND targettype IN ('customerreturn', 'customerreturn_customerreturn') AND sourcetype = 'warrantysvc_svcrequest' LIMIT 1";
 		$res = $this->db->query($sql);
 		if (!$res) {
 			return;
@@ -260,10 +278,7 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 	private function _syncWarrantyClaimCount($fk_warranty)
 	{
 		$fk = (int) $fk_warranty;
-		$sql = "UPDATE ".MAIN_DB_PREFIX."svc_warranty SET claim_count = ("
-			."SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."svc_request"
-			." WHERE fk_warranty = ".$fk
-			.") WHERE rowid = ".$fk;
+		$sql = "UPDATE ".MAIN_DB_PREFIX."svc_warranty SET claim_count = (SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."svc_request WHERE fk_warranty = ".$fk.") WHERE rowid = ".$fk;
 		$this->db->query($sql);
 		dol_syslog('WarrantySvcTrigger: synced claim_count on warranty '.$fk, LOG_DEBUG);
 	}
@@ -454,7 +469,7 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 		$lines   = array();
 		$lines[] = '';
 		$lines[] = $langs->trans('Ref').': '.$object->ref;
-		$lines[] = $langs->trans('SerialNumber').': '.($object->serial_number ?? '-');
+		$lines[] = $langs->trans('SvcSerialNumber').': '.($object->serial_number ?? '-');
 		$lines[] = $langs->trans('ResolutionType').': '.svcrequest_resolution_label($object->resolution_type);
 		return "\n".implode("\n", $lines);
 	}
@@ -472,23 +487,37 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 	}
 
 	/**
-	 * STRETCH #14: Auto-create SvcWarranty records for serialized products
-	 * in a validated shipment (EXPEDITION_VALIDATE trigger).
+	 * Auto-create SvcWarranty records for serialized products
+	 * in a closed shipment (SHIPPING_CLOSED trigger).
 	 *
 	 * For each expedition line with a serial/lot (llx_expeditiondet_batch),
 	 * check if a warranty already exists for that serial. If not, create one
-	 * using the default coverage from WARRANTYSVC_DEFAULT_COVERAGE_DAYS (default 12).
+	 * using the product-specific warranty type default (if configured),
+	 * falling back to the first active warranty type, with coverage_terms
+	 * and exclusions populated from the resolved type.
 	 *
-	 * @param  Expedition $object Validated shipment object
+	 * @param  Expedition $object Closed shipment object
 	 * @param  User       $user   Actor
 	 * @param  Translate  $langs  Lang
 	 * @return void
 	 */
 	private function _autoCreateWarrantiesFromShipment($object, $user, $langs)
 	{
-		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarranty.class.php';
+		global $conf;
 
-		$coverage_days = getDolGlobalInt('WARRANTYSVC_DEFAULT_COVERAGE_DAYS', 365);
+		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarranty.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarrantytype.class.php';
+
+		$global_coverage_days = getDolGlobalInt('WARRANTYSVC_DEFAULT_COVERAGE_DAYS', 365);
+
+		// Pre-load all active warranty types (used for coverage_terms/exclusions lookup)
+		$all_types = SvcWarrantyType::fetchAllForForm($this->db);
+
+		// Resolve order ID from shipment origin
+		$order_id = 0;
+		if (!empty($object->origin) && $object->origin == 'commande' && !empty($object->origin_id)) {
+			$order_id = (int) $object->origin_id;
+		}
 
 		// Fetch serialized lines for this shipment
 		// llx_expeditiondet_batch.batch is the serial/lot string directly
@@ -500,7 +529,7 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 
 		$resql = $this->db->query($sql);
 		if (!$resql) {
-			dol_syslog('WarrantySvcTrigger: SHIPPING_VALIDATE query failed: '.$this->db->lasterror(), LOG_WARNING);
+			dol_syslog('WarrantySvcTrigger: SHIPPING_CLOSED query failed: '.$this->db->lasterror(), LOG_WARNING);
 			return;
 		}
 
@@ -511,16 +540,71 @@ class interface_99_modWarrantySvc_WarrantySvcTrigger extends CommonHookActions
 				continue; // already covered
 			}
 
+			// ---- Resolve warranty type: product default > first active type > 'standard' ----
+			$type_code = '';
+			$product_coverage_days = 0;
+
+			// 1. Check product-specific warranty default
+			$sql_pd  = "SELECT warranty_type, coverage_days FROM ".MAIN_DB_PREFIX."warrantysvc_product_default";
+			$sql_pd .= " WHERE fk_product = ".((int) $line->fk_product)." AND entity = ".((int) $conf->entity);
+			$res_pd  = $this->db->query($sql_pd);
+			$row_pd  = ($res_pd) ? $this->db->fetch_object($res_pd) : null;
+
+			// 2. If not found, check parent product (variant cascade)
+			if (!$row_pd && isModEnabled('variants')) {
+				$sql_par  = "SELECT fk_product_parent FROM ".MAIN_DB_PREFIX."product_attribute_combination";
+				$sql_par .= " WHERE fk_product_child = ".((int) $line->fk_product);
+				$sql_par .= " AND entity IN (".getEntity('product').")";
+				$res_par  = $this->db->query($sql_par);
+				if ($res_par && ($row_par = $this->db->fetch_object($res_par))) {
+					$sql_pd2  = "SELECT warranty_type, coverage_days FROM ".MAIN_DB_PREFIX."warrantysvc_product_default";
+					$sql_pd2 .= " WHERE fk_product = ".((int) $row_par->fk_product_parent)." AND entity = ".((int) $conf->entity);
+					$res_pd2  = $this->db->query($sql_pd2);
+					$row_pd   = ($res_pd2) ? $this->db->fetch_object($res_pd2) : null;
+				}
+			}
+
+			if ($row_pd && !empty($row_pd->warranty_type)) {
+				$type_code = $row_pd->warranty_type;
+				$product_coverage_days = ($row_pd->coverage_days > 0) ? (int) $row_pd->coverage_days : 0;
+			}
+
+			// 3. Find the matching type object for coverage_terms and exclusions
+			$matched_type = null;
+			if ($all_types) {
+				foreach ($all_types as $wt) {
+					if ($type_code && $wt->code === $type_code) {
+						$matched_type = $wt;
+						break;
+					}
+				}
+				// Fallback to first active type if no product-specific match
+				if (!$matched_type) {
+					$matched_type = $all_types[0];
+					$type_code = $matched_type->code;
+				}
+			}
+
+			// ---- Build warranty record ----
 			$warranty                  = new SvcWarranty($this->db);
 			$warranty->serial_number   = $line->serial_number;
 			$warranty->fk_product      = $line->fk_product;
 			$warranty->fk_soc          = $object->socid;
 			$warranty->fk_expedition   = $object->id;
-			// Use the first active warranty type (by position) as the default, falling back to 'standard'
-			$default_types = SvcWarrantyType::fetchAllForForm($this->db);
-			$warranty->warranty_type = $default_types ? $default_types[0]->code : 'standard';
+			$warranty->fk_commande     = $order_id;
+			$warranty->warranty_type   = $type_code ?: 'standard';
+			$warranty->coverage_terms  = $matched_type ? $matched_type->coverage_terms : '';
+			$warranty->exclusions      = $matched_type ? $matched_type->exclusions : '';
 			$warranty->start_date      = dol_now();
-			$warranty->coverage_days = $coverage_days;
+
+			// Coverage days priority: product default > type default > global config
+			if ($product_coverage_days > 0) {
+				$warranty->coverage_days = $product_coverage_days;
+			} elseif ($matched_type && $matched_type->default_coverage_days > 0) {
+				$warranty->coverage_days = (int) $matched_type->default_coverage_days;
+			} else {
+				$warranty->coverage_days = $global_coverage_days;
+			}
 			// expiry_date auto-computed in create() from coverage_days + start_date
 
 			$result = $warranty->create($user);

@@ -87,8 +87,8 @@ class SvcRequest extends CommonObject
 		'fk_facture'           => array('type' => 'integer',      'label' => 'Invoice',          'enabled' => 1, 'visible' => -1, 'position' => 125),
 		'serial_in'            => array('type' => 'varchar(128)', 'label' => 'SerialIn',         'enabled' => 1, 'visible' => 1,  'position' => 130),
 		'serial_out'           => array('type' => 'varchar(128)', 'label' => 'SerialOut',        'enabled' => 1, 'visible' => 1,  'position' => 135),
-		'fk_warehouse_source'  => array('type' => 'integer',      'label' => 'WarehouseSource',  'enabled' => 1, 'visible' => -1, 'position' => 140),
-		'fk_warehouse_return'  => array('type' => 'integer',      'label' => 'WarehouseReturn',  'enabled' => 1, 'visible' => -1, 'position' => 145),
+		'fk_warehouse_source'  => array('type' => 'integer',      'label' => 'SvcWarehouseSource',  'enabled' => 1, 'visible' => -1, 'position' => 140),
+		'fk_warehouse_return'  => array('type' => 'integer',      'label' => 'SvcWarehouseReturn',  'enabled' => 1, 'visible' => -1, 'position' => 145),
 		'outbound_carrier'     => array('type' => 'varchar(100)', 'label' => 'OutboundCarrier',  'enabled' => 1, 'visible' => -1, 'position' => 150),
 		'outbound_tracking'    => array('type' => 'varchar(100)', 'label' => 'OutboundTracking', 'enabled' => 1, 'visible' => -1, 'position' => 155),
 		'date_shipped'         => array('type' => 'datetime',     'label' => 'DateShipped',      'enabled' => 1, 'visible' => -1, 'position' => 160),
@@ -780,29 +780,19 @@ class SvcRequest extends CommonObject
 
 			// Clean up stale rows with unprefixed types from older versions
 			foreach ($link['stale'] as $stale_type) {
-				$sql_del = "DELETE FROM ".MAIN_DB_PREFIX."element_element WHERE"
-					." ((fk_source = ".((int) $fk_id)." AND sourcetype = '".$this->db->escape($stale_type)."'"
-					."   AND fk_target = ".((int) $this->id).")"
-					." OR (fk_target = ".((int) $fk_id)." AND targettype = '".$this->db->escape($stale_type)."'"
-					."   AND fk_source = ".((int) $this->id)."))";
+				$sql_del = "DELETE FROM ".MAIN_DB_PREFIX."element_element WHERE ((fk_source = ".((int) $fk_id)." AND sourcetype = '".$this->db->escape($stale_type)."' AND fk_target = ".((int) $this->id).") OR (fk_target = ".((int) $fk_id)." AND targettype = '".$this->db->escape($stale_type)."' AND fk_source = ".((int) $this->id)."))";
+
 				$this->db->query($sql_del);
 			}
 
 			// Also clean up rows where our target type is unprefixed
 			if ($bare_target !== $target_type) {
-				$sql_del2 = "DELETE FROM ".MAIN_DB_PREFIX."element_element WHERE"
-					." fk_target = ".((int) $this->id)
-					." AND targettype = '".$this->db->escape($bare_target)."'";
+				$sql_del2 = "DELETE FROM ".MAIN_DB_PREFIX."element_element WHERE fk_target = ".((int) $this->id)." AND targettype = '".$this->db->escape($bare_target)."'";
 				$this->db->query($sql_del2);
 			}
 
 			// Check if the correct prefixed link already exists
-			$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."element_element WHERE"
-				." ((fk_source = ".((int) $fk_id)." AND sourcetype = '".$this->db->escape($source_type)."'"
-				."   AND fk_target = ".((int) $this->id)." AND targettype = '".$this->db->escape($target_type)."')"
-				."  OR (fk_source = ".((int) $this->id)." AND sourcetype = '".$this->db->escape($target_type)."'"
-				."   AND fk_target = ".((int) $fk_id)." AND targettype = '".$this->db->escape($source_type)."'))"
-				." LIMIT 1";
+			$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."element_element WHERE ((fk_source = ".((int) $fk_id)." AND sourcetype = '".$this->db->escape($source_type)."' AND fk_target = ".((int) $this->id)." AND targettype = '".$this->db->escape($target_type)."') OR (fk_source = ".((int) $this->id)." AND sourcetype = '".$this->db->escape($target_type)."' AND fk_target = ".((int) $fk_id)." AND targettype = '".$this->db->escape($source_type)."')) LIMIT 1";
 
 			$res = $this->db->query($sql);
 			if ($res && $this->db->num_rows($res) == 0) {
@@ -918,16 +908,7 @@ class SvcRequest extends CommonObject
 
 		// Insert reception lines (no PO line — fk_commandefourndet NULL)
 		foreach ($lines_to_receive as $line) {
-			$sql = "INSERT INTO ".MAIN_DB_PREFIX."receptiondet_batch"
-				." (fk_reception, fk_product, qty, fk_entrepot, fk_commandefourndet, comment, status)"
-				." VALUES ("
-				.$rec_id.", "
-				.$line['fk_product'].", "
-				.$line['qty'].", "
-				.((int) $fk_warehouse).", "
-				."NULL, "
-				."'".$this->db->escape('RMA '.$this->ref)."', "
-				."0)";
+			$sql = "INSERT INTO ".MAIN_DB_PREFIX."receptiondet_batch (fk_reception, fk_product, qty, fk_entrepot, fk_commandefourndet, comment, status) VALUES (".$rec_id.", ".$line['fk_product'].", ".$line['qty'].", ".((int) $fk_warehouse).", NULL, '".$this->db->escape('RMA '.$this->ref)."', 0)";
 			if (!$this->db->query($sql)) {
 				$this->db->rollback();
 				$this->error = $this->db->lasterror();
@@ -1301,13 +1282,13 @@ class SvcRequest extends CommonObject
 		$langs->load('warrantysvc');
 
 		$statusLabels = array(
-			self::STATUS_DRAFT        => array('label' => 'Draft',        'picto' => 'status0'),
-			self::STATUS_VALIDATED    => array('label' => 'Validated',    'picto' => 'status1'),
-			self::STATUS_IN_PROGRESS  => array('label' => 'InProgress',   'picto' => 'status3'),
+			self::STATUS_DRAFT        => array('label' => 'SvcDraft',        'picto' => 'status0'),
+			self::STATUS_VALIDATED    => array('label' => 'SvcValidated',    'picto' => 'status1'),
+			self::STATUS_IN_PROGRESS  => array('label' => 'SvcInProgress',   'picto' => 'status3'),
 			self::STATUS_AWAIT_RETURN => array('label' => 'AwaitingReturn','picto' => 'status4'),
-			self::STATUS_RESOLVED     => array('label' => 'Resolved',     'picto' => 'status6'),
-			self::STATUS_CLOSED       => array('label' => 'Closed',       'picto' => 'status6'),
-			self::STATUS_CANCELLED    => array('label' => 'Cancelled',    'picto' => 'status9'),
+			self::STATUS_RESOLVED     => array('label' => 'SvcResolved',     'picto' => 'status6'),
+			self::STATUS_CLOSED       => array('label' => 'SvcClosed',       'picto' => 'status6'),
+			self::STATUS_CANCELLED    => array('label' => 'SvcCancelled',    'picto' => 'status9'),
 		);
 
 		$s = isset($statusLabels[$status]) ? $statusLabels[$status] : array('label' => 'Unknown', 'picto' => 'status0');

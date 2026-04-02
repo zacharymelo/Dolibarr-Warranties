@@ -8,8 +8,8 @@
  */
 
 $res = 0;
-if (!$res && file_exists("../main.inc.php"))       { $res = @include "../main.inc.php"; }
-if (!$res && file_exists("../../main.inc.php"))    { $res = @include "../../main.inc.php"; }
+if (!$res && file_exists("../main.inc.php")) { $res = @include "../main.inc.php"; }
+if (!$res && file_exists("../../main.inc.php")) { $res = @include "../../main.inc.php"; }
 if (!$res && file_exists("../../../main.inc.php")) { $res = @include "../../../main.inc.php"; }
 if (!$res) { die("Include of main fails"); }
 
@@ -150,7 +150,7 @@ print '<td>'.$langs->trans('CoverageTerms').'</td>';
 print '<td>'.$langs->trans('Exclusions').'</td>';
 print '<td class="center">'.$langs->trans('DefaultCoverageDays').'</td>';
 print '<td class="center">'.$langs->trans('Position').'</td>';
-print '<td class="center">'.$langs->trans('Active').'</td>';
+print '<td class="center">'.$langs->trans('SvcActive').'</td>';
 print '<td class="center"></td>';
 print '</tr>';
 
@@ -181,15 +181,15 @@ foreach ($types as $t) {
 		print '<td class="opacitymedium">'.dol_escape_htmltag($t->description).'</td>';
 		print '<td class="opacitymedium">'.($t->coverage_terms ? '<span title="'.dol_escape_htmltag(dol_string_nohtmltag($t->coverage_terms)).'">'.dol_escape_htmltag(dol_trunc(dol_string_nohtmltag($t->coverage_terms), 60)).'</span>' : '').'</td>';
 		print '<td class="opacitymedium">'.($t->exclusions     ? '<span title="'.dol_escape_htmltag(dol_string_nohtmltag($t->exclusions)).'">'.dol_escape_htmltag(dol_trunc(dol_string_nohtmltag($t->exclusions), 60)).'</span>' : '').'</td>';
-		print '<td class="center">'.((int) $t->default_coverage_days).' '.$langs->trans('Days').'</td>';
+		print '<td class="center">'.((int) $t->default_coverage_days).' '.$langs->trans('SvcDays').'</td>';
 		print '<td class="center">'.((int) $t->position).'</td>';
 		print '<td class="center">';
 		if ($permwrite) {
 			print '<a href="'.$_SERVER['PHP_SELF'].'?action=toggleactive&token='.newToken().'&id='.$t->rowid.'">';
-			print img_picto($t->active ? $langs->trans('Active') : $langs->trans('Inactive'), $t->active ? 'switch_on' : 'switch_off');
+			print img_picto($t->active ? $langs->trans('SvcActive') : $langs->trans('Inactive'), $t->active ? 'switch_on' : 'switch_off');
 			print '</a>';
 		} else {
-			print img_picto($t->active ? $langs->trans('Active') : $langs->trans('Inactive'), $t->active ? 'switch_on' : 'switch_off');
+			print img_picto($t->active ? $langs->trans('SvcActive') : $langs->trans('Inactive'), $t->active ? 'switch_on' : 'switch_off');
 		}
 		print '</td>';
 		print '<td class="center">';
@@ -235,7 +235,7 @@ if ($permwrite && $action != 'edit') {
 	print '<td><textarea name="exclusions" class="flat" rows="3" style="width:90%" placeholder="'.$langs->trans('ExclusionsPlaceholder').'"></textarea></td></tr>';
 
 	print '<tr><td>'.$form->textwithpicto($langs->trans('DefaultCoverageDays'), $langs->trans('TooltipWTypeDefaultDays')).'</td>';
-	print '<td><input type="number" name="default_coverage_days" class="flat width75" value="365" min="1" max="3650"> '.$langs->trans('Days').'</td></tr>';
+	print '<td><input type="number" name="default_coverage_days" class="flat width75" value="365" min="1" max="3650"> '.$langs->trans('SvcDays').'</td></tr>';
 
 	print '<tr><td>'.$form->textwithpicto($langs->trans('Position'), $langs->trans('TooltipWTypePosition')).'</td>';
 	print '<td><input type="number" name="position" class="flat width75" value="0"></td></tr>';

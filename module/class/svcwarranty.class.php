@@ -304,15 +304,23 @@ class SvcWarranty extends CommonObject
 	 */
 	public function delete($user)
 	{
+		$this->db->begin();
+
+		// Remove element_element links (both prefixed and bare type names)
+		$this->deleteObjectLinked();
+
+		// Remove extrafields
 		$this->deleteExtraFields();
 
 		$sql = "DELETE FROM ".MAIN_DB_PREFIX."svc_warranty WHERE rowid = ".((int) $this->id);
-		if ($this->db->query($sql)) {
-			return 1;
+		if (!$this->db->query($sql)) {
+			$this->error = $this->db->lasterror();
+			$this->db->rollback();
+			return -1;
 		}
 
-		$this->error = $this->db->lasterror();
-		return -1;
+		$this->db->commit();
+		return 1;
 	}
 
 	/**
@@ -397,9 +405,9 @@ class SvcWarranty extends CommonObject
 		}
 
 		$labels = array(
-			self::STATUS_ACTIVE  => array('label' => 'Active',  'class' => 'badge-status1'),
-			self::STATUS_EXPIRED => array('label' => 'Expired', 'class' => 'badge-status8'),
-			self::STATUS_VOIDED  => array('label' => 'Voided',  'class' => 'badge-status9'),
+			self::STATUS_ACTIVE  => array('label' => 'SvcActive',  'class' => 'badge-status1'),
+			self::STATUS_EXPIRED => array('label' => 'SvcExpired', 'class' => 'badge-status8'),
+			self::STATUS_VOIDED  => array('label' => 'SvcVoided',  'class' => 'badge-status9'),
 		);
 
 		$s = isset($labels[$status]) ? $labels[$status] : array('label' => 'Unknown', 'class' => 'badge-status0');

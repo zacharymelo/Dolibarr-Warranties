@@ -8,8 +8,8 @@
  */
 
 $res = 0;
-if (!$res && file_exists("../main.inc.php"))       { $res = @include "../main.inc.php"; }
-if (!$res && file_exists("../../main.inc.php"))    { $res = @include "../../main.inc.php"; }
+if (!$res && file_exists("../main.inc.php")) { $res = @include "../main.inc.php"; }
+if (!$res && file_exists("../../main.inc.php")) { $res = @include "../../main.inc.php"; }
 if (!$res && file_exists("../../../main.inc.php")) { $res = @include "../../../main.inc.php"; }
 if (!$res) { die("Include of main fails"); }
 
@@ -232,10 +232,7 @@ if ($action == 'create_from_shipment') {
 			while ($obj_ser = $db->fetch_object($res_ser)) {
 				$opt_label = $obj_ser->serial_number.' — '.$obj_ser->product_ref.($obj_ser->product_label ? ' '.$obj_ser->product_label : '');
 				$serial_options[$obj_ser->serial_number] = $opt_label;
-				$serial_product_map .= '"'.dol_escape_js($obj_ser->serial_number).'":{'
-					.'"fk_product":'.((int) $obj_ser->fk_product).','
-					.'"label":"'.dol_escape_js($obj_ser->product_ref.($obj_ser->product_label ? ' — '.$obj_ser->product_label : '')).'"'
-					.'},';
+				$serial_product_map .= '"'.dol_escape_js($obj_ser->serial_number).'":{"fk_product":'.((int) $obj_ser->fk_product).',"label":"'.dol_escape_js($obj_ser->product_ref.($obj_ser->product_label ? ' — '.$obj_ser->product_label : '')).'"},';
 			}
 		}
 		$serial_product_map = rtrim($serial_product_map, ',').'}';
@@ -279,7 +276,7 @@ if ($action == 'create_from_shipment') {
 			print '</td></tr>';
 
 			// Serial number dropdown (only uncovered serials from this shipment)
-			print '<tr><td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td>';
+			print '<tr><td class="fieldrequired">'.$form->textwithpicto($langs->trans('SvcSerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td>';
 			print '<td>';
 			print Form::selectarray('serial_number', $serial_options, dol_escape_htmltag(GETPOST('serial_number', 'alpha')), 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth300', 0, '', '', true);
 			print '</td></tr>';
@@ -304,7 +301,7 @@ if ($action == 'create_from_shipment') {
 			print '<tr><td>'.$form->textwithpicto($langs->trans('CoverageDays'), $langs->trans('TooltipCoverageDays')).'</td>';
 			print '<td>';
 			print '<input type="number" id="coverage_days" name="coverage_days" value="'.$initial_days.'" class="flat width75" min="1" max="3650"'.$days_disabled.'>';
-			print ' '.$langs->trans('Days');
+			print ' '.$langs->trans('SvcDays');
 			print ' &nbsp;<span id="coverage_auto_hint" class="opacitymedium"'.($selected_wtype ? '' : ' style="display:none"').'>'.$langs->trans('CoverageFromType').'</span>';
 			print '</td></tr>';
 
@@ -461,7 +458,7 @@ if ($action == 'create') {
 
 	// Serial — Standard row (select from product_lot)
 	print '<tr id="row_std_serial"'.($prev_mode !== 'standard' ? ' style="display:none"' : '').'>';
-	print '<td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td><td>';
+	print '<td class="fieldrequired">'.$form->textwithpicto($langs->trans('SvcSerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td><td>';
 	print '<select name="serial_number" id="manual_serial_select" class="minwidth200" disabled>';
 	print '<option value="">'.$langs->trans('SelectProductFirst').'</option>';
 	print '</select>';
@@ -470,7 +467,7 @@ if ($action == 'create') {
 	// Serial — Override row (free-text input)
 	$show_free_ser = ($prev_mode === 'override');
 	print '<tr id="row_free_serial"'.(!$show_free_ser ? ' style="display:none"' : '').'>';
-	print '<td class="fieldrequired">'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td><td>';
+	print '<td class="fieldrequired">'.$form->textwithpicto($langs->trans('SvcSerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td><td>';
 	print '<input type="text" name="serial_number" id="serial_number_free"';
 	print ' class="flat minwidth200"';
 	print ' placeholder="'.dol_escape_htmltag($langs->trans('SerialNumberOverridePlaceholder')).'"';
@@ -781,7 +778,7 @@ if (initMode === "standard") {
 	print '<tr><td>'.$form->textwithpicto($langs->trans('CoverageDays'), $langs->trans('TooltipCoverageDays')).'</td>';
 	print '<td>';
 	print '<input type="number" id="coverage_days" name="coverage_days" value="'.$initial_days.'" class="flat width75" min="1" max="3650"'.$days_disabled.'>';
-	print ' '.$langs->trans('Days');
+	print ' '.$langs->trans('SvcDays');
 	print ' &nbsp;<span id="coverage_auto_hint" class="opacitymedium"'.($selected_wtype ? '' : ' style="display:none"').'>'.$langs->trans('CoverageFromType').'</span>';
 	print ' <span id="coverage_manual_hint" class="opacitymedium"'.($selected_wtype ? ' style="display:none"' : '').'>'.$langs->trans('ExpiryAutoComputed').'</span>';
 	print '</td></tr>';
@@ -820,7 +817,7 @@ if (initMode === "standard") {
 			if(manualHint) manualHint.style.display = "";
 		}
 	}
-	if(sel){ sel.addEventListener("change", sync); }
+	if(sel){ sel.addEventListener("change", sync); sync(); }
 })();
 </script>';
 
@@ -970,7 +967,7 @@ if ($action == 'edit') {
 print '</td></tr>';
 
 // Serial number
-print '<tr><td>'.$form->textwithpicto($langs->trans('SerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td>';
+print '<tr><td>'.$form->textwithpicto($langs->trans('SvcSerialNumber'), $langs->trans('TooltipWarrantySerial')).'</td>';
 print '<td>';
 if ($action == 'edit') {
 	print '<input type="text" name="serial_number" value="'.dol_escape_htmltag($object->serial_number).'" class="flat minwidth200">';
@@ -1035,9 +1032,7 @@ print '<tr><td>'.$langs->trans('Status').'</td>';
 print '<td>'.svcwarranty_status_badge($display_status).'</td></tr>';
 
 // Claim summary — live count from svc_request to avoid stale denormalized counter
-$sql_cc = "SELECT COUNT(*) as cnt FROM ".MAIN_DB_PREFIX."svc_request"
-	." WHERE fk_warranty = ".((int) $object->id)
-	." AND entity IN (".getEntity('svcrequest').")";
+$sql_cc = "SELECT COUNT(*) as cnt FROM ".MAIN_DB_PREFIX."svc_request WHERE fk_warranty = ".((int) $object->id)." AND entity IN (".getEntity('svcrequest').")";
 $res_cc = $db->query($sql_cc);
 $live_claim_count = 0;
 if ($res_cc) {
@@ -1073,10 +1068,10 @@ print '<td>';
 if ($action == 'edit') {
 	$edit_days_disabled = ($object->warranty_type ? ' disabled style="opacity:0.5"' : '');
 	print '<input type="number" id="coverage_days" name="coverage_days" value="'.((int) $object->coverage_days).'" class="flat width75" min="0" max="3650"'.$edit_days_disabled.'>';
-	print ' '.$langs->trans('Days');
+	print ' '.$langs->trans('SvcDays');
 	print ' &nbsp;<span class="opacitymedium" id="coverage_type_hint"'.($object->warranty_type ? '' : ' style="display:none"').'>'.$langs->trans('CoverageFromType').'</span>';
 } else {
-	print $object->coverage_days ? ((int) $object->coverage_days).' '.$langs->trans('Days') : '<span class="opacitymedium">&mdash;</span>';
+	print $object->coverage_days ? ((int) $object->coverage_days).' '.$langs->trans('SvcDays') : '<span class="opacitymedium">&mdash;</span>';
 }
 print '</td></tr>';
 
@@ -1279,10 +1274,7 @@ if ($action == 'edit') {
 		print dolGetButtonAction('', $langs->trans('Modify'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=edit&token='.newToken(), '');
 	}
 	if ($user->hasRight('warrantysvc', 'svcrequest', 'write')) {
-		$sr_url = DOL_URL_ROOT.'/custom/warrantysvc/card.php?action=create'
-			.'&fk_warranty='.$object->id
-			.'&fk_soc='.$object->fk_soc
-			.'&serial_number='.urlencode($object->serial_number)
+		$sr_url = DOL_URL_ROOT.'/custom/warrantysvc/card.php?action=create&fk_warranty='.$object->id.'&fk_soc='.$object->fk_soc.'&serial_number='.urlencode($object->serial_number)
 			.(!empty($object->fk_product) ? '&fk_product='.$object->fk_product : '');
 		print dolGetButtonAction('', $langs->trans('NewSvcRequest'), 'default', $sr_url, '');
 	}
