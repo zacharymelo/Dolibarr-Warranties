@@ -635,6 +635,14 @@ class InterfaceWarrantySvcTrigger extends DolibarrTriggers
 				}
 				if ($warranty->fk_commande > 0) {
 					$warranty->add_object_linked('commande', $warranty->fk_commande);
+					// Discover and link invoices tied to this order
+					$sql_inv = "SELECT fk_target FROM ".MAIN_DB_PREFIX."element_element WHERE fk_source = ".((int) $warranty->fk_commande)." AND sourcetype = 'commande' AND targettype = 'facture'";
+					$res_inv = $this->db->query($sql_inv);
+					if ($res_inv) {
+						while ($row_inv = $this->db->fetch_object($res_inv)) {
+							$warranty->add_object_linked('facture', (int) $row_inv->fk_target);
+						}
+					}
 				}
 			} else {
 				dol_syslog(

@@ -90,6 +90,14 @@ if ($action == 'add' && $permwrite) {
 		}
 		if ($object->fk_commande > 0) {
 			$object->add_object_linked('commande', $object->fk_commande);
+			// Discover and link invoices tied to this order
+			$sql_inv = "SELECT fk_target FROM ".MAIN_DB_PREFIX."element_element WHERE fk_source = ".((int) $object->fk_commande)." AND sourcetype = 'commande' AND targettype = 'facture'";
+			$res_inv = $db->query($sql_inv);
+			if ($res_inv) {
+				while ($row_inv = $db->fetch_object($res_inv)) {
+					$object->add_object_linked('facture', (int) $row_inv->fk_target);
+				}
+			}
 		}
 		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$result);
 		exit;
@@ -1251,6 +1259,7 @@ print dol_get_fiche_end();
 
 // ---- Linked objects block ----
 if ($action != 'edit' && $object->id > 0) {
+	$object->fetchObjectLinked();
 	$tmparray = $form->showLinkToObjectBlock($object, array(), array('svcwarranty'), 1);
 	$linktoelem = isset($tmparray['linktoelem']) ? $tmparray['linktoelem'] : '';
 	$htmltoenteralink = isset($tmparray['htmltoenteralink']) ? $tmparray['htmltoenteralink'] : '';
