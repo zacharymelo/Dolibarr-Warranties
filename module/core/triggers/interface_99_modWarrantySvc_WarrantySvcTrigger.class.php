@@ -554,10 +554,30 @@ class InterfaceWarrantySvcTrigger extends DolibarrTriggers
 		}
 
 		while ($line = $this->db->fetch_object($resql)) {
-			// Skip if a warranty already exists for this serial
-			$existing = new SvcWarranty($this->db);
-			if ($existing->fetchBySerial($line->serial_number) > 0) {
-				continue; // already covered
+			// Skip if a warranty already exists for this serial ON THIS SHIPMENT
+			$sql_dup = "SELECT rowid FROM ".MAIN_DB_PREFIX."svc_warranty";
+			$sql_dup .= " WHERE serial_number = '".$this->db->escape($line->serial_number)."'";
+			$sql_dup .= " AND fk_expedition = ".((int) $object->id);
+			$sql_dup .= " AND entity = ".((int) $conf->entity);
+			$res_dup = $this->db->query($sql_dup);
+			if ($res_dup && $this->db->fetch_object($res_dup)) {
+				continue; // warranty already exists for this serial on this shipment
+			}
+
+			// Auto-void active warranties for this serial held by a DIFFERENT customer
+			// (unit was returned and resold). Same-customer warranties are kept (sub-coverage).
+			$sql_void = "SELECT rowid, fk_soc FROM ".MAIN_DB_PREFIX."svc_warranty";
+			$sql_void .= " WHERE serial_number = '".$this->db->escape($line->serial_number)."'";
+			$sql_void .= " AND status = 'active'";
+			$sql_void .= " AND entity = ".((int) $conf->entity);
+			$res_void = $this->db->query($sql_void);
+			if ($res_void) {
+				while ($row_void = $this->db->fetch_object($res_void)) {
+					if ((int) $row_void->fk_soc !== (int) $object->socid) {
+						$this->db->query("UPDATE ".MAIN_DB_PREFIX."svc_warranty SET status = 'voided' WHERE rowid = ".((int) $row_void->rowid));
+						dol_syslog('WarrantySvcTrigger: voided warranty '.$row_void->rowid.' for serial '.$line->serial_number.' (resold to different customer)', LOG_INFO);
+					}
+				}
 			}
 
 			// ---- Resolve warranty type: product default > first active type > 'standard' ----
