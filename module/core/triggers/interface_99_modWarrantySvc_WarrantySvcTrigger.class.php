@@ -170,6 +170,26 @@ class InterfaceWarrantySvcTrigger extends DolibarrTriggers
 				return 1;
 
 			// ------------------------------------------------------------------
+			// Order closed (classified as delivered) — auto-create warranty
+			// records by iterating linked shipments. Reuses the existing
+			// _autoCreateWarrantiesFromShipment() method for each expedition.
+			// ------------------------------------------------------------------
+			case 'ORDER_CLOSE':
+				if (getDolGlobalInt('WARRANTYSVC_AUTO_WARRANTY_ON_ORDER_CLOSE')) {
+					$object->fetchObjectLinked('', 'expedition', $object->id, 'commande');
+					if (!empty($object->linkedObjects['expedition'])) {
+						foreach ($object->linkedObjects['expedition'] as $expedition) {
+							// Ensure the expedition has its socid set (needed by _autoCreateWarrantiesFromShipment)
+							if (empty($expedition->socid) && !empty($object->socid)) {
+								$expedition->socid = $object->socid;
+							}
+							$this->_autoCreateWarrantiesFromShipment($expedition, $user, $langs);
+						}
+					}
+				}
+				return 1;
+
+			// ------------------------------------------------------------------
 			// Sales order created — if origin is an SR, auto-link via
 			// llx_element_element and store fk_commande on the SR
 			// ------------------------------------------------------------------

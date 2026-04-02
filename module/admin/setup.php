@@ -45,6 +45,7 @@ if ($action == 'update') {
 		'WARRANTYSVC_AUTO_WARRANTY_CHECK',
 		'WARRANTYSVC_AUTO_WARRANTY_ON_SHIPMENT',
 		'WARRANTYSVC_WARRANTY_TRIGGER_EVENT',
+		'WARRANTYSVC_AUTO_WARRANTY_ON_ORDER_CLOSE',
 		'WARRANTYSVC_DEFAULT_COVERAGE_DAYS',
 		'WARRANTYSVC_NOTIFY_WARRANTY_CREATED',
 		'WARRANTYSVC_WARRANTY_REQUIRES_LOTS',
@@ -184,6 +185,15 @@ print '<option value="validate"'.($trigger_event == 'validate' ? ' selected' : '
 print '<option value="close"'.($trigger_event == 'close' ? ' selected' : '').'>'.$langs->trans('OnShipmentClose').'</option>';
 print '<option value="both"'.($trigger_event == 'both' ? ' selected' : '').'>'.$langs->trans('OnShipmentBoth').'</option>';
 print '</select>';
+print '</td></tr>';
+
+// Auto-create warranty on order close (delivered)
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans('AutoWarrantyOnOrderClose').'<br><span class="opacitymedium">'
+	.$langs->trans('AutoWarrantyOnOrderCloseDesc').'</span></td>';
+print '<td>';
+$chk_oc = getDolGlobalString('WARRANTYSVC_AUTO_WARRANTY_ON_ORDER_CLOSE') ? ' checked' : '';
+print '<input type="checkbox" name="WARRANTYSVC_AUTO_WARRANTY_ON_ORDER_CLOSE" value="1"'.$chk_oc.'>';
 print '</td></tr>';
 
 // Default warranty coverage months
