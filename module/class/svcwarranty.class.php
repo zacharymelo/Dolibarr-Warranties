@@ -413,4 +413,25 @@ class SvcWarranty extends CommonObject
 		$s = isset($labels[$status]) ? $labels[$status] : array('label' => 'Unknown', 'class' => 'badge-status0');
 		return '<span class="badge '.$s['class'].'">'.$langs->trans($s['label']).'</span>';
 	}
+
+	/**
+	 * Count warranties for a given third party (used by tab badge).
+	 *
+	 * @param  int $socid Third party ID
+	 * @return int        Number of warranties
+	 */
+	public static function countForThirdparty($socid)
+	{
+		global $db, $conf;
+
+		$sql = "SELECT COUNT(*) as nb FROM ".MAIN_DB_PREFIX."svc_warranty";
+		$sql .= " WHERE fk_soc = ".((int) $socid);
+		$sql .= " AND entity IN (".getEntity('svcwarranty').")";
+		$resql = $db->query($sql);
+		if ($resql) {
+			$obj = $db->fetch_object($resql);
+			return (int) $obj->nb;
+		}
+		return 0;
+	}
 }

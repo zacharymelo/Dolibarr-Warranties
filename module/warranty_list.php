@@ -28,6 +28,7 @@ if (!$user->hasRight('warrantysvc', 'svcwarranty', 'read')) {
 
 $action      = GETPOST('action', 'aZ09');
 $optioncss   = GETPOST('optioncss', 'alpha');
+$socid       = GETPOSTINT('socid');
 $contextpage = GETPOST('contextpage', 'aZ') ? GETPOST('contextpage', 'aZ') : 'svcwarranty';
 
 // Search filters
@@ -87,6 +88,9 @@ $sql .= " LEFT JOIN ".MAIN_DB_PREFIX."svc_warranty_type as wt ON wt.code = t.war
 $sql .= "  AND wt.entity IN (".getEntity('svcwarrantytype').")";
 $sql .= " WHERE t.entity IN (".getEntity('svcwarranty').")";
 
+if ($socid > 0) {
+	$sql .= " AND t.fk_soc = ".((int) $socid);
+}
 if ($search_ref) {
 	$sql .= natural_search('t.ref', $search_ref);
 }
@@ -137,6 +141,19 @@ $sql .= $db->plimit($limit, $offset);
  */
 llxHeader('', $langs->trans('Warranties'), '');
 
+// When accessed from a third party tab, show the third party header + tabs
+if ($socid > 0) {
+	require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
+	$soc = new Societe($db);
+	$soc->fetch($socid);
+	$head = societe_prepare_head($soc);
+	print dol_get_fiche_head($head, 'warrantysvc_warranties', $langs->trans('ThirdParty'), -1, 'company');
+	dol_banner_tab($soc, 'socid', '', 0, 'rowid', 'nom');
+	print dol_get_fiche_end();
+	print '<br>';
+}
+
 $newcardbutton = '';
 if ($user->hasRight('warrantysvc', 'svcwarranty', 'write')) {
 	$newcardbutton = dolGetButtonTitle(
@@ -177,12 +194,16 @@ print '<style>.warranty-row-expired { background-color: rgba(220,53,69,0.07) !im
 
 // Quick filter presets
 print '<div class="divsearchfield">';
-print '<a class="btnTitle'.($preset == 'active' ? ' btnTitleSelected' : '').'" href="'.$_SERVER['PHP_SELF'].'?preset=active">'.$langs->trans('SvcActive').'</a> &nbsp;';
-print '<a class="btnTitle'.($preset == 'expiring' ? ' btnTitleSelected' : '').'" href="'.$_SERVER['PHP_SELF'].'?preset=expiring">'.$langs->trans('ExpiringSoon').'</a> &nbsp;';
-print '<a class="btnTitle'.($preset == 'expired' ? ' btnTitleSelected' : '').'" href="'.$_SERVER['PHP_SELF'].'?preset=expired">'.$langs->trans('SvcExpired').'</a>';
+$socparam = ($socid > 0) ? '&socid='.((int) $socid) : '';
+print '<a class="btnTitle'.($preset == 'active' ? ' btnTitleSelected' : '').'" href="'.$_SERVER['PHP_SELF'].'?preset=active'.$socparam.'">'.$langs->trans('SvcActive').'</a> &nbsp;';
+print '<a class="btnTitle'.($preset == 'expiring' ? ' btnTitleSelected' : '').'" href="'.$_SERVER['PHP_SELF'].'?preset=expiring'.$socparam.'">'.$langs->trans('ExpiringSoon').'</a> &nbsp;';
+print '<a class="btnTitle'.($preset == 'expired' ? ' btnTitleSelected' : '').'" href="'.$_SERVER['PHP_SELF'].'?preset=expired'.$socparam.'">'.$langs->trans('SvcExpired').'</a>';
 print '</div>';
 
 print '<form method="GET" id="searchFormList" action="'.$_SERVER['PHP_SELF'].'">';
+if ($socid > 0) {
+	print '<input type="hidden" name="socid" value="'.((int) $socid).'">';
+}
 if ($preset) {
 	print '<input type="hidden" name="preset" value="'.dol_escape_htmltag($preset).'">';
 }
