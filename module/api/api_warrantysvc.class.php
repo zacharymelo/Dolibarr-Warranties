@@ -86,7 +86,7 @@ class WarrantySvc extends DolibarrApi
 		while ($obj = $this->db->fetch_object($resql)) {
 			$request = new SvcRequest($this->db);
 			if ($request->fetch($obj->rowid) > 0) {
-				$obj_ret[] = $this->_cleanObjectDatas($request);
+				$obj_ret[] = $this->cleanObjectDatas($request);
 			}
 		}
 		$this->db->free($resql);
@@ -119,7 +119,7 @@ class WarrantySvc extends DolibarrApi
 			throw new RestException(500, $request->error);
 		}
 
-		return $this->_cleanObjectDatas($request);
+		return $this->cleanObjectDatas($request);
 	}
 
 	/**
@@ -277,7 +277,7 @@ class WarrantySvc extends DolibarrApi
 		while ($obj = $this->db->fetch_object($resql)) {
 			$warranty = new SvcWarranty($this->db);
 			if ($warranty->fetch($obj->rowid) > 0) {
-				$obj_ret[] = $this->_cleanObjectDatas($warranty);
+				$obj_ret[] = $this->cleanObjectDatas($warranty);
 			}
 		}
 		$this->db->free($resql);
@@ -310,7 +310,7 @@ class WarrantySvc extends DolibarrApi
 			throw new RestException(500, $warranty->error);
 		}
 
-		return $this->_cleanObjectDatas($warranty);
+		return $this->cleanObjectDatas($warranty);
 	}
 
 	/**
@@ -338,7 +338,7 @@ class WarrantySvc extends DolibarrApi
 			throw new RestException(500, $warranty->error);
 		}
 
-		return $this->_cleanObjectDatas($warranty);
+		return $this->cleanObjectDatas($warranty);
 	}
 
 	// ====================================================================
@@ -351,7 +351,7 @@ class WarrantySvc extends DolibarrApi
 	 * @param  CommonObject $object Object to clean
 	 * @return array                Cleaned associative array
 	 */
-	protected function _cleanObjectDatas($object)
+	protected function cleanObjectDatas($object)
 	{
 		$object = parent::_cleanObjectDatas($object);
 		// Remove large/internal fields not relevant to API consumers
