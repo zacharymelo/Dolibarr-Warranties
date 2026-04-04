@@ -1,262 +1,199 @@
-# WarrantySvc — Dolibarr Warranty & RMA Module
+# WarrantySvc for Dolibarr
 
-A Dolibarr custom module for warranty registration and RMA (Return Merchandise Authorization) tracking, built for small manufacturing businesses that sell serialized equipment.
+**RMA and Warranty Management for serialized equipment.**
 
----
+Track warranties by serial number, manage service requests from intake to resolution, and automate return logistics -- all inside Dolibarr.
 
-## Overview
-
-WarrantySvc adds a full service lifecycle to Dolibarr, covering:
-
-- **Service Requests** — intake, triage, and resolution tracking for customer complaints and RMA cases
-- **Warranties** — per-serial-number coverage records tied to customers and products, with expiry tracking
-- **Warranty Types** — admin-defined templates (standard, extended, etc.) with default coverage durations
-- **Guided Troubleshooting** — a structured diagnostic checklist workflow attached to service requests
-
-The module integrates with native Dolibarr objects: Societe, Product, Expedition (Shipment), Reception, FichInter (Intervention), Commande (Order), Facture (Invoice), and Project.
-
----
-
-## Requirements
-
-- Dolibarr 17.x or later
-- PHP 8.0+
-- The following Dolibarr modules should be enabled for full functionality:
-  - **Stocks / Warehouses** — required for warehouse-based shipment and return tracking
-  - **Shipments (Expedition)** — enables outbound shipment creation from service requests
-  - **Interventions (FichInter)** — enables on-site service scheduling
-  - **Invoices** — enables non-return invoicing
-  - **Orders** — enables origin order linkage on warranties
-  - **Projects** — enables project linkage on service requests (optional)
-
----
-
-## Installation
-
-1. Download the latest release zip (e.g. `module_warrantysvc-1.15.0.zip`).
-2. Extract and copy the `warrantysvc/` folder into your Dolibarr `custom/` directory:
-   ```
-   htdocs/custom/warrantysvc/
-   ```
-3. In Dolibarr, go to **Setup → Modules/Applications** and enable **Warranty & Service Management**.
-4. After activation, go to **Setup → Warranty & Service → Setup** to configure warehouses, coverage defaults, and automation settings.
-
-> **Note:** The zip must contain a `warrantysvc/` root directory. Do not rename it — Dolibarr uses the folder name as the module identifier.
+**Version:** 1.27.2
+**License:** GPL-3.0
 
 ---
 
 ## Features
 
-### Service Requests
+- **Service Requests** -- Create and track customer complaints and RMA cases through a full lifecycle: Draft, Validated, In Progress, Awaiting Return, Resolved, and Closed.
+- **Warranty Tracking** -- Register warranties per serial number with configurable warranty types and coverage durations. Warranty status (Active, Expiring Soon, Expired, Voided) is computed automatically.
+- **Automatic Warranty Creation** -- Optionally create warranties when a shipment is validated or an order is closed. Duplicate warranties for the same serial and shipment are prevented automatically.
+- **Auto-Void on Resale** -- When a unit is resold to a new customer, the original warranty is voided automatically.
+- **Resolution Workflows** -- Choose from Component Shipment, Full Unit Swap (cross-ship or wait-for-return), On-Site Service, Guidance Only, and more. Each type shows only the panels you need.
+- **Movement Tracker** -- Track outbound shipments, expected returns, carrier info, and tracking numbers. Overdue returns are flagged automatically.
+- **PDF Authorization Slips** -- Generate a printable service authorization document for each service request.
+- **Linked Objects** -- Service requests and warranties appear in the Related Objects block on Orders, Shipments, Invoices, and Projects.
+- **Warranties Tab on Customer Card** -- View all warranties for a customer directly from their third-party record.
+- **Extrafields Support** -- Add custom fields to both warranties and service requests through the standard Dolibarr extrafields system.
 
-Service requests represent a customer complaint or RMA case. Each request tracks:
+---
 
-| Field | Description |
+## Screenshots
+
+### Service Requests List
+
+Filter and manage all open and closed service requests.
+
+![Service Requests List](docs/screenshots/service-requests-list.png)
+
+### Warranty List
+
+View warranty records with status, serial number, customer, and coverage dates.
+
+![Warranty List](docs/screenshots/warranty-list.png)
+
+### New Warranty Form
+
+Create warranties in Standard mode (from a shipment) or Override mode (manual entry).
+
+![New Warranty Form](docs/screenshots/new-warranty-form.png)
+
+### Admin Setup
+
+Configure warehouses, automation rules, and default values.
+
+![Admin Setup](docs/screenshots/admin-setup.png)
+
+---
+
+## Requirements
+
+| Requirement | Minimum Version |
 |---|---|
-| Customer | The Dolibarr Societe linked to this case |
-| Product | The product with the reported fault |
-| Serial Number | The customer's defective unit serial/lot number |
-| Issue Date | When the customer reported the fault |
-| Reported Via | Intake channel: phone, email, on-site, or other |
-| Resolution Type | Determines the workflow (see below) |
-| Issue Description | Customer-reported fault detail — appears on the service authorization PDF |
-| Customer Site | Physical installation location |
-| Assigned To | Internal technician responsible for the case |
-| Warranty Status | Auto-matched from warranty records by serial number |
-| Billable | Whether to invoice the customer for this case |
-| Resolution Notes | Internal notes on how the case was closed |
+| Dolibarr | 16.0 or later |
+| PHP | 7.0 or later |
 
-#### Resolution Types
+**Required Dolibarr modules** (must be enabled before activating WarrantySvc):
 
-The resolution type chosen at intake determines which workflow panels appear:
+- Third Parties
+- Products
+- Stock / Warehouses
 
-| Type | Description | Panels |
-|---|---|---|
-| Component Shipment | Ship a part to the customer — no return required | Outbound |
-| Component Shipment + Return | Ship a part and request the old part back for analysis | Outbound + Return |
-| Full Unit Swap — Cross Ship | Send a refurbished unit now; customer returns faulty unit after | Outbound + Return |
-| Full Unit Swap — Wait for Return | Customer ships faulty unit first; replacement sent after receipt | Return + Outbound |
-| On-Site Service | Schedule a technician visit; optionally creates a Dolibarr Intervention | Intervention |
-| Guidance Only | Provide troubleshooting steps by phone/email — no physical action | None |
-| Informational | No fault found — logged for audit purposes | None |
+**Optional modules** (enable for additional functionality):
 
-#### Service Request Lifecycle
-
-```
-Draft → Validated → In Progress → Awaiting Return → Resolved → Closed
-                                                   ↗
-                                          (swap/component types)
-```
-
-Additional transitions: **Cancel** (from any non-closed state), **Re-open** (from Closed or Cancelled).
-
-#### Movement Tracker
-
-For resolution types involving physical movement, a Movement Tracker panel shows:
-- **Outbound** — carrier, tracking number, replacement serial, link to created Dolibarr shipment
-- **Return** — expected return date, carrier, tracking, received serial, overdue indicator
-- **Intervention** — link to created Dolibarr Intervention record
-- Quick actions: **Ship Components**, **Ship Replacement Unit**, **Log Return Received**, **Send Reminder**, **Invoice for Non-Return**
+- Shipments -- needed for outbound shipment creation and auto-warranty on shipment
+- Orders -- enables linking warranties to their origin order
+- Projects -- enables project linkage on service requests
+- Customer Returns -- enables return receipt workflows
 
 ---
 
-### Warranties
+## Installation
 
-Warranties cover a specific serial number for a specific customer and product. Each warranty tracks:
+WarrantySvc is installed using the standard Dolibarr module installer. No command-line access is needed.
 
-| Field | Description |
+1. Download the latest release zip from the [Releases page](https://github.com/zacharymelo/Dolibarr-Warranties/releases) (the file is named `module_warrantysvc-1.27.2.zip`).
+2. In Dolibarr, go to **Home > Setup > Modules/Applications**.
+3. Click **Deploy an external module** (at the top of the page).
+4. Upload the zip file and click **Send**.
+5. After the upload completes, find **Warranty & Service Management** in the module list and click the toggle to enable it.
+6. Proceed to **Configuration** below.
+
+> **Important:** Do not rename or re-zip the file. Dolibarr expects the archive to contain a `warrantysvc/` directory at the root.
+
+---
+
+## Configuration
+
+After enabling the module, go to **Warranty & Service > Setup** from the left menu to configure it for your business.
+
+### Warehouse Settings
+
+| Setting | What It Does |
 |---|---|
-| Serial Number | The unit covered — must be unique per active warranty |
-| Customer | The Dolibarr Societe that owns the warranty |
-| Product | The product type covered |
-| Warranty Type | Optional template that auto-fills coverage duration |
-| Start Date | When coverage begins |
-| Coverage Days | Duration of coverage in days |
-| Expiry Date | Auto-computed from start date + coverage days, or set manually |
-| Coverage Terms | What is covered — printed on warranty documents |
-| Exclusions | What is explicitly not covered — printed on warranty documents |
-| Origin Order | Optional link to the Dolibarr order this warranty came from |
-| Origin Shipment | Auto-linked when created from a validated shipment |
-| Note Public | Customer-visible notes — included in warranty notification emails |
-| Status | Active / Expiring Soon / Expired / Voided |
-| Claims | Count and total value of all service requests filed against this warranty |
+| Replacement From Warehouse | The warehouse that replacement and refurbished units are shipped from. |
+| Return To Warehouse | The warehouse where returned units are received. |
 
-#### Creating Warranties
+### Automation Settings
 
-Two methods are available:
-
-1. **From Shipment** — Select a validated shipment; the module shows all serialized product lines that don't yet have warranty coverage. Choose a serial, a warranty type, and a start date.
-2. **Manually** — Fill in all fields directly. Useful for warranties issued outside of the normal shipment flow.
-
-Warranties can also be **auto-created on shipment validation** if the `WARRANTYSVC_AUTO_WARRANTY_ON_SHIPMENT` setting is enabled.
-
----
-
-### Warranty Types
-
-Warranty Types are admin-defined templates that appear in warranty form dropdowns. Selecting a type auto-fills the coverage duration and locks the field.
-
-Each type has:
-- **Code** — short machine-readable identifier (e.g. `standard`, `extended_2yr`)
-- **Label** — human-readable name shown in dropdowns
-- **Description** — optional description visible to staff
-- **Default Coverage Days** — auto-fills the warranty coverage field when this type is selected
-- **Position** — controls display order in dropdowns
-
-Warranty types are managed at **Warranty & Service → Warranty Types**.
-
----
-
-### Guided Troubleshooting
-
-Each service request has a **Troubleshoot** tab that presents a product-aware diagnostic checklist. Technicians can:
-- Check off each diagnostic step as completed
-- Record a finding or measurement per step
-- Write a session summary
-- Record an outcome (resolved, no fault, escalate, parts needed, on-site required)
-
-Findings are appended to the service request's internal notes as a structured block. Multiple sessions are preserved and displayed chronologically. Selecting **No fault found** automatically updates the resolution type to *Informational*.
-
-Checklist steps are product-aware:
-- **All products**: Safety inspection, power supply verification, startup observation
-- **Oxygen compressors** (product ref contains `compressor` or `oc-`): Intake filter, output pressure, flow rate, moisture trap, outlet purity, vibration/noise, heat/temperature
-- **All products (wrap-up)**: Customer steps to reproduce, attempt to reproduce, firmware/software version
-
----
-
-## Admin Configuration
-
-Go to **Setup → Warranty & Service → Setup** to configure:
-
-| Setting | Description |
+| Setting | What It Does |
 |---|---|
-| Replacement From Warehouse | Warehouse from which refurbished/replacement units are shipped |
-| Return To Warehouse | Warehouse where returned or in-repair units are received |
-| Return reminder delay | Days after the expected return date before the first reminder email is sent |
-| Auto-invoice after | Days after the expected return date before auto-invoicing unreturned units |
-| Default replacement strategy | How the system suggests a replacement unit: FIFO, Least Serviced, Best Condition, or Manual |
-| Auto-check warranty on creation | Look up warranty coverage automatically when a service request is created |
-| Auto-create warranty on shipment | Register a warranty for each serialized line when a shipment is validated |
-| Default warranty coverage (days) | Coverage period used when auto-creating warranties from shipments |
-| Email customer on warranty creation | Send a notification email when a new warranty is registered |
-| Restrict service requests to serialized products | Only show lot/serial-tracked products in service request forms |
+| Return reminder delay (days) | How many days after the expected return date to send a reminder to the customer. |
+| Auto-invoice after (days) | How many days after the expected return date to automatically create an invoice for unreturned units. |
+| Default replacement selection strategy | How the system suggests a replacement unit. Options: FIFO (oldest stock first), Least Serviced, Best Condition, or Manual. |
+
+### Warranty Automation
+
+| Setting | What It Does |
+|---|---|
+| Auto-check warranty on creation | When a service request is created, the system automatically looks up whether the serial number has active warranty coverage. |
+| Auto-create warranty on shipment | Automatically register a warranty for each serialized product line when a shipment is validated. |
+| Warranty creation trigger | Controls when auto-created warranties are generated (for example, on shipment close). |
+
+All settings have sensible defaults. You can adjust them at any time without affecting existing records.
 
 ---
 
-## Reference Numbering
+## Usage Guide
 
-Service request reference numbers follow the pattern `SVC-YYMM-XXXX` by default. The numbering module can be changed on the Setup page under **Reference Numbering Module**.
+### Creating a Warranty
 
----
+1. Go to **Warranty & Service > New Warranty**.
+2. **Standard mode:** Select a validated shipment. The form will show all serialized product lines from that shipment that do not already have warranty coverage. Choose the serial number, a warranty type, and a start date.
+3. **Override mode:** Fill in all fields manually (customer, product, serial number, start date, coverage days). Use this for warranties issued outside of the normal shipment flow.
+4. Click **Create** to save.
 
-## DoliStore Publication Checklist
+The warranty status is computed automatically based on the start date and coverage duration.
 
-Before submitting to [DoliStore](https://www.dolistore.com):
+### Managing Warranty Types
 
-- [ ] **Register a module ID** in the `100000–499999` range on the [Dolibarr module ID wiki page](https://wiki.dolibarr.org/index.php?title=List_of_modules_id) and update `$this->numero` in `core/modules/modWarrantySvc.class.php`
-  - Current value `510000` is valid for private use only (`>500000` range)
-  - DoliStore requires a registered ID in `100000–499999`
-- [x] Zip named `module_warrantysvc-VERSION.zip` (DoliStore file validator requirement)
-- [x] `docs/LICENSE` present (GPL v3)
-- [x] `langs/en_US/warrantysvc.lang` present and complete
-- [x] `main.inc.php` loaded via multi-depth fallback (htdocs/custom + htdocs compatibility)
-- [ ] Test "Deploy an external module" via Dolibarr **Home → Setup → Modules** before submitting
-- [ ] English product description ready for DoliStore listing
-- [ ] Support contact email ready (required for paid modules)
+Go to **Warranty & Service > Warranty Types** to create templates such as "Standard 1-Year" or "Extended 2-Year." Each type defines a default coverage duration in days. When staff select a warranty type during warranty creation, the coverage duration fills in automatically.
 
----
+### Creating a Service Request
 
-## Changelog
+1. Go to **Warranty & Service > New Service Request**.
+2. Select the customer, product, and serial number.
+3. Choose a **Resolution Type** to determine the workflow:
+   - **Component Shipment** -- Ship a replacement part (no return needed).
+   - **Component Shipment + Return** -- Ship a part and request the old one back.
+   - **Full Unit Swap (Cross Ship)** -- Send a replacement now; customer returns the faulty unit later.
+   - **Full Unit Swap (Wait for Return)** -- Customer ships the faulty unit first; replacement sent after receipt.
+   - **On-Site Service** -- Schedule a technician visit.
+   - **Guidance Only** -- Resolve by phone or email with no physical action.
+   - **Informational** -- No fault found; logged for records.
+4. Fill in the issue description and any other relevant details.
+5. Click **Create** to save the request in Draft status.
 
-### v1.16.0
-- Standards compliance audit and fixes (Dolibarr coding standards + DoliStore qualification)
-  - `svcrequest.class.php`: added entity filter to fetch-by-ID (was missing, fetch-by-ref was correct)
-  - `card.php`: added entity filter to PBX call display-mode query (edit-mode query was already correct)
-  - `svcservicelog.class.php`: migrated `CONDITION_*` constants from strings to integers (`SMALLINT`); updated SQL write points accordingly
-  - `sql/llx_svc_service_log.sql`: changed `condition_status` from `VARCHAR(50)` to `SMALLINT DEFAULT 0`; added `import_key VARCHAR(14)`
-  - `sql/llx_svc_service_log_upgrade.sql`: added migration for existing deployments
-  - `docs/LICENSE`: added GPL v3 license file (required for DoliStore)
-  - Build: zip naming changed to `module_warrantysvc-VERSION.zip` (required by DoliStore file validator)
+### Service Request Lifecycle
 
-### v1.15.0
-- Cross-module linked objects integration: Warranty and Service Request records now appear in the native "Related objects" block on Order, Shipment, Invoice, Intervention, and Project cards, with the native "Link to..." hyperlink for manual linking
-- Added linked objects block to the Service Request card (`card.php`)
-- Fixed `SvcRequest::$element` type mismatch (`warrantysvc` → `svcrequest`) so links stored in `llx_element_element` resolve correctly; `warrantysvc` retained as backward-compat alias
+Move the request through its stages using the status buttons on the request card:
 
-### v1.3.x
-- Auto-create warranty from validated shipment (trigger-based)
-- Warranty card now shows claim history with value totals
-- Movement tracker — overdue indicator on return tracking
-- PDF: service authorization slip with component lines and tracking info
+1. **Draft** -- Initial entry. Edit freely.
+2. **Validated** -- Request is confirmed and ready for action.
+3. **In Progress** -- Work has begun (shipment sent, technician dispatched, etc.).
+4. **Awaiting Return** -- Applies to swap and return workflows. The system tracks the expected return date and flags overdue returns.
+5. **Resolved** -- The issue has been addressed.
+6. **Closed** -- Final state. The case is complete.
 
-### v1.2.x
-- Fixed layout errors on warranty card page
-- Renamed `coverage_months` → `coverage_days` in database schema
-- Migration script included in `sql/llx_svc_warranty_upgrade.sql`
+You can also **Cancel** a request from any non-closed state, or **Re-open** a closed or cancelled request.
 
-### v1.1.x
-- Guided troubleshooting workflow (Troubleshoot tab)
-- Oxygen compressor-specific diagnostic steps
+### Generating a PDF Authorization Slip
 
-### v1.0.0
-- Initial release: Service Requests, Warranties, Warranty Types, Movement Tracker
+From any service request card, click the **Generate PDF** button to create a printable service authorization document. This includes the customer details, product info, issue description, and tracking information.
+
+### Viewing Warranties for a Customer
+
+Open any third-party (customer) card and click the **Warranties** tab to see all warranty records for that customer in one place.
 
 ---
 
-## Development
+## Optional Integrations
 
-Local development uses Docker Compose:
+WarrantySvc works on its own with the required modules listed above. Enabling these optional Dolibarr modules adds extra capabilities:
 
-```sh
-docker compose up
-```
+| Module | What It Enables |
+|---|---|
+| Shipments | Create outbound shipments directly from service requests. Required for auto-warranty on shipment validation. |
+| Orders | Link warranties to their origin sales order. |
+| Projects | Attach service requests to a Dolibarr project for grouped tracking. |
+| Customer Returns | Manage inbound return receipts within the return workflow. |
 
-To build an installable zip:
+Linked objects (orders, shipments, invoices, projects) appear automatically in the Related Objects block on service request and warranty cards.
 
-```sh
-# The archive root must be warrantysvc/ — not module/
-# The module_ prefix is required by DoliStore's file validator
-zip -r module_warrantysvc-x.y.z.zip warrantysvc/
-```
+---
 
-See `project_build.md` in the memory store for full build instructions.
+## Support
+
+Report issues or request features on GitHub: [https://github.com/zacharymelo/Dolibarr-Warranties/issues](https://github.com/zacharymelo/Dolibarr-Warranties/issues)
+
+---
+
+## License
+
+This module is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html).
