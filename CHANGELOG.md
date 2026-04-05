@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.28.15] - 2026-04-05
+
+### Added
+- Ship Replacement Unit button on service request card — creates a $0 warranty replacement order, validates it, and creates a Draft shipment linked to the SR
+- Redirects to Dolibarr's native Shipment Distribution page for serial/lot selection
+- Supports both batch-tracked and non-batch products
+- Orphan detection for deleted shipments and orders on SR card with "Remove Link" button
+
+### Fixed
+- Use `isModEnabled('shipping')` for Dolibarr 22 compatibility (not `expedition`)
+- Handle batch-tracked products via direct expeditiondet insert with fk_elementdet (Dolibarr 22 API limitation; TODO: use addlinefree on Dolibarr 23+)
+
 ## [1.27.2] - 2026-04-03
 
 ### Fixed

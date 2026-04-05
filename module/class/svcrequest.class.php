@@ -929,6 +929,172 @@ class SvcRequest extends CommonObject
 	}
 
 	/**
+	 * Create a replacement shipment (Expedition) directly from this service request,
+	 * bypassing the sales order flow. The shipment is created in Draft status.
+	 *
+	 * @param  User $user User performing action
+	 * @return int        Shipment ID if OK, <0 if KO
+	 */
+	public function createReplacementShipment($user)
+	{
+		global $conf, $langs;
+
+		if (!isModEnabled('shipping') && !isModEnabled('expedition')) {
+			$this->error = $langs->trans('ErrorExpeditionModuleDisabled');
+			return -1;
+		}
+		if (!isModEnabled('order') && !isModEnabled('commande')) {
+			$this->error = $langs->trans('ErrorFieldRequired', 'Orders module');
+			return -1;
+		}
+
+		if (empty($this->fk_product)) {
+			$this->error = $langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('Product'));
+			return -1;
+		}
+
+		// Determine warehouse: SR field → global setting
+		$warehouse_id = !empty($this->fk_warehouse_source) ? (int) $this->fk_warehouse_source : getDolGlobalInt('WARRANTYSVC_WAREHOUSE_REFURB');
+		if ($warehouse_id <= 0) {
+			$this->error = $langs->trans('ErrorNoWarehouseSelected');
+			return -1;
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/expedition/class/expedition.class.php';
+
+		$langs->load('warrantysvc@warrantysvc');
+
+		$this->db->begin();
+
+		// Step 1: Create a $0 warranty replacement order
+		$order = new Commande($this->db);
+		$order->socid = $this->fk_soc;
+		$order->fk_project = $this->fk_project;
+		$order->note_private = 'RMA '.$this->ref.' - warranty replacement (auto-created)';
+		$order->entity = $conf->entity;
+		$order->date_commande = dol_now();
+
+		$order_id = $order->create($user);
+		if ($order_id <= 0) {
+			$this->db->rollback();
+			$this->error = 'Order create failed: '.($order->error ?: $this->db->lasterror());
+			$this->errors = $order->errors;
+			return -1;
+		}
+
+		// Add product line at $0
+		$result = $order->addline(
+			$langs->trans('ReplacementForSR', $this->ref),
+			0,
+			1,
+			0,
+			0,
+			0,
+			$this->fk_product
+		);
+		if ($result <= 0) {
+			$this->db->rollback();
+			$this->error = 'Order addline failed: '.($order->error ?: $this->db->lasterror());
+			return -1;
+		}
+		$order_line_id = $result;
+
+		// Validate the order
+		$result = $order->valid($user);
+		if ($result <= 0) {
+			$this->db->rollback();
+			$this->error = 'Order validate failed: '.($order->error ?: $this->db->lasterror());
+			return -1;
+		}
+
+		// Step 2: Create shipment from the order
+		$expedition = new Expedition($this->db);
+		$expedition->socid = $this->fk_soc;
+		$expedition->origin = 'commande';
+		$expedition->origin_id = $order_id;
+		$expedition->entrepot_id = $warehouse_id;
+		$expedition->fk_project = $this->fk_project;
+		$expedition->note_private = 'RMA '.$this->ref.' - replacement shipment';
+		$expedition->entity = $conf->entity;
+		$expedition->date_creation = dol_now();
+
+		$exp_id = $expedition->create($user);
+		if ($exp_id <= 0) {
+			$this->db->rollback();
+			$this->error = 'Expedition create failed: '.($expedition->error ?: $this->db->lasterror());
+			$this->errors = $expedition->errors;
+			return -1;
+		}
+
+		// Add the order line to the shipment
+		// Check if product is batch-tracked — if so, use addline_batch
+		// Fetch order line via Commande::fetch_lines to get product_tobatch populated
+		$order->fetch_lines();
+		$orderline = null;
+		foreach ($order->lines as $ol) {
+			if ($ol->id == $order_line_id) {
+				$orderline = $ol;
+				break;
+			}
+		}
+		if (!$orderline) {
+			$this->db->rollback();
+			$this->error = 'Order line not found after creation';
+			return -1;
+		}
+
+		$is_batch_product = false;
+		if (isModEnabled('productbatch')) {
+			require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
+			$prod_check = new Product($this->db);
+			$prod_check->fetch($this->fk_product);
+			$is_batch_product = !empty($prod_check->status_batch);
+		}
+
+		if (!$is_batch_product) {
+			// Non-batch product — add line via API
+			$line_result = $expedition->addline($warehouse_id, $order_line_id, 1);
+			if ($line_result < 0) {
+				$this->db->rollback();
+				$this->error = 'Expedition addline failed: '.($expedition->error ?: $this->db->lasterror());
+				return -1;
+			}
+		} else {
+			// Batch-tracked product — insert expeditiondet with fk_elementdet
+			// pointing to the order line so the dispatch page can render the
+			// serial picker. Direct SQL required because addline() rejects batch
+			// products and create_line() requires fk_elementdet OR fk_parent but
+			// then addline() blocks batch products anyway.
+			// TODO: Dolibarr 23+ has addlinefree() — switch to that when upgrading.
+			$sql_line = "INSERT INTO ".MAIN_DB_PREFIX."expeditiondet";
+			$sql_line .= " (fk_expedition, fk_entrepot, fk_elementdet, fk_product, qty, element_type, rang)";
+			$sql_line .= " VALUES (".$exp_id.", ".((int) $warehouse_id).", ".((int) $order_line_id);
+			$sql_line .= ", ".((int) $this->fk_product).", 1, 'order', 0)";
+			if (!$this->db->query($sql_line)) {
+				$this->db->rollback();
+				$this->error = 'Insert expeditiondet failed: '.$this->db->lasterror();
+				return -1;
+			}
+		}
+
+		// Link shipment and order to this SR via element_element
+		$this->add_object_linked('shipping', $exp_id);
+
+		// Update SR with shipment and order references
+		$this->fk_shipment = $exp_id;
+		$this->fk_commande = $order_id;
+		if ($this->update($user, 1) < 0) {
+			$this->db->rollback();
+			$this->error = 'SR update failed: '.$this->error;
+			return -1;
+		}
+
+		$this->db->commit();
+		return $exp_id;
+	}
+
+	/**
 	 * Validate the return reception linked to this RMA.
 	 *
 	 * @param  User $user User performing action

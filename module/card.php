@@ -243,6 +243,42 @@ if ($action == 'validate_return_reception' && $permwrite && isModEnabled('recept
 	exit;
 }
 
+// Create replacement shipment directly (no sales order required)
+if ($action == 'createreplacementshipment' && $permwrite) {
+	if (!isModEnabled('shipping') && !isModEnabled('expedition')) {
+		setEventMessages('Shipment module is not enabled', null, 'errors');
+		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+		exit;
+	}
+	$shipment_id = $object->createReplacementShipment($user);
+	if ($shipment_id > 0) {
+		setEventMessages($langs->trans('ShipmentCreated'), null, 'mesgs');
+		// Redirect to dispatch page so user can assign serial/lot from stock
+		header('Location: '.DOL_URL_ROOT.'/expedition/dispatch.php?id='.$shipment_id);
+		exit;
+	} else {
+		setEventMessages($object->error ?: 'Unknown error creating shipment', $object->errors, 'errors');
+		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+		exit;
+	}
+}
+
+// Clear orphaned shipment FK (shipment was deleted externally)
+if ($action == 'clearorphanshipment' && $permwrite) {
+	$object->fk_shipment = null;
+	$object->update($user, 1);
+	header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+	exit;
+}
+
+// Clear orphaned order FK (order was deleted externally)
+if ($action == 'clearorphanorder' && $permwrite) {
+	$object->fk_commande = null;
+	$object->update($user, 1);
+	header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+	exit;
+}
+
 // Log that a return was received (manually, before Reception module workflow)
 if ($action == 'log_return_received' && $permwrite) {
 	$object->date_return_received = dol_now();
@@ -1111,18 +1147,50 @@ if ($action == 'create') {
 			print '<td style="padding:8px 12px; font-weight:bold; width:220px;">'.img_picto('', 'rightarrow', 'class="pictofixedwidth"').$langs->trans('ReplacementOrder').'</td>';
 			print '<td style="padding:8px 12px;">';
 
-			if (!empty($object->fk_commande)) {
+			if (!empty($object->fk_shipment)) {
+				// Linked shipment — check if it still exists
+				require_once DOL_DOCUMENT_ROOT.'/expedition/class/expedition.class.php';
+				$_exp = new Expedition($db);
+				$_exp_exists = ($_exp->fetch($object->fk_shipment) > 0);
+				if ($_exp_exists) {
+					print img_picto('', 'dolly', 'class="pictofixedwidth"');
+					print '<a href="'.DOL_URL_ROOT.'/expedition/card.php?id='.$object->fk_shipment.'">'.$langs->trans('Shipment').' '.$_exp->ref.'</a>';
+					if ($object->serial_out) {
+						print ' &mdash; '.$langs->trans('Serial').': <strong>'.dol_escape_htmltag($object->serial_out).'</strong>';
+					}
+				} else {
+					// Shipment was deleted — show orphan notice and clear link
+					print '<span class="opacitymedium" style="text-decoration:line-through;">'.img_picto('', 'dolly', 'class="pictofixedwidth"').$langs->trans('Shipment').' #'.$object->fk_shipment.' ('.$langs->trans('Deleted').')</span>';
+					if ($permwrite) {
+						print ' <a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=clearorphanshipment&token='.newToken().'" class="butActionDelete" style="margin-left:8px;">'.$langs->trans('RemoveLink').'</a>';
+					}
+				}
+			} elseif (!empty($object->fk_commande)) {
 				require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
 				$_ord = new Commande($db);
-				$_ord_label = ($_ord->fetch($object->fk_commande) > 0 && $_ord->ref) ? $_ord->ref : '#'.$object->fk_commande;
-				print img_picto('', 'order', 'class="pictofixedwidth"');
-				print '<a href="'.DOL_URL_ROOT.'/commande/card.php?id='.$object->fk_commande.'">'.$langs->trans('Order').' '.$_ord_label.'</a>';
-				if ($object->serial_out) {
-					print ' &mdash; '.$langs->trans('Serial').': <strong>'.dol_escape_htmltag($object->serial_out).'</strong>';
+				$_ord_exists = ($_ord->fetch($object->fk_commande) > 0);
+				if ($_ord_exists) {
+					print img_picto('', 'order', 'class="pictofixedwidth"');
+					print '<a href="'.DOL_URL_ROOT.'/commande/card.php?id='.$object->fk_commande.'">'.$langs->trans('Order').' '.$_ord->ref.'</a>';
+					if ($object->serial_out) {
+						print ' &mdash; '.$langs->trans('Serial').': <strong>'.dol_escape_htmltag($object->serial_out).'</strong>';
+					}
+				} else {
+					print '<span class="opacitymedium" style="text-decoration:line-through;">'.img_picto('', 'order', 'class="pictofixedwidth"').$langs->trans('Order').' #'.$object->fk_commande.' ('.$langs->trans('Deleted').')</span>';
+					if ($permwrite) {
+						print ' <a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=clearorphanorder&token='.newToken().'" class="butActionDelete" style="margin-left:8px;">'.$langs->trans('RemoveLink').'</a>';
+					}
 				}
-			} elseif ($active_status && $permwrite && isModEnabled('order')) {
-				$create_so_url = DOL_URL_ROOT.'/commande/card.php?action=create&socid='.((int) $object->fk_soc).'&rma_sr_id='.((int) $object->id).'&backtopage='.urlencode(DOL_URL_ROOT.'/custom/warrantysvc/card.php?id='.$object->id);
-				print '<a href="'.dol_escape_htmltag($create_so_url).'" class="butAction" style="margin:0;">'.$langs->trans('CreateReplacementOrder').'</a>';
+			} elseif ($active_status && $permwrite) {
+				// Direct shipment button (no order needed)
+				if (isModEnabled('shipping')) {
+					print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=createreplacementshipment&token='.newToken().'" class="butAction" style="margin:0;">'.$langs->trans('ShipReplacementUnit').'</a>';
+				}
+				// Order-based flow as fallback
+				if (isModEnabled('order')) {
+					print ' ';
+					print '<a href="'.dol_escape_htmltag(DOL_URL_ROOT.'/commande/card.php?action=create&socid='.((int) $object->fk_soc).'&rma_sr_id='.((int) $object->id).'&backtopage='.urlencode(DOL_URL_ROOT.'/custom/warrantysvc/card.php?id='.$object->id)).'" class="butAction" style="margin:0;">'.$langs->trans('CreateReplacementOrder').'</a>';
+				}
 			} else {
 				print '<span class="opacitymedium">'.$langs->trans('NoReplacementOrderYet').'</span>';
 			}
