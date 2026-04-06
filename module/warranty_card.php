@@ -302,7 +302,7 @@ if ($action == 'create_from_shipment') {
 			// Start date
 			print '<tr><td class="fieldrequired">'.$langs->trans('StartDate').'</td>';
 			print '<td>';
-			print $form->selectDate(dol_now(), 'start_date', 0, 0, 0, 'formship', 1, 1, 0, '', '', $expedition->date_shipping, '', 1, $langs->trans('DateShipping'));
+			print $form->selectDate(dol_now(), 'start_date', 0, 0, 0, 'formship', 1, 1);
 			print '</td></tr>';
 
 			// Coverage days
@@ -536,7 +536,7 @@ function clearOrder() {
 function syncOrder() {
 	if (!stdSerSel) return;
 	var opt = stdSerSel.options[stdSerSel.selectedIndex];
-	if (!opt || !opt.value) { clearOrder(); return; }
+	if (!opt || !opt.value) { clearOrder(); updateDateLink(null); return; }
 	var comId  = opt.dataset.fkCommande   || 0;
 	var expId  = opt.dataset.fkExpedition || 0;
 	var comRef = opt.dataset.commandeRef  || "";
@@ -547,6 +547,27 @@ function syncOrder() {
 		if (comRef) ordRefSpan.classList.remove("opacitymedium");
 		else ordRefSpan.classList.add("opacitymedium");
 	}
+	updateDateLink(opt);
+}
+
+function updateDateLink(opt) {
+	var el = document.getElementById("origin_date_link");
+	if (!el) return;
+	var dateStr  = opt ? (opt.dataset.originDate  || "") : "";
+	var labelStr = opt ? (opt.dataset.originLabel || "") : "";
+	var day   = opt ? parseInt(opt.dataset.originDay, 10)   : 0;
+	var month = opt ? parseInt(opt.dataset.originMonth, 10) : 0;
+	var year  = opt ? parseInt(opt.dataset.originYear, 10)  : 0;
+	var input = opt ? (opt.dataset.originInput || "")       : "";
+	if (!dateStr || !day) { el.style.display = "none"; el.textContent = ""; return; }
+	el.style.display = "";
+	el.textContent = labelStr + " (" + dateStr + ")";
+	el.onclick = function() {
+		jQuery("#start_dateday").val(day);
+		jQuery("#start_datemonth").val(month);
+		jQuery("#start_dateyear").val(year);
+		jQuery("#start_date").val(input);
+	};
 }
 
 function resetSerials() {
@@ -583,6 +604,12 @@ function loadWarrantySerials(socid, pid) {
 				o.dataset.fkExpedition = s.fk_expedition || 0;
 				o.dataset.commandeRef  = s.commande_ref  || "";
 				o.dataset.expeditionRef = s.expedition_ref || "";
+				o.dataset.originDate   = s.origin_date   || "";
+				o.dataset.originLabel  = s.origin_label  || "";
+				o.dataset.originDay    = s.origin_day    || 0;
+				o.dataset.originMonth  = s.origin_month  || 0;
+				o.dataset.originYear   = s.origin_year   || 0;
+				o.dataset.originInput  = s.origin_input  || "";
 				stdSerSel.appendChild(o);
 			});
 			stdSerSel.disabled = false;
@@ -779,6 +806,7 @@ if (initMode === "standard") {
 	print '<tr><td class="fieldrequired">'.$langs->trans('StartDate').'</td>';
 	print '<td>';
 	print $form->selectDate(GETPOST('start_date', 'int') ? GETPOST('start_date', 'int') : dol_now(), 'start_date', 0, 0, 0, 'formcreate', 1, 1);
+	print ' - <button class="dpInvisibleButtons datenowlink" type="button" id="origin_date_link" style="display:none"></button>';
 	print '</td></tr>';
 
 	// Coverage months — disabled when a type is selected (auto-filled by JS)
