@@ -43,6 +43,9 @@ class SvcServiceLog
 	public $condition_status = self::CONDITION_GOOD;
 	public $date_last_updated;
 
+	/** @var bool When true, save() will not overwrite condition_score with computeConditionScore() */
+	public $skip_auto_score = false;
+
 	/**
 	 * Constructor
 	 *
@@ -106,7 +109,9 @@ class SvcServiceLog
 		global $conf;
 
 		$this->date_last_updated = dol_now();
-		$this->condition_score   = $this->computeConditionScore();
+		if (!$this->skip_auto_score) {
+			$this->condition_score = $this->computeConditionScore();
+		}
 
 		// Upsert: update if exists, insert if not
 		$existing = $this->fetchBySerial($this->serial_number, $conf->entity);

@@ -6,28 +6,28 @@
 # Module
 #
 WarrantySvc = Warranty
-WarrantySvcDescription = Manage service requests, warranties, and RMA workflows for serialized equipment.
+WarrantySvcDescription = Manage warranty claims, warranties, and RMA workflows for serialized equipment.
 
 #
 # Menu
 #
 WarrantySvcMenu = Warranty & Service
-SvcRequests = Service Requests
-ServiceRequests = Service Requests
-NewSvcRequest = New Service Request
+SvcRequests = Warranty Claims
+ServiceRequests = Warranty Claims
+NewSvcRequest = New Warranty Claim
 Warranties = Warranties
 NewWarranty = New Warranty
 
 #
 # Object labels
 #
-SvcRequest = Service Request
-SvcRequests = Service Requests
+SvcRequest = Warranty Claim
+SvcRequests = Warranty Claims
 SvcWarranty = Warranty
 SvcWarranties = Warranties
 ServiceLog = Service Log
 LinkToWarranty = Link to warranty
-LinkToServiceRequest = Link to service request
+LinkToServiceRequest = Link to warranty claim
 
 #
 # Status labels
@@ -159,11 +159,11 @@ MarkResolved = Mark Resolved
 CloseSvcRequest = Close
 ReopenSvcRequest = Re-open
 CancelSvcRequest = Cancel
-DeleteSvcRequest = Delete Service Request
-SvcRequestCancelledWithShipmentWarning = Service request cancelled. Linked shipment (ID: %s) still exists — <a href="%s">view it in the Shipments module</a> and cancel or delete it manually if no longer needed.
-ConfirmCancelSvcRequest = Are you sure you want to cancel this service request? This cannot be undone without re-opening.
-ConfirmReopenSvcRequest = Are you sure you want to re-open this service request?
-ConfirmDeleteSvcRequest = Are you sure you want to permanently delete service request %s? This action cannot be undone.
+DeleteSvcRequest = Delete Warranty Claim
+SvcRequestCancelledWithShipmentWarning = Warranty claim cancelled. Linked shipment (ID: %s) still exists — <a href="%s">view it in the Shipments module</a> and cancel or delete it manually if no longer needed.
+ConfirmCancelSvcRequest = Are you sure you want to cancel this warranty claim? This cannot be undone without re-opening.
+ConfirmReopenSvcRequest = Are you sure you want to re-open this warranty claim?
+ConfirmDeleteSvcRequest = Are you sure you want to permanently delete warranty claim %s? This action cannot be undone.
 SendReminder = Send Return Reminder
 InvoiceNonReturn = Invoice for Non-Return
 VoidWarranty = Void Warranty
@@ -181,15 +181,15 @@ SectionLinkedObjects = Linked Objects
 #
 # Info/status banners
 #
-WarrantyCoveredBanner = This service request is covered under active warranty.
-WarrantyExpiredBanner = Warranty has expired. This request is billable.
-WarrantyNoneBanner = No warranty on file for this serial number. This request is billable.
+WarrantyCoveredBanner = This warranty claim is covered under active warranty.
+WarrantyExpiredBanner = Warranty has expired. This claim is billable.
+WarrantyNoneBanner = No warranty on file for this serial number. This claim is billable.
 NoSerialSelected = No serial number selected — warranty cannot be checked.
 
 #
 # PDF document labels
 #
-SvcRequestSlip = Service Request Authorization
+SvcRequestSlip = Warranty Claim Authorization
 ReturnInstructions = Return Instructions
 ReturnShipTo = Please return the unit to:
 EstimatedResolution = Estimated Resolution
@@ -279,14 +279,14 @@ ChecklistFirmwareDesc = Check if unit is on current firmware. Note version.
 #
 # Email notifications — trigger-based
 #
-NotifTechValidateSubject = [New Assignment] Service Request %s assigned to you
-NotifTechValidateBody = Hello %2$s,\n\nService request %1$s has been validated and assigned to you.
-NotifTechInProgressSubject = [In Progress] Service Request %s
-NotifTechInProgressBody = Hello %2$s,\n\nService request %1$s has been moved to In Progress status.
-NotifCustAwaitReturnSubject = [Action Required] Please return unit — Service Request %s
-NotifCustAwaitReturnBody = Dear customer,\n\nA replacement unit has been shipped for service request %1$s (serial: %2$s).\n\nPlease arrange the return of the original unit.
-NotifCustResolvedSubject = [Resolved] Service Request %s
-NotifCustResolvedBody = Dear customer,\n\nYour service request %s has been resolved.
+NotifTechValidateSubject = [New Assignment] Warranty Claim %s assigned to you
+NotifTechValidateBody = Hello %2$s,\n\nWarranty claim %1$s has been validated and assigned to you.
+NotifTechInProgressSubject = [In Progress] Warranty Claim %s
+NotifTechInProgressBody = Hello %2$s,\n\nWarranty claim %1$s has been moved to In Progress status.
+NotifCustAwaitReturnSubject = [Action Required] Please return unit — Warranty Claim %s
+NotifCustAwaitReturnBody = Dear customer,\n\nA replacement unit has been shipped for warranty claim %1$s (serial: %2$s).\n\nPlease arrange the return of the original unit.
+NotifCustResolvedSubject = [Resolved] Warranty Claim %s
+NotifCustResolvedBody = Dear customer,\n\nYour warranty claim %s has been resolved.
 NotifWarrantyCreatedSubject = Warranty Registration — %s
 NotifWarrantyCreatedBody = Dear customer,\n\nYour warranty %1$s for serial number %2$s has been registered.\n\nCoverage expires: %3$s
 NoExpiryDate = No expiry date
@@ -294,8 +294,8 @@ NoExpiryDate = No expiry date
 #
 # Email notifications — cron reminders
 #
-ReminderReturnSubject = [ACTION REQUIRED] Please return unit for service request %s
-ReminderReturnBody = Dear customer,\n\nThis is a reminder that we are waiting for the return of serial number %2$s related to service request %1$s.\n\nPlease arrange return shipment at your earliest convenience.
+ReminderReturnSubject = [ACTION REQUIRED] Please return unit for warranty claim %s
+ReminderReturnBody = Dear customer,\n\nThis is a reminder that we are waiting for the return of serial number %2$s related to warranty claim %1$s.\n\nPlease arrange return shipment at your earliest convenience.
 ReminderReturnFooter = Thank you for your cooperation.\n\nWarranty & Service Team
 NoEmailForCustomer = No email address on file for this customer.
 NoSenderEmailConfigured = No sender email address configured in Dolibarr settings.
@@ -303,10 +303,10 @@ NoSenderEmailConfigured = No sender email address configured in Dolibarr setting
 #
 # Error messages (must start with Error)
 #
-ErrorSvcRequestNotInDraftStatus = This service request is not in draft status.
-ErrorSvcRequestNotInValidatedStatus = This service request must be validated before proceeding.
-ErrorSvcRequestCannotClose = This service request cannot be closed from its current status.
-ErrorSvcRequestAlreadyClosedOrCancelled = This service request is already closed or cancelled.
+ErrorSvcRequestNotInDraftStatus = This warranty claim is not in draft status.
+ErrorSvcRequestNotInValidatedStatus = This warranty claim must be validated before proceeding.
+ErrorSvcRequestCannotClose = This warranty claim cannot be closed from its current status.
+ErrorSvcRequestAlreadyClosedOrCancelled = This warranty claim is already closed or cancelled.
 ErrorNoSerialForSwap = A serial number must be set before creating a unit swap shipment.
 ErrorNoSerialInWarehouse = Serial/lot %s not found in the source warehouse. Check stock or select a different warehouse.
 ErrorNoWarehouseSelected = Please select a warehouse before creating a shipment.
@@ -330,7 +330,7 @@ ReturnInvoiceDaysDesc = Days after the expected return date before an invoice is
 ReplacementStrategy = Default replacement selection strategy
 ReplacementStrategyDesc = How the system suggests a serial number when creating a unit swap.
 AutoWarrantyCheck = Auto-check warranty on creation
-AutoWarrantyCheckDesc = Automatically look up warranty coverage when a service request is created.
+AutoWarrantyCheckDesc = Automatically look up warranty coverage when a warranty claim is created.
 AutoWarrantyOnShipment = Auto-create warranty on shipment
 AutoWarrantyOnShipmentDesc = Automatically register a warranty for each serialized product line that does not already have one, using the configured trigger event below.
 WarrantyTriggerEvent = Warranty creation trigger
@@ -345,10 +345,10 @@ DefaultCoverageDaysDesc = Fallback coverage period in days when no product-speci
 SvcDays = days
 NotifyWarrantyCreated = Email customer on warranty creation
 NotifyWarrantyCreatedDesc = Send an email notification to the customer when a new warranty record is created for their unit.
-WarrantyRequiresLots = Restrict service requests to serialized products
-WarrantyRequiresLotsDesc = When enabled, the product selector on service request forms will only show products that have serial number or lot tracking enabled in the Stocks module.
+WarrantyRequiresLots = Restrict warranty claims to serialized products
+WarrantyRequiresLotsDesc = When enabled, the product selector on warranty claim forms will only show products that have serial number or lot tracking enabled in the Stocks module.
 UseCustomerReturns = Use Customer Returns module for inbound returns
-UseCustomerReturnsDesc = When enabled, the "Create Return" button on service requests will open the Customer Returns module instead of creating a native Reception. This provides stock movement tracking, credit note generation, and a dedicated return document.
+UseCustomerReturnsDesc = When enabled, the "Create Return" button on warranty claims will open the Customer Returns module instead of creating a native Reception. This provides stock movement tracking, credit note generation, and a dedicated return document.
 CustomerReturnModuleNotInstalled = The Customer Returns module is not installed or enabled. Install it from the Modules page to use this feature.
 CreateCustomerReturn = Create Customer Return
 NumberingModule = Reference Numbering Module
@@ -360,7 +360,7 @@ ReturnFromCustomer = ← Return from Customer
 OnSiteIntervention = On-Site Intervention
 OnSiteVisit = On-Site Visit
 LinkedCall = Linked Call
-TooltipLinkedCall = PBX call record that originated this service request. Set automatically when created from the call summary tab, or link manually.
+TooltipLinkedCall = PBX call record that originated this warranty claim. Set automatically when created from the call summary tab, or link manually.
 ShipComponents = Ship Components
 ShipReplacementUnit = Ship Replacement Unit
 LogReturnReceived = Log Return Received
@@ -380,7 +380,7 @@ ReplacementOrderCreated = Replacement order created.
 NoReplacementOrderYet = No replacement order yet
 CreateShipment = Create Shipment
 ShipmentCreated = Shipment created.
-ReplacementForSR = Replacement unit for service request %s
+ReplacementForSR = Replacement unit for warranty claim %s
 ValidateShipment = Validate Shipment
 ShipmentValidated = Shipment validated.
 CreateReturnReception = Create Return Reception
@@ -441,7 +441,7 @@ CoverageTermsPlaceholder = e.g. Covers defects in materials and workmanship unde
 ExclusionsPlaceholder = e.g. Physical damage, consumables, accessories, damage caused by misuse...
 TroubleshootSummaryPlaceholder = Summarise what was checked, what symptoms were observed, and what action was recommended...
 TooltipTroubleshootSummary = Overall summary of this diagnostic session — what was checked, what was found, and recommended next steps.
-TooltipTroubleshootOutcome = The result of this session. Selecting "No fault found" will update the resolution type on the service request to Informational.
+TooltipTroubleshootOutcome = The result of this session. Selecting "No fault found" will update the resolution type on the warranty claim to Informational.
 SelectProductFirst = Select a product first
 NoSerialsAvailable = No known serials for this product
 SelectCustomerFirst = Select a customer first
@@ -491,5 +491,5 @@ DebugModeDesc = Exposes diagnostic endpoints at /custom/warrantysvc/ajax/debug.p
 
 # Admin / Extrafields
 WarrantySvcSetup = Warranty & Service Setup
-ServiceRequestExtraFields = SR Extra Fields
+ServiceRequestExtraFields = Claim Extra Fields
 WarrantyExtraFields = Warranty Extra Fields

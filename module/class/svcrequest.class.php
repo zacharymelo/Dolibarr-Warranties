@@ -971,9 +971,11 @@ class SvcRequest extends CommonObject
 		$order = new Commande($this->db);
 		$order->socid = $this->fk_soc;
 		$order->fk_project = $this->fk_project;
+		$order->ref_client = 'RMA '.$this->ref;
 		$order->note_private = 'RMA '.$this->ref.' - warranty replacement (auto-created)';
 		$order->entity = $conf->entity;
-		$order->date_commande = dol_now();
+		$order->date = dol_now();
+		$order->date_commande = $order->date;
 
 		$order_id = $order->create($user);
 		if ($order_id <= 0) {
@@ -1013,6 +1015,7 @@ class SvcRequest extends CommonObject
 		$expedition->socid = $this->fk_soc;
 		$expedition->origin = 'commande';
 		$expedition->origin_id = $order_id;
+		$expedition->ref_customer = 'RMA '.$this->ref;
 		$expedition->entrepot_id = $warehouse_id;
 		$expedition->fk_project = $this->fk_project;
 		$expedition->note_private = 'RMA '.$this->ref.' - replacement shipment';

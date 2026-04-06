@@ -76,7 +76,8 @@ $eff_exp = "COALESCE(t.expiry_date, IF(t.start_date IS NOT NULL AND wt.default_c
 // Build query
 $sql  = "SELECT t.rowid, t.ref, t.fk_soc, t.fk_product, t.serial_number,";
 $sql .= " t.warranty_type, t.start_date, t.expiry_date, t.status,";
-$sql .= " t.claim_count, t.total_claimed_value,";
+$sql .= " (SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."svc_request sr WHERE sr.fk_warranty = t.rowid) AS claim_count,";
+$sql .= " t.total_claimed_value,";
 $sql .= " s.nom as company_name,";
 $sql .= " p.ref as product_ref, p.label as product_label,";
 $sql .= " wt.default_coverage_days,";

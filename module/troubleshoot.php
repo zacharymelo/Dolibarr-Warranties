@@ -87,6 +87,40 @@ if ($action == 'save_findings' && $permwrite) {
 	}
 
 	$object->update($user);
+
+	// Update the service log for this serial — populates Unit Service History on warranty card
+	if (!empty($object->serial_number)) {
+		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcservicelog.class.php';
+		$svclog = new SvcServiceLog($db);
+		$svclog->fetchBySerial($object->serial_number, $conf->entity);
+
+		$svclog->serial_number    = $object->serial_number;
+		$svclog->fk_product       = $object->fk_product;
+		$svclog->service_count    = ((int) $svclog->service_count) + 1;
+		$svclog->last_service_date = dol_now();
+		$svclog->condition_notes  = $summary ?: $svclog->condition_notes;
+
+		// Map outcome to condition status
+		$outcome_to_condition = array(
+			'resolved'     => SvcServiceLog::CONDITION_GOOD,
+			'no_fault'     => SvcServiceLog::CONDITION_GOOD,
+			'escalate'     => SvcServiceLog::CONDITION_POOR,
+			'parts_needed' => SvcServiceLog::CONDITION_FAIR,
+			'intervention' => SvcServiceLog::CONDITION_FAIR,
+		);
+		if (!empty($outcome) && isset($outcome_to_condition[$outcome])) {
+			$svclog->condition_status = $outcome_to_condition[$outcome];
+		}
+
+		// If the svcrecord module manages condition scoring, don't overwrite
+		// with the old formula — let svcrecord's multi-factor scores take precedence
+		if (isModEnabled('svcrecord')) {
+			$svclog->skip_auto_score = true;
+		}
+
+		$svclog->save($user);
+	}
+
 	setEventMessages($langs->trans('TroubleshootSaved'), null, 'mesgs');
 	$action = '';
 }

@@ -302,7 +302,7 @@ if ($action == 'create_from_shipment') {
 			// Start date
 			print '<tr><td class="fieldrequired">'.$langs->trans('StartDate').'</td>';
 			print '<td>';
-			print $form->selectDate(dol_now(), 'start_date', 0, 0, 0, 'formship', 1, 1);
+			print $form->selectDate(dol_now(), 'start_date', 0, 0, 0, 'formship', 1, 1, 0, '', '', $expedition->date_shipping, '', 1, $langs->trans('DateShipping'));
 			print '</td></tr>';
 
 			// Coverage days
