@@ -22,6 +22,9 @@ class ActionsWarrantySvc
 	/** @var string Error message */
 	public $error = '';
 
+	/** @var array Error messages (written to by Dolibarr hookmanager; declared for PHP 8.2 compliance) */
+	public $errors = array();
+
 	/** @var array Result set returned to hook manager */
 	public $results = array();
 
