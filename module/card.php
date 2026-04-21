@@ -234,7 +234,7 @@ if ($action == 'validate_return_reception' && $permwrite && isModEnabled('recept
 	if (!empty($object->fk_reception)) {
 		$result = $object->validateReception($user);
 		if ($result > 0) {
-			setEventMessages($langs->trans('ReceptionValidated'), null, 'mesgs');
+			setEventMessages($langs->trans('SvcReceptionValidated'), null, 'mesgs');
 		} else {
 			setEventMessages($object->error, $object->errors, 'errors');
 		}

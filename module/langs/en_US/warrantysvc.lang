@@ -378,7 +378,7 @@ ReplacementSerial = Replacement Serial #
 CreateReplacementOrder = Create Replacement Order
 ReplacementOrderCreated = Replacement order created.
 NoReplacementOrderYet = No replacement order yet
-CreateShipment = Create Shipment
+SvcCreateShipment = Create Shipment
 ShipmentCreated = Shipment created.
 ReplacementForSR = Replacement unit for warranty claim %s
 ValidateShipment = Validate Shipment
@@ -386,7 +386,7 @@ ShipmentValidated = Shipment validated.
 CreateReturnReception = Create Return Reception
 ReceptionCreated = Return reception created.
 ValidateReception = Validate Reception
-ReceptionValidated = Return reception validated.
+SvcReceptionValidated = Return reception validated.
 WaitingForShipmentValidation = Waiting for outbound shipment to be validated
 
 #

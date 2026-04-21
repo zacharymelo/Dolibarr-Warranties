@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.31.2] - 2026-04-21
+
+### Fixed
+- Rename `ReceptionValidated` lang key to `SvcReceptionValidated` — the generic key was overriding Dolibarr core's own `ReceptionValidated` (`receptions.lang`), causing every standard reception's auto-agenda entry to be mislabeled as "Return reception validated."
+- Also namespaces the unused `CreateShipment` key to `SvcCreateShipment` to prevent future collisions
+
 ## [1.28.15] - 2026-04-05
 
 ### Added
