@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.3] - 2026-04-21
+
+### Fixed
+- Audit of remaining lang key collisions with Dolibarr core:
+  - Removed duplicate definitions for `AssignedTo`, `Billable`, `ExpiryDate`, `ValidateReception` (Dolibarr core values are functionally equivalent — callers now resolve via core)
+  - Renamed `SetupSaved` → `SvcSetupSaved` to preserve our "Settings saved." message without overriding core's "Setup saved"
+
 ## [1.31.2] - 2026-04-21
 
 ### Fixed

@@ -58,7 +58,7 @@ if ($action == 'update') {
 		dolibarr_set_const($db, $key, $val, 'chaine', 0, '', $conf->entity);
 	}
 
-	setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
+	setEventMessages($langs->trans('SvcSetupSaved'), null, 'mesgs');
 }
 
 // Load warehouses for selectors
@@ -317,7 +317,7 @@ if (!$resql) {
 if ($action == 'setmod') {
 	$value = GETPOST('value', 'alpha');
 	dolibarr_set_const($db, 'WARRANTYSVC_ADDON', $value, 'chaine', 0, '', $conf->entity);
-	setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
+	setEventMessages($langs->trans('SvcSetupSaved'), null, 'mesgs');
 	header('Location: '.$_SERVER['PHP_SELF']);
 	exit;
 }
