@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.32.0] - 2026-05-11
+
+### Added
+- Security Seal # field on service requests — records the unique number from the physical security sticker shipped with repaired parts. Visible and editable once a ticket is In Progress or beyond; displays read-only with a lock icon on closed records. An intact seal is evidence that authorized warranty service was performed; a missing or broken seal voids coverage.
+
 ## [1.31.3] - 2026-04-21
 
 ### Fixed

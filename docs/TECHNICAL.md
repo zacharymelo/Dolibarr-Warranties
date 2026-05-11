@@ -1,6 +1,6 @@
 # WarrantySvc -- Technical Reference
 
-Module ID: **510000** | Family: `crm` | Version: **1.27.2**
+Module ID: **510000** | Family: `crm` | Version: **1.32.0**
 Requires: Dolibarr >= 16.0, PHP >= 7.0
 Dependencies: `modSociete`, `modProduct`, `modStock`
 
@@ -331,6 +331,7 @@ Main service request / RMA case table.
 | fk_facture | INTEGER | FK to llx_facture |
 | serial_in | VARCHAR(128) | Returning serial |
 | serial_out | VARCHAR(128) | Replacement serial |
+| seal_number | VARCHAR(128) | Security sticker number applied after service — evidence of authorized warranty repair |
 | fk_warehouse_source | INTEGER | Replacement from warehouse |
 | fk_warehouse_return | INTEGER | Return to warehouse |
 | outbound_carrier | VARCHAR(100) | |
@@ -511,6 +512,7 @@ Standard Dolibarr extrafields table for warranties.
 
 | File | Description |
 |------|-------------|
+| `llx_svc_request_upgrade.sql` | Adds `seal_number VARCHAR(128)` column to `llx_svc_request`. |
 | `llx_svc_warranty_upgrade.sql` | Renames `coverage_months` to `coverage_days`. Adds `coverage_terms` and `exclusions` columns to `llx_svc_warranty_type`. |
 | `llx_svc_service_log_upgrade.sql` | Migrates `condition_status` from VARCHAR to SMALLINT. Adds `import_key`. |
 
@@ -561,7 +563,7 @@ File: `langs/en_US/warrantysvc.lang`
 | Object labels | `SvcRequest`, `SvcWarranty`, `ServiceLog`, `LinkToWarranty`, `LinkToServiceRequest` |
 | Status labels | `SvcDraft`, `SvcValidated`, `SvcInProgress`, `AwaitingReturn`, `SvcResolved`, `SvcClosed`, `SvcCancelled`, `SvcActive`, `SvcExpired`, `SvcVoided`, `NoCoverage` |
 | Resolution types | `ResolutionComponent`, `ResolutionComponentReturn`, `ResolutionSwapCross`, `ResolutionSwapWait`, `ResolutionIntervention`, `ResolutionGuidance`, `ResolutionInformational` + `*Desc` variants |
-| Field labels | `SvcSerialNumber`, `SerialIn`, `SerialOut`, `IssueDescription`, `IssueDate`, `ReportedVia`, `CustomerSite`, `ResolutionNotes`, `WarrantyStatus`, `Billable`, `OutboundCarrier`, `OutboundTracking`, `ReturnCarrier`, `ReturnTracking`, `CoverageDays`, `CoverageTerms`, `Exclusions`, `ClaimCount` |
+| Field labels | `SvcSerialNumber`, `SerialIn`, `SerialOut`, `SealNumber`, `IssueDescription`, `IssueDate`, `ReportedVia`, `CustomerSite`, `ResolutionNotes`, `WarrantyStatus`, `Billable`, `OutboundCarrier`, `OutboundTracking`, `ReturnCarrier`, `ReturnTracking`, `CoverageDays`, `CoverageTerms`, `Exclusions`, `ClaimCount` |
 | Reported via options | `ReportedViaPhone`, `ReportedViaEmail`, `ReportedViaOnSite`, `ReportedViaOther` |
 | Warranty type management | `WarrantyType`, `AddWarrantyType`, `WarrantyTypeAdded`, `SelectWarrantyType`, `ErrorWarrantyTypeCodeLabelRequired` |
 | Condition labels | `ConditionGood`, `ConditionFair`, `ConditionPoor`, `ConditionScrap` |
@@ -669,7 +671,7 @@ File: `core/modules/modWarrantySvc.class.php`
 | Module ID | 510000 |
 | Family | crm |
 | Position | 50 |
-| Version | 1.27.2 |
+| Version | 1.32.0 |
 | Picto | technic |
 | Config page | setup.php@warrantysvc |
 | Dependencies | modSociete, modProduct, modStock |

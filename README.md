@@ -1,6 +1,6 @@
 # WarrantySvc — Warranty & Service Management for Dolibarr
 
-**Version 1.27.2** | [GitHub Repository](https://github.com/zacharymelo/Dolibarr-Warranties) | License: GPL-3.0
+**Version 1.32.0** | [GitHub Repository](https://github.com/zacharymelo/Dolibarr-Warranties) | License: GPL-3.0
 
 ## Overview
 
@@ -20,6 +20,8 @@ Create and manage service requests for warranted equipment. Each request follows
 6. **Closed** -- Finalized and archived
 
 Each service request supports one of **7 resolution types**: Component Shipment, Component Shipment + Return, Full Unit Swap (Cross Ship), Full Unit Swap (Wait for Return), On-Site Service, Guidance Only, and Informational.
+
+- **Security Seal tracking** -- Record the unique number from the physical security sticker shipped with repaired parts. An intact sticker on the closed service record confirms authorized warranty service was performed. A missing or broken seal voids warranty coverage.
 
 ### Warranties
 
