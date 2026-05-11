@@ -87,6 +87,7 @@ class SvcRequest extends CommonObject
 		'fk_facture'           => array('type' => 'integer',      'label' => 'Invoice',          'enabled' => 1, 'visible' => -1, 'position' => 125),
 		'serial_in'            => array('type' => 'varchar(128)', 'label' => 'SerialIn',         'enabled' => 1, 'visible' => 1,  'position' => 130),
 		'serial_out'           => array('type' => 'varchar(128)', 'label' => 'SerialOut',        'enabled' => 1, 'visible' => 1,  'position' => 135),
+		'seal_number'          => array('type' => 'varchar(128)', 'label' => 'SealNumber',        'enabled' => 1, 'visible' => 1,  'position' => 137),
 		'fk_warehouse_source'  => array('type' => 'integer',      'label' => 'SvcWarehouseSource',  'enabled' => 1, 'visible' => -1, 'position' => 140),
 		'fk_warehouse_return'  => array('type' => 'integer',      'label' => 'SvcWarehouseReturn',  'enabled' => 1, 'visible' => -1, 'position' => 145),
 		'outbound_carrier'     => array('type' => 'varchar(100)', 'label' => 'OutboundCarrier',  'enabled' => 1, 'visible' => -1, 'position' => 150),
@@ -140,6 +141,7 @@ class SvcRequest extends CommonObject
 	public $fk_facture;
 	public $serial_in;
 	public $serial_out;
+	public $seal_number;
 	public $fk_warehouse_source;
 	public $fk_warehouse_return;
 	public $outbound_carrier;
@@ -220,7 +222,7 @@ class SvcRequest extends CommonObject
 		$sql .= " issue_description, issue_date, reported_via, fk_pbxcall,";
 		$sql .= " resolution_type, resolution_notes,";
 		$sql .= " fk_warranty, warranty_status, billable,";
-		$sql .= " serial_in, serial_out, fk_warehouse_source, fk_warehouse_return,";
+		$sql .= " serial_in, serial_out, seal_number, fk_warehouse_source, fk_warehouse_return,";
 		$sql .= " fk_user_assigned, status,";
 		$sql .= " date_creation, fk_user_creat,";
 		$sql .= " model_pdf, note_private, note_public";
@@ -247,6 +249,7 @@ class SvcRequest extends CommonObject
 		$sql .= ", ".((int) $this->billable);
 		$sql .= ", ".($this->serial_in ? "'".$this->db->escape($this->serial_in)."'" : "NULL");
 		$sql .= ", ".($this->serial_out ? "'".$this->db->escape($this->serial_out)."'" : "NULL");
+		$sql .= ", ".($this->seal_number ? "'".$this->db->escape($this->seal_number)."'" : "NULL");
 		$sql .= ", ".($this->fk_warehouse_source > 0 ? ((int) $this->fk_warehouse_source) : "NULL");
 		$sql .= ", ".($this->fk_warehouse_return > 0 ? ((int) $this->fk_warehouse_return) : "NULL");
 		$sql .= ", ".($this->fk_user_assigned > 0 ? ((int) $this->fk_user_assigned) : "NULL");
@@ -309,7 +312,7 @@ class SvcRequest extends CommonObject
 		$sql .= " t.issue_description, t.issue_date, t.reported_via, t.fk_pbxcall,";
 		$sql .= " t.resolution_type, t.resolution_notes,";
 		$sql .= " t.fk_warranty, t.warranty_status, t.billable, t.fk_facture,";
-		$sql .= " t.serial_in, t.serial_out, t.fk_warehouse_source, t.fk_warehouse_return,";
+		$sql .= " t.serial_in, t.serial_out, t.seal_number, t.fk_warehouse_source, t.fk_warehouse_return,";
 		$sql .= " t.outbound_carrier, t.outbound_tracking, t.date_shipped, t.fk_shipment,";
 		$sql .= " t.return_carrier, t.return_tracking, t.date_return_expected, t.date_return_received,";
 		$sql .= " t.return_reminder_count, t.fk_reception, t.fk_intervention,";
@@ -356,6 +359,7 @@ class SvcRequest extends CommonObject
 				$this->fk_facture           = $obj->fk_facture;
 				$this->serial_in            = $obj->serial_in;
 				$this->serial_out           = $obj->serial_out;
+				$this->seal_number          = $obj->seal_number;
 				$this->fk_warehouse_source  = $obj->fk_warehouse_source;
 				$this->fk_warehouse_return  = $obj->fk_warehouse_return;
 				$this->outbound_carrier     = $obj->outbound_carrier;
@@ -467,6 +471,7 @@ class SvcRequest extends CommonObject
 		$sql .= ", fk_facture = ".($this->fk_facture > 0 ? ((int) $this->fk_facture) : "NULL");
 		$sql .= ", serial_in = ".($this->serial_in ? "'".$this->db->escape($this->serial_in)."'" : "NULL");
 		$sql .= ", serial_out = ".($this->serial_out ? "'".$this->db->escape($this->serial_out)."'" : "NULL");
+		$sql .= ", seal_number = ".($this->seal_number ? "'".$this->db->escape($this->seal_number)."'" : "NULL");
 		$sql .= ", fk_warehouse_source = ".($this->fk_warehouse_source > 0 ? ((int) $this->fk_warehouse_source) : "NULL");
 		$sql .= ", fk_warehouse_return = ".($this->fk_warehouse_return > 0 ? ((int) $this->fk_warehouse_return) : "NULL");
 		$sql .= ", outbound_carrier = ".($this->outbound_carrier ? "'".$this->db->escape($this->outbound_carrier)."'" : "NULL");

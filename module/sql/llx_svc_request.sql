@@ -30,6 +30,7 @@ CREATE TABLE llx_svc_request(
 	fk_facture             INTEGER,
 	serial_in              VARCHAR(128),
 	serial_out             VARCHAR(128),
+	seal_number            VARCHAR(128),
 	fk_warehouse_source    INTEGER,
 	fk_warehouse_return    INTEGER,
 	outbound_carrier       VARCHAR(100),

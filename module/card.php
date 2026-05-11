@@ -139,6 +139,7 @@ if ($action == 'update' && $permwrite) {
 	$object->resolution_notes    = GETPOST('resolution_notes', 'restricthtml');
 	$object->serial_in           = GETPOST('serial_in', 'alpha');
 	$object->serial_out          = GETPOST('serial_out', 'alpha');
+	$object->seal_number         = GETPOST('seal_number', 'alphanohtml');
 	$object->fk_warehouse_source = GETPOST('fk_warehouse_source', 'int');
 	$object->fk_warehouse_return = GETPOST('fk_warehouse_return', 'int');
 	$object->fk_user_assigned    = GETPOST('fk_user_assigned', 'int');
@@ -1084,6 +1085,22 @@ if ($action == 'create') {
 			print '<textarea name="resolution_notes" class="centpercent" rows="3">'.dol_escape_htmltag($object->resolution_notes, 1, 1).'</textarea>';
 		} else {
 			print dol_nl2br(dol_escape_htmltag($object->resolution_notes, 0, 1));
+		}
+		print '</td></tr>';
+	}
+
+	// Security seal number (visible once in progress)
+	if (!in_array($object->status, array(SvcRequest::STATUS_DRAFT, SvcRequest::STATUS_VALIDATED)) || $action == 'edit') {
+		print '<tr><td>'.$form->textwithpicto($langs->trans('SealNumber'), $langs->trans('TooltipSealNumber')).'</td><td>';
+		if ($action == 'edit' && $permwrite) {
+			print '<input type="text" name="seal_number" class="minwidth200" placeholder="'.dol_escape_htmltag($langs->trans('SealNumberPlaceholder')).'" value="'.dol_escape_htmltag($object->seal_number).'">';
+		} else {
+			if ($object->seal_number) {
+				print img_picto('', 'lock', 'class="pictofixedwidth"');
+				print '<strong>'.dol_escape_htmltag($object->seal_number).'</strong>';
+			} else {
+				print '<span class="opacitymedium">&mdash;</span>';
+			}
 		}
 		print '</td></tr>';
 	}
