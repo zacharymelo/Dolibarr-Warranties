@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.32.2] - 2026-05-12
+
+### Fixed
+- Data migration in upgrade SQL: corrects stale `expedition` element-type rows in `llx_element_element` to `shipping`. Rows written by old trigger code were invisible to Dolibarr's Related Objects renderer because `Expedition::$element = 'shipping'`; existing warranty→shipment links now surface correctly on shipment cards.
+
+## [1.32.1] - 2026-05-12
+
+### Fixed
+- `getElementProperties` hook now returns `custom/warrantysvc/class` (with `custom/` prefix) so Dolibarr can resolve module class files when rendering Related Objects on external cards.
+- Warranty auto-create trigger: changed `add_object_linked('expedition', ...)` to `add_object_linked('shipping', ...)` — `Expedition::$element` is `'shipping'`, not `'expedition'`.
+- `syncLinkedObjects()` in SvcRequest: removed a DELETE-all statement that ran inside the per-link foreach loop, wiping all previously added links on every iteration. Fixed the existence-check to compare against `$this->element` (`'svcrequest'`) rather than `getElementType()` (`'warrantysvc_svcrequest'`) to match what `add_object_linked` actually stores.
+
 ## [1.32.0] - 2026-05-11
 
 ### Added
