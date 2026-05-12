@@ -65,7 +65,7 @@ class ActionsWarrantySvc
 				'element'       => 'svcwarranty',
 				'table_element' => 'svc_warranty',
 				'subelement'    => 'svcwarranty',
-				'classpath'     => 'warrantysvc/class',
+				'classpath'     => 'custom/warrantysvc/class',
 				'classfile'     => 'svcwarranty',
 				'classname'     => 'SvcWarranty',
 			);
@@ -77,7 +77,7 @@ class ActionsWarrantySvc
 				'element'       => 'svcrequest',
 				'table_element' => 'svc_request',
 				'subelement'    => 'svcrequest',
-				'classpath'     => 'warrantysvc/class',
+				'classpath'     => 'custom/warrantysvc/class',
 				'classfile'     => 'svcrequest',
 				'classname'     => 'SvcRequest',
 			);

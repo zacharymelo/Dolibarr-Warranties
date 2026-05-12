@@ -651,7 +651,7 @@ class InterfaceWarrantySvcTrigger extends DolibarrTriggers
 			if ($result > 0) {
 				// Link warranty to shipment and order in element_element
 				if ($warranty->fk_expedition > 0) {
-					$warranty->add_object_linked('expedition', $warranty->fk_expedition);
+					$warranty->add_object_linked('shipping', $warranty->fk_expedition);
 				}
 				if ($warranty->fk_commande > 0) {
 					$warranty->add_object_linked('commande', $warranty->fk_commande);

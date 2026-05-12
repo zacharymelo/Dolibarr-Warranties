@@ -759,13 +759,11 @@ class SvcRequest extends CommonObject
 			return;
 		}
 
-		$target_type = $this->getElementType(); // 'warrantysvc_svcrequest'
-		$bare_target = $this->element;           // 'svcrequest'
+		$bare_target = $this->element; // 'svcrequest' — matches what add_object_linked() writes
 
-		// Use prefixed element types for custom objects so showLinkedObjectBlock
-		// can resolve the template path (warrantysvc_svcwarranty → warrantysvc/svcwarranty/tpl/).
 		// Core objects (commande, shipping, etc.) use their native unprefixed names.
-		// The 'stale' key lists unprefixed aliases to clean up from older versions.
+		// Custom objects use the prefixed form (warrantysvc_svcwarranty).
+		// The 'stale' key lists old type names to clean up from earlier versions.
 		$links = array(
 			array('type' => 'warrantysvc_svcwarranty', 'fk' => $this->fk_warranty,      'stale' => array('svcwarranty')),
 			array('type' => 'commande',                'fk' => $this->fk_commande,       'stale' => array()),
@@ -786,18 +784,12 @@ class SvcRequest extends CommonObject
 			// Clean up stale rows with unprefixed types from older versions
 			foreach ($link['stale'] as $stale_type) {
 				$sql_del = "DELETE FROM ".MAIN_DB_PREFIX."element_element WHERE ((fk_source = ".((int) $fk_id)." AND sourcetype = '".$this->db->escape($stale_type)."' AND fk_target = ".((int) $this->id).") OR (fk_target = ".((int) $fk_id)." AND targettype = '".$this->db->escape($stale_type)."' AND fk_source = ".((int) $this->id)."))";
-
 				$this->db->query($sql_del);
 			}
 
-			// Also clean up rows where our target type is unprefixed
-			if ($bare_target !== $target_type) {
-				$sql_del2 = "DELETE FROM ".MAIN_DB_PREFIX."element_element WHERE fk_target = ".((int) $this->id)." AND targettype = '".$this->db->escape($bare_target)."'";
-				$this->db->query($sql_del2);
-			}
-
-			// Check if the correct prefixed link already exists
-			$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."element_element WHERE ((fk_source = ".((int) $fk_id)." AND sourcetype = '".$this->db->escape($source_type)."' AND fk_target = ".((int) $this->id)." AND targettype = '".$this->db->escape($target_type)."') OR (fk_source = ".((int) $this->id)." AND sourcetype = '".$this->db->escape($target_type)."' AND fk_target = ".((int) $fk_id)." AND targettype = '".$this->db->escape($source_type)."')) LIMIT 1";
+			// Check if link already exists — use $bare_target ('svcrequest') because
+			// add_object_linked() writes $this->element (not getElementType()) as targettype
+			$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."element_element WHERE ((fk_source = ".((int) $fk_id)." AND sourcetype = '".$this->db->escape($source_type)."' AND fk_target = ".((int) $this->id)." AND targettype = '".$this->db->escape($bare_target)."') OR (fk_source = ".((int) $this->id)." AND sourcetype = '".$this->db->escape($bare_target)."' AND fk_target = ".((int) $fk_id)." AND targettype = '".$this->db->escape($source_type)."')) LIMIT 1";
 
 			$res = $this->db->query($sql);
 			if ($res && $this->db->num_rows($res) == 0) {
