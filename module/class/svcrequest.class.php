@@ -662,6 +662,11 @@ class SvcRequest extends CommonObject
 	 */
 	public function setAwaitingReturn($user)
 	{
+		if ($this->status != self::STATUS_IN_PROGRESS) {
+			$this->error = 'SvcRequestNotInProgressStatus';
+			return -1;
+		}
+
 		$this->status = self::STATUS_AWAIT_RETURN;
 		return $this->update($user);
 	}

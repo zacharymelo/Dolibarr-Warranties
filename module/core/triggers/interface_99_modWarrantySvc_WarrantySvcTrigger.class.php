@@ -167,6 +167,9 @@ class InterfaceWarrantySvcTrigger extends DolibarrTriggers
 						$this->_autoCreateWarrantiesFromShipment($object, $user, $langs);
 					}
 				}
+				if ($action === 'SHIPPING_VALIDATE') {
+					$this->_markSvcRequestsAwaitingReturn($object, $user);
+				}
 				return 1;
 
 			// ------------------------------------------------------------------
@@ -349,6 +352,62 @@ class InterfaceWarrantySvcTrigger extends DolibarrTriggers
 		}
 
 		dol_syslog('WarrantySvcTrigger: CustomerReturn '.$cr_id.' reopened, receipt cleared on SR '.$sr_id, LOG_DEBUG);
+	}
+
+	/**
+	 * When a replacement shipment is validated, move linked In Progress service requests whose
+	 * resolution ships first and expects the faulty unit back (cross-ship, component + return) to Await Return.
+	 *
+	 * @param  Expedition $object  The validated shipment
+	 * @param  User       $user    Actor
+	 * @return void
+	 */
+	private function _markSvcRequestsAwaitingReturn($object, $user)
+	{
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
+		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcrequest.class.php';
+
+		$shipment_id = (int) $object->id;
+		$order_id = ($object->origin_type == 'commande') ? (int) $object->origin_id : 0;
+
+		$sql = "SELECT r.rowid FROM ".MAIN_DB_PREFIX."svc_request as r";
+		$sql .= " WHERE r.entity IN (".getEntity('svcrequest').")";
+		$sql .= " AND r.status = ".((int) SvcRequest::STATUS_IN_PROGRESS);
+		$sql .= " AND r.resolution_type IN ('swap_cross', 'component_return')";
+		$sql .= " AND (r.fk_shipment = ".((int) $shipment_id);
+		if ($order_id > 0) {
+			$sql .= " OR r.fk_commande = ".((int) $order_id);
+			$sql .= " OR r.rowid IN (SELECT ee.fk_source FROM ".MAIN_DB_PREFIX."element_element as ee WHERE ee.sourcetype = 'warrantysvc_svcrequest' AND ee.targettype = 'commande' AND ee.fk_target = ".((int) $order_id).")";
+			$sql .= " OR r.rowid IN (SELECT ee2.fk_target FROM ".MAIN_DB_PREFIX."element_element as ee2 WHERE ee2.targettype = 'warrantysvc_svcrequest' AND ee2.sourcetype = 'commande' AND ee2.fk_source = ".((int) $order_id).")";
+		}
+		$sql .= ")";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog('WarrantySvcTrigger: await-return lookup failed for shipment '.$shipment_id.': '.$this->db->lasterror(), LOG_ERR);
+			return;
+		}
+		$sr_ids = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$sr_ids[] = (int) $obj->rowid;
+		}
+		$this->db->free($resql);
+
+		$grace_days = getDolGlobalInt('WARRANTYSVC_RETURN_GRACE_DAYS', 7);
+		foreach ($sr_ids as $sr_id) {
+			$sr = new SvcRequest($this->db);
+			if ($sr->fetch($sr_id) <= 0) {
+				continue;
+			}
+			if (empty($sr->date_return_expected)) {
+				$sr->date_return_expected = dol_time_plus_duree(dol_now(), $grace_days, 'd');
+			}
+			if ($sr->setAwaitingReturn($user) < 0) {
+				dol_syslog('WarrantySvcTrigger: could not move SR '.$sr_id.' to Await Return after shipment '.$shipment_id.': '.$sr->error, LOG_WARNING);
+			} else {
+				dol_syslog('WarrantySvcTrigger: shipment '.$shipment_id.' validated, SR '.$sr_id.' now awaiting return', LOG_DEBUG);
+			}
+		}
 	}
 
 	/**

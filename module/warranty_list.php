@@ -63,7 +63,7 @@ if (GETPOST('button_removefilter_x', 'alpha') || GETPOST('button_removefilter', 
 	$preset = '';
 }
 
-$sortfield = GETPOST('sortfield', 'aZ09comma') ? GETPOST('sortfield', 'aZ09comma') : 't.expiry_date';
+$sortfield = GETPOST('sortfield', 'aZ09comma') ? GETPOST('sortfield', 'aZ09comma') : 'effective_expiry';
 $sortorder = GETPOST('sortorder', 'aZ09comma') ? GETPOST('sortorder', 'aZ09comma') : 'ASC';
 $limit     = $conf->liste_limit;
 $page      = GETPOSTISSET('pageplusone') ? (GETPOST('pageplusone') - 1) : max(0, GETPOST('page', 'int'));
@@ -82,7 +82,9 @@ $sql .= " s.nom as company_name,";
 $sql .= " p.ref as product_ref, p.label as product_label,";
 $sql .= " wt.default_coverage_days,";
 $sql .= " ".$eff_exp." AS effective_expiry";
-$sql .= " FROM ".MAIN_DB_PREFIX."svc_warranty as t";
+// Keep the select list apart so the count query can reuse FROM/WHERE as-is
+$sqlfields = $sql;
+$sql = " FROM ".MAIN_DB_PREFIX."svc_warranty as t";
 $sql .= " LEFT JOIN ".MAIN_DB_PREFIX."societe as s ON s.rowid = t.fk_soc";
 $sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product as p ON p.rowid = t.fk_product";
 $sql .= " LEFT JOIN ".MAIN_DB_PREFIX."svc_warranty_type as wt ON wt.code = t.warranty_type";
@@ -123,11 +125,11 @@ if ($search_expiry_to) {
 	$sql .= " AND ".$eff_exp." <= '".$db->idate($search_expiry_to)."'";
 }
 
-$sql .= $db->order($sortfield, $sortorder);
+// Count for pagination (the select list holds a sub-select, so no regex rewrite of $sql)
+$sqlcount = "SELECT COUNT(*) as nb".$sql;
 
-// Count for pagination
-$sqlcount = preg_replace('/SELECT.*?FROM/s', 'SELECT COUNT(*) as nb FROM', $sql);
-$sqlcount = preg_replace('/ORDER BY.*$/s', '', $sqlcount);
+$sql = $sqlfields.$sql;
+$sql .= $db->order($sortfield, $sortorder);
 $nbtotalofrecords = 0;
 $resqlcount = $db->query($sqlcount);
 if ($resqlcount) {
@@ -173,7 +175,7 @@ print_barre_liste(
 	$sortfield,
 	$sortorder,
 	'',
-	$nbtotalofrecords,
+	$nbtotalofrecords - $offset,
 	$nbtotalofrecords,
 	'bill',
 	0,
@@ -265,8 +267,8 @@ print getTitleFieldOfList('SerialNumber',  0, $_SERVER['PHP_SELF'], 't.serial_nu
 print getTitleFieldOfList('WarrantyType',  0, $_SERVER['PHP_SELF'], 't.warranty_type', '', '', '',       '', $sortfield, $sortorder);
 print getTitleFieldOfList('Status',        0, $_SERVER['PHP_SELF'], 't.status',       '', '', 'center', '', $sortfield, $sortorder);
 print getTitleFieldOfList('StartDate',     0, $_SERVER['PHP_SELF'], 't.start_date',   '', '', '',       '', $sortfield, $sortorder);
-print getTitleFieldOfList('ExpiryDate',    0, $_SERVER['PHP_SELF'], 't.expiry_date',  '', '', '',       '', $sortfield, $sortorder);
-print getTitleFieldOfList('Claims',        0, $_SERVER['PHP_SELF'], 't.claim_count',  '', '', 'center', '', $sortfield, $sortorder);
+print getTitleFieldOfList('ExpiryDate',    0, $_SERVER['PHP_SELF'], 'effective_expiry', '', '', '',     '', $sortfield, $sortorder);
+print getTitleFieldOfList('Claims',        0, $_SERVER['PHP_SELF'], 'claim_count',    '', '', 'center', '', $sortfield, $sortorder);
 print getTitleFieldOfList('',              0, $_SERVER['PHP_SELF'], '',               '', '', 'maxwidthsearch', '', $sortfield, $sortorder);
 print '</tr>';
 

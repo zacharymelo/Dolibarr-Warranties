@@ -24,7 +24,7 @@ require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/lib/warrantysvc.lib.php';
 
 $langs->loadLangs(array('warrantysvc@warrantysvc', 'companies', 'products'));
 
-$id     = GETPOST('id', 'int');
+$id     = GETPOSTINT('id');
 $ref    = GETPOST('ref', 'alpha');
 $action = GETPOST('action', 'aZ09');
 $cancel = GETPOST('cancel', 'alpha');
@@ -58,6 +58,10 @@ if ($cancel) {
 	}
 	exit;
 }
+
+// Add/remove links made from the "Link to..." block
+$permissiondellink = $permwrite;
+include DOL_DOCUMENT_ROOT.'/core/actions_dellink.inc.php';
 
 // ---- CREATE ----
 if ($action == 'add' && $permwrite) {
@@ -1044,12 +1048,12 @@ if ($action == 'edit') {
 		var code = sel ? sel.value : "";
 		if(code && defaults[code] !== undefined){
 			var d = defaults[code];
-			cm.value = d.days; cm.disabled = true; cm.style.opacity = "0.5";
+			cm.value = d.days; cm.readOnly = true; cm.style.opacity = "0.5";
 			if(userChanged){
 				setEditorValue("coverage_terms", d.terms || "");
 				setEditorValue("exclusions",     d.excl  || "");
 			}
-		} else { cm.disabled = false; cm.style.opacity = ""; }
+		} else { cm.readOnly = false; cm.style.opacity = ""; }
 	}
 	if(sel){
 		sel.addEventListener("change", function(){ userChanged = true; sync(); });
@@ -1103,7 +1107,7 @@ print '</td></tr>';
 print '<tr><td>'.$form->textwithpicto($langs->trans('CoverageDays'), $langs->trans('TooltipCoverageDays')).'</td>';
 print '<td>';
 if ($action == 'edit') {
-	$edit_days_disabled = ($object->warranty_type ? ' disabled style="opacity:0.5"' : '');
+	$edit_days_disabled = ($object->warranty_type ? ' readonly style="opacity:0.5"' : '');
 	print '<input type="number" id="coverage_days" name="coverage_days" value="'.((int) $object->coverage_days).'" class="flat width75" min="0" max="3650"'.$edit_days_disabled.'>';
 	print ' '.$langs->trans('SvcDays');
 	print ' &nbsp;<span class="opacitymedium" id="coverage_type_hint"'.($object->warranty_type ? '' : ' style="display:none"').'>'.$langs->trans('CoverageFromType').'</span>';
