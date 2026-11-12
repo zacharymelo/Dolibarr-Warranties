@@ -200,6 +200,7 @@ if ($action == 'create_from_shipment') {
 
 	// Step 1 — shipment selector (GET reload)
 	print '<form method="GET" action="'.$_SERVER['PHP_SELF'].'">';
+	print '<input type="hidden" name="token" value="'.newToken().'">';
 	print '<input type="hidden" name="action" value="create_from_shipment">';
 	print '<table class="noborder centpercent">';
 	print '<tr class="liste_titre"><td colspan="2">'.$langs->trans('SelectShipmentStep').'</td></tr>';
@@ -408,7 +409,7 @@ if ($action == 'create') {
 	}
 
 	print load_fiche_titre($langs->trans('NewWarranty'), '', 'bill');
-	print '<p><a href="'.$_SERVER['PHP_SELF'].'?action=create_from_shipment">'.img_picto('', 'shipment', 'class="paddingright"').$langs->trans('CreateWarrantyFromShipment').'</a></p>';
+	print '<p><a href="'.$_SERVER['PHP_SELF'].'?action=create_from_shipment&token='.newToken().'">'.img_picto('', 'shipment', 'class="paddingright"').$langs->trans('CreateWarrantyFromShipment').'</a></p>';
 
 	print '<form action="'.$_SERVER['PHP_SELF'].'" method="POST">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
