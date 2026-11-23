@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.37.1] - 2026-11-22
+
+### Fixed
+- Service requests no longer save a product of -1. Core's product dropdown posts -1 for "nothing selected", and both create and edit stored it as-is. In production this left 6 of 13 requests with no product, and the -1 spread to the service log and to svcrecord sessions. On save, a missing product is now filled in from the serial's lot when exactly one product owns that serial; otherwise it is stored as 0. The existing -1 requests self-heal the next time they are saved.
+
 ## [1.37.0] - 2026-11-11
 
 ### Added
