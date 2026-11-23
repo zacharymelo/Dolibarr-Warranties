@@ -942,7 +942,8 @@ if ($action == 'create') {
 		if (!is_null($filtered_product_list)) {
 			print Form::selectarray('fk_product', $filtered_product_list, $object->fk_product, 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth200');
 		} else {
-			$form->select_produits($object->fk_product, 'fk_product', '', 0, 0, -1, 0, '', 1, 0, 'minwidth200');
+			// finished=2: all products (0 listed raw materials only, so the claim's own product never showed and Save wiped it)
+			$form->select_produits($object->fk_product, 'fk_product', '', 0, 0, -1, 2, '', 1, array(), 0, '1', 0, 'minwidth200');
 		}
 	} else {
 		require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';

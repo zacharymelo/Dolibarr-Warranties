@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.37.2] - 2026-11-23
+
+### Fixed
+- The warranty claim **Modify** form opened with Product blank, and saving it wiped the product. Its product dropdown asked core for raw materials only (`finished=0`), so a claim's finished product was never in the list. It now lists all products with the claim's product selected. This is the source of the product -1 claims in production; 1.37.1 repairs them on save, and this stops new ones. A claim whose serial isn't registered no longer loses its product on every edit.
+
 ## [1.37.1] - 2026-11-22
 
 ### Fixed
