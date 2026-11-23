@@ -59,7 +59,7 @@ function warrantysvc_prepare_head($object)
 
 	$nbFiles = 0;
 	if ($upload_dir) {
-		$filearray = dol_dir_list($upload_dir.'/'.$object->ref, 'files', 0, '', '(\.meta|_preview.*\.png)$');
+		$filearray = dol_dir_list($upload_dir.'/svcrequest/'.dol_sanitizeFileName($object->ref), 'files', 0, '', '(\.meta|_preview.*\.png)$');
 		$nbFiles   = count($filearray);
 	}
 

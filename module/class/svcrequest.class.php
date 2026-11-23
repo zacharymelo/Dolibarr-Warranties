@@ -183,6 +183,41 @@ class SvcRequest extends CommonObject
 	}
 
 	/**
+	 * Fill a missing product from the serial's lot, and never keep the -1 "none selected" value.
+	 * The product is set only when exactly one product owns a lot with this serial.
+	 *
+	 * @return void
+	 */
+	public function resolveProductFromSerial()
+	{
+		if ((int) $this->fk_product > 0) {
+			return;
+		}
+		$this->fk_product = 0;
+
+		if (empty($this->serial_number)) {
+			return;
+		}
+
+		$sql = "SELECT DISTINCT pl.fk_product";
+		$sql .= " FROM ".MAIN_DB_PREFIX."product_lot as pl";
+		$sql .= " WHERE pl.batch = '".$this->db->escape($this->serial_number)."'";
+		$sql .= " AND pl.entity IN (".getEntity('productlot').")";
+		$sql .= $this->db->plimit(2);
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+			return;
+		}
+		if ($this->db->num_rows($resql) == 1) {
+			$obj = $this->db->fetch_object($resql);
+			$this->fk_product = (int) $obj->fk_product;
+		}
+		$this->db->free($resql);
+	}
+
+	/**
 	 * Create RMA case in database
 	 *
 	 * @param  User $user      User creating the record
@@ -194,6 +229,8 @@ class SvcRequest extends CommonObject
 		global $conf;
 
 		$error = 0;
+
+		$this->resolveProductFromSerial();
 
 		$this->db->begin();
 
@@ -444,6 +481,8 @@ class SvcRequest extends CommonObject
 	{
 		$error = 0;
 
+		$this->resolveProductFromSerial();
+
 		$this->db->begin();
 
 		if (!empty($this->socid) && empty($this->fk_soc)) {
@@ -662,6 +701,11 @@ class SvcRequest extends CommonObject
 	 */
 	public function setAwaitingReturn($user)
 	{
+		if ($this->status != self::STATUS_IN_PROGRESS) {
+			$this->error = 'SvcRequestNotInProgressStatus';
+			return -1;
+		}
+
 		$this->status = self::STATUS_AWAIT_RETURN;
 		return $this->update($user);
 	}

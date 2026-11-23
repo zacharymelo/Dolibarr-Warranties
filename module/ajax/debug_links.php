@@ -10,6 +10,11 @@ if (!$res && file_exists("../../../../main.inc.php")) { $res = @include "../../.
 if (!$res) { http_response_code(500); exit; }
 
 if (!$user->admin) { http_response_code(403); print 'Admin only'; exit; }
+if (!getDolGlobalInt('WARRANTYSVC_DEBUG_MODE')) {
+	http_response_code(403);
+	print 'Debug mode not enabled. Go to Warranty > Setup and enable Debug Mode.';
+	exit;
+}
 
 $id = GETPOSTINT('id');
 header('Content-Type: text/plain');

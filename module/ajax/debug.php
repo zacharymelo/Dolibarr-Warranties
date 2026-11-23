@@ -13,7 +13,7 @@
  *   links       — All element_element rows involving this module's types
  *   settings    — All WARRANTYSVC_* constants from llx_const
  *   classes     — Class loading + method availability for all module objects
- *   sql         — Run a read-only diagnostic query (?mode=sql&q=SELECT...)
+ *   sql         — Run a fixed diagnostic query (?mode=sql&preset=requests|warranties|links|servicelog)
  *   triggers    — List all registered triggers and check ours is loaded
  *   hooks       — Show registered hook contexts and verify our hooks fire
  *   all         — Run every diagnostic at once
@@ -65,7 +65,7 @@ print "Module version: ".getDolGlobalString('MAIN_MODULE_WARRANTYSVC_VERSION', '
 print "Mode: $mode\n";
 print "Usage: ?mode=overview|object|links|settings|classes|sql|triggers|hooks|all\n";
 print "       ?mode=object&type=svcrequest&id=11\n";
-print "       ?mode=sql&q=SELECT+rowid,ref+FROM+llx_svc_request+LIMIT+5\n";
+print "       ?mode=sql&preset=requests\n";
 print str_repeat('=', 60)."\n\n";
 
 
@@ -340,67 +340,43 @@ if ($mode === 'classes' || $run_all) {
 // SQL — run a read-only diagnostic query
 // =====================================================================
 if ($mode === 'sql') {
-	$q = GETPOST('q', 'restricthtml');
+	// Fixed diagnostic queries only: free-form SQL allowed file reads (INTO OUTFILE, LOAD_FILE) and cross-entity access
+	$sql_presets = array(
+		'requests' => "SELECT rowid, ref, fk_warranty, fk_commande, fk_shipment, status FROM ".MAIN_DB_PREFIX."svc_request WHERE entity IN (".getEntity('svcrequest').") ORDER BY rowid DESC",
+		'warranties' => "SELECT rowid, ref, serial_number, status, claim_count FROM ".MAIN_DB_PREFIX."svc_warranty WHERE entity IN (".getEntity('svcwarranty').") ORDER BY rowid DESC",
+		'links' => "SELECT * FROM ".MAIN_DB_PREFIX."element_element WHERE sourcetype LIKE '%svc%' OR targettype LIKE '%svc%' ORDER BY rowid DESC",
+		'servicelog' => "SELECT * FROM ".MAIN_DB_PREFIX."svc_service_log ORDER BY rowid DESC",
+	);
+	$sql_preset = GETPOST('preset', 'aZ09');
 	print "--- SQL QUERY ---\n";
 
-	if (empty($q)) {
-		print "Usage: ?mode=sql&q=SELECT+rowid,ref+FROM+llx_svc_request+LIMIT+5\n";
-		print "\nUseful queries:\n";
-		print "  ?mode=sql&q=SELECT rowid,ref,fk_warranty,fk_commande,fk_shipment,status FROM llx_svc_request ORDER BY rowid DESC LIMIT 10\n";
-		print "  ?mode=sql&q=SELECT rowid,ref,serial_number,status,claim_count FROM llx_svc_warranty ORDER BY rowid DESC LIMIT 10\n";
-		print "  ?mode=sql&q=SELECT * FROM llx_element_element WHERE sourcetype LIKE '%svc%' OR targettype LIKE '%svc%' ORDER BY rowid DESC LIMIT 20\n";
-		print "  ?mode=sql&q=SELECT * FROM llx_svc_service_log ORDER BY rowid DESC LIMIT 10\n";
+	if (empty($sql_presets[$sql_preset])) {
+		print "Usage: ?mode=sql&preset=NAME\n";
+		print "\nAvailable presets: ".implode(', ', array_keys($sql_presets))."\n";
 	} else {
-		// Safety: only allow SELECT statements
-		$q_trimmed = trim($q);
-		if (stripos($q_trimmed, 'SELECT') !== 0) {
-			print "ERROR: Only SELECT queries allowed.\n";
+		$sql_debug = $sql_presets[$sql_preset].$db->plimit(50);
+		print "Query: ".$sql_debug."\n\n";
+		$resql = $db->query($sql_debug);
+		if ($resql) {
+			$row_num = 0;
+			$first = true;
+			while ($obj = $db->fetch_array($resql)) {
+				if ($first) {
+					// Print column headers
+					print implode("\t", array_keys($obj))."\n";
+					print str_repeat('-', 80)."\n";
+					$first = false;
+				}
+				$row_num++;
+				$vals = array();
+				foreach ($obj as $v) {
+					$vals[] = ($v === null) ? 'NULL' : (dol_strlen((string) $v) > 40 ? dol_substr((string) $v, 0, 40).'...' : $v);
+				}
+				print implode("\t", $vals)."\n";
+			}
+			print "\n$row_num rows returned.\n";
 		} else {
-			// Block dangerous keywords
-			$blocked = array('INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'TRUNCATE', 'CREATE', 'GRANT', 'REVOKE');
-			$safe = true;
-			foreach ($blocked as $kw) {
-				if (stripos($q_trimmed, $kw) !== false && stripos($q_trimmed, $kw) !== stripos($q_trimmed, 'SELECT')) {
-					$safe = false;
-					break;
-				}
-			}
-			if (!$safe) {
-				print "ERROR: Query contains blocked keywords.\n";
-			} else {
-				// Add LIMIT if not present
-				if (stripos($q_trimmed, 'LIMIT') === false) {
-					$q_trimmed .= ' LIMIT 50';
-				}
-
-				// Auto-replace llx_ with actual DB prefix
-				$q_trimmed = str_replace('llx_', MAIN_DB_PREFIX, $q_trimmed);
-
-				print "Query: $q_trimmed\n\n";
-				$resql = $db->query($q_trimmed);
-				if ($resql) {
-					$num = $db->num_rows($resql);
-					$first = true;
-					$row_num = 0;
-					while ($obj = $db->fetch_array($resql)) {
-						if ($first) {
-							// Print column headers
-							print implode("\t", array_keys($obj))."\n";
-							print str_repeat('-', 80)."\n";
-							$first = false;
-						}
-						$row_num++;
-						$vals = array();
-						foreach ($obj as $v) {
-							$vals[] = ($v === null) ? 'NULL' : (strlen($v) > 40 ? substr($v, 0, 40).'...' : $v);
-						}
-						print implode("\t", $vals)."\n";
-					}
-					print "\n$row_num rows returned.\n";
-				} else {
-					print "SQL ERROR: ".$db->lasterror()."\n";
-				}
-			}
+			print "SQL ERROR: ".$db->lasterror()."\n";
 		}
 	}
 	print "\n";

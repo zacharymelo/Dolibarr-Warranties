@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.37.2] - 2026-11-23
+
+### Fixed
+- The warranty claim **Modify** form opened with Product blank, and saving it wiped the product. Its product dropdown asked core for raw materials only (`finished=0`), so a claim's finished product was never in the list. It now lists all products with the claim's product selected. This is the source of the product -1 claims in production; 1.37.1 repairs them on save, and this stops new ones. A claim whose serial isn't registered no longer loses its product on every edit.
+
+## [1.37.1] - 2026-11-22
+
+### Fixed
+- Service requests no longer save a product of -1. Core's product dropdown posts -1 for "nothing selected", and both create and edit stored it as-is. In production this left 6 of 13 requests with no product, and the -1 spread to the service log and to svcrecord sessions. On save, a missing product is now filled in from the serial's lot when exactly one product owns that serial; otherwise it is stored as 0. The existing -1 requests self-heal the next time they are saved.
+
+## [1.37.0] - 2026-11-11
+
+### Added
+- Cross-ship and component-with-return cases now move to Await Return when the replacement shipment linked to them (directly, or through its sales order) is validated. The expected-return date defaults to today + `WARRANTYSVC_RETURN_GRACE_DAYS` when empty. This unblocks the return reminders, the Await Return list preset and the Customer Return validate trigger, none of which could fire before because nothing set the status.
+- "Mark Awaiting Return" button on In Progress cases whose resolution expects a return (covers customer-returns-first). `setAwaitingReturn()` now refuses from any status other than In Progress.
+- Documents tab (`document.php`, core upload/list template). Files are stored in `<dir_output>/svcrequest/<ref>/`, the layout core's download check grants through `svcrequest->read`.
+
+### Fixed
+- Saving the service request edit form no longer blanks the 14 fields it doesn't render (order link, serial in/out, warehouses, carriers and tracking, expected-return date, notes); only posted fields are written.
+- Warranty list: the count query was built by a regex that stopped at the claim-count sub-select, so paging never rendered and records past the first page were unreachable. Sorting by Claims raised an SQL error. Expiry sorted on the stored date instead of the displayed effective expiry. The last page also no longer shows a "next" arrow.
+- Saving a warranty that has a type no longer wipes its coverage days (the input was `disabled`, so it was never posted).
+- "Link to..." add/remove now works on the service request and warranty cards (`actions_dellink.inc.php` was never included).
+- `ajax/debug.php` no longer runs free-form SQL (the keyword blocklist let `INTO OUTFILE`, `LOAD_FILE()` and cross-entity reads through). It is replaced by fixed, entity-scoped `?mode=sql&preset=` queries. `ajax/debug_links.php` now also requires `WARRANTYSVC_DEBUG_MODE`.
+
+### Notes
+- Static-checked with doli-check: the new `document.php` is fully clean, and the edited files add no new phpcs or phan findings. Not yet exercised on a running Dolibarr; see the staging checklist in `TODO.md`.
+- PDFs from `pdf_svcrequest_standard` still target `<dir_output>/<ref>/` and will not show in the new Documents tab (tracked in `TODO.md`).
+
+## [1.36.1] - 2026-11-11
+
+### Fixed
+- "Create warranty from shipment" was refused by CSRF protection level 3: the link and the shipment selector GET form now carry a token.
+
 ## [1.36.0] - 2026-09-01
 
 ### Added

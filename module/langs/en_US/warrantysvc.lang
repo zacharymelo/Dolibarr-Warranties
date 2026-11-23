@@ -173,6 +173,9 @@ SvcChooseResolutionAfterDiagnosis = Choose a resolution type once diagnosis is c
 SvcRequestNotInValidatedStatus = This warranty claim must be validated before it can enter diagnosis.
 SvcRequestNotInDiagnosingStatus = This warranty claim is not in a state that allows moving to In Progress.
 SvcRequestResolutionTypeRequiredBeforeProgress = Choose a resolution type before moving to In Progress.
+SvcRequestNotInProgressStatus = Only a warranty claim that is In Progress can be marked as awaiting return.
+MarkAwaitingReturn = Mark Awaiting Return
+RMAActions = Replacement and Return
 InvoiceNonReturn = Invoice for Non-Return
 VoidWarranty = Void Warranty
 

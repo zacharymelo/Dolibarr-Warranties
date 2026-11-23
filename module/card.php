@@ -23,7 +23,7 @@ require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/lib/warrantysvc.lib.php';
 
 $langs->loadLangs(array('warrantysvc@warrantysvc', 'companies', 'bills', 'stocks'));
 
-$id         = GETPOST('id', 'int');
+$id         = GETPOSTINT('id');
 $ref        = GETPOST('ref', 'alpha');
 $action     = GETPOST('action', 'aZ09');
 $cancel     = GETPOST('cancel', 'alpha');
@@ -79,6 +79,10 @@ if ($cancel) {
 	exit;
 }
 
+// Add/remove links made from the "Link to..." block
+$permissiondellink = $permwrite;
+include DOL_DOCUMENT_ROOT.'/core/actions_dellink.inc.php';
+
 if ($action == 'add' && $permwrite) {
 	$object->fk_soc            = GETPOST('fk_soc', 'int');
 	$object->fk_product        = GETPOST('fk_product', 'int');
@@ -94,7 +98,7 @@ if ($action == 'add' && $permwrite) {
 	// resolution_type is not set at intake — chosen during the Diagnosing stage
 
 	// Manual warranty pairing
-	$fk_warranty_posted = GETPOST('fk_warranty', 'int');
+	$fk_warranty_posted = GETPOSTINT('fk_warranty');
 	if ($fk_warranty_posted > 0) {
 		require_once DOL_DOCUMENT_ROOT.'/custom/warrantysvc/class/svcwarranty.class.php';
 		$w = new SvcWarranty($db);
@@ -124,33 +128,43 @@ if ($action == 'add' && $permwrite) {
 }
 
 if ($action == 'update' && $permwrite) {
-	$object->fk_soc              = GETPOST('fk_soc', 'int');
-	$object->fk_product          = GETPOST('fk_product', 'int');
-	$object->serial_number       = GETPOST('serial_number', 'alpha');
-	$object->fk_contact          = GETPOST('fk_contact', 'int');
-	$object->customer_site       = GETPOST('customer_site', 'alphanohtml');
-	$object->fk_project          = GETPOST('fk_project', 'int');
-	$object->fk_commande         = GETPOST('fk_commande', 'int');
-	$object->issue_date          = dol_mktime(12, 0, 0, GETPOST('issue_datemonth', 'int'), GETPOST('issue_dateday', 'int'), GETPOST('issue_dateyear', 'int'));
-	$object->reported_via        = GETPOST('reported_via', 'alpha');
-	$object->fk_pbxcall          = GETPOST('fk_pbxcall', 'int');
-	$object->issue_description   = GETPOST('issue_description', 'restricthtml');
-	$object->resolution_type     = GETPOST('resolution_type', 'alpha');
-	$object->resolution_notes    = GETPOST('resolution_notes', 'restricthtml');
-	$object->serial_in           = GETPOST('serial_in', 'alpha');
-	$object->serial_out          = GETPOST('serial_out', 'alpha');
-	$object->seal_number         = GETPOST('seal_number', 'alphanohtml');
-	$object->fk_warehouse_source = GETPOST('fk_warehouse_source', 'int');
-	$object->fk_warehouse_return = GETPOST('fk_warehouse_return', 'int');
-	$object->fk_user_assigned    = GETPOST('fk_user_assigned', 'int');
-	$object->billable            = GETPOST('billable', 'int');
-	$object->outbound_carrier    = GETPOST('outbound_carrier', 'alphanohtml');
-	$object->outbound_tracking   = GETPOST('outbound_tracking', 'alphanohtml');
-	$object->return_carrier      = GETPOST('return_carrier', 'alphanohtml');
-	$object->return_tracking     = GETPOST('return_tracking', 'alphanohtml');
-	$object->date_return_expected = dol_mktime(12, 0, 0, GETPOST('date_return_expectedmonth', 'int'), GETPOST('date_return_expectedday', 'int'), GETPOST('date_return_expectedyear', 'int'));
-	$object->note_private        = GETPOST('note_private', 'restricthtml');
-	$object->note_public         = GETPOST('note_public', 'restricthtml');
+	// Only overwrite fields the edit form actually posted; absent inputs keep their stored value
+	$update_int_fields = array('fk_soc', 'fk_product', 'fk_contact', 'fk_project', 'fk_commande', 'fk_pbxcall', 'fk_warehouse_source', 'fk_warehouse_return', 'fk_user_assigned');
+	foreach ($update_int_fields as $update_field) {
+		if (GETPOSTISSET($update_field)) {
+			$object->$update_field = GETPOSTINT($update_field);
+		}
+	}
+	$update_text_fields = array(
+		'serial_number' => 'alpha',
+		'customer_site' => 'alphanohtml',
+		'reported_via' => 'alpha',
+		'issue_description' => 'restricthtml',
+		'resolution_type' => 'alpha',
+		'resolution_notes' => 'restricthtml',
+		'serial_in' => 'alpha',
+		'serial_out' => 'alpha',
+		'seal_number' => 'alphanohtml',
+		'outbound_carrier' => 'alphanohtml',
+		'outbound_tracking' => 'alphanohtml',
+		'return_carrier' => 'alphanohtml',
+		'return_tracking' => 'alphanohtml',
+		'note_private' => 'restricthtml',
+		'note_public' => 'restricthtml',
+	);
+	foreach ($update_text_fields as $update_field => $update_filter) {
+		if (GETPOSTISSET($update_field)) {
+			$object->$update_field = GETPOST($update_field, $update_filter);
+		}
+	}
+	if (GETPOSTISSET('issue_dateday')) {
+		$object->issue_date = dol_mktime(12, 0, 0, GETPOSTINT('issue_datemonth'), GETPOSTINT('issue_dateday'), GETPOSTINT('issue_dateyear'));
+	}
+	if (GETPOSTISSET('date_return_expectedday')) {
+		$object->date_return_expected = dol_mktime(12, 0, 0, GETPOSTINT('date_return_expectedmonth'), GETPOSTINT('date_return_expectedday'), GETPOSTINT('date_return_expectedyear'));
+	}
+	// Checkbox: always rendered in edit mode, and an unchecked box posts nothing
+	$object->billable = GETPOSTINT('billable');
 
 	// Retrieve extrafields from POST
 	$extrafields->setOptionalsFromPost(null, $object);
@@ -204,6 +218,18 @@ if ($action == 'confirm_setinprogress' && $permwrite) {
 	exit;
 }
 
+if ($action == 'confirm_setawaitreturn' && $permwrite) {
+	if (empty($object->date_return_expected)) {
+		$object->date_return_expected = dol_time_plus_duree(dol_now(), getDolGlobalInt('WARRANTYSVC_RETURN_GRACE_DAYS', 7), 'd');
+	}
+	$result = $object->setAwaitingReturn($user);
+	if ($result < 0) {
+		setEventMessages($langs->trans($object->error), $object->errors, 'errors');
+	}
+	header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+	exit;
+}
+
 if ($action == 'confirm_resolve' && $permwrite) {
 	$object->resolve($user);
 	header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
@@ -238,7 +264,7 @@ if ($action == 'confirm_reopen' && GETPOST('confirm', 'alpha') == 'yes' && $perm
 // Create return reception (warehouse chosen in inline form)
 if ($action == 'create_return_reception' && $permwrite && isModEnabled('reception')) {
 	if (in_array($object->resolution_type, $types_with_return) && empty($object->fk_reception)) {
-		$rec_warehouse = GETPOST('rec_warehouse', 'int');
+		$rec_warehouse = GETPOSTINT('rec_warehouse');
 		$object->serial_in = GETPOST('serial_in', 'alpha');
 		$rec_id = $object->createReturnReception($user, $rec_warehouse);
 		if ($rec_id > 0) {
@@ -375,7 +401,7 @@ if ($action == 'addline' && $permwrite) {
 
 // Delete component line
 if ($action == 'deleteline' && $permwrite) {
-	$lineid = GETPOST('lineid', 'int');
+	$lineid = GETPOSTINT('lineid');
 	$line   = new SvcRequestLine($db);
 	$line->fetch($lineid);
 	if ($line->fk_rma_case == $object->id) {
@@ -916,7 +942,8 @@ if ($action == 'create') {
 		if (!is_null($filtered_product_list)) {
 			print Form::selectarray('fk_product', $filtered_product_list, $object->fk_product, 0, 0, 0, '', 0, 0, 0, '', 'flat minwidth200');
 		} else {
-			$form->select_produits($object->fk_product, 'fk_product', '', 0, 0, -1, 0, '', 1, 0, 'minwidth200');
+			// finished=2: all products (0 listed raw materials only, so the claim's own product never showed and Save wiped it)
+			$form->select_produits($object->fk_product, 'fk_product', '', 0, 0, -1, 2, '', 1, array(), 0, '1', 0, 'minwidth200');
 		}
 	} else {
 		require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
@@ -932,7 +959,7 @@ if ($action == 'create') {
 	print '<tr><td>'.$form->textwithpicto($langs->trans('SvcSerialNumber'), $langs->trans('TooltipSerialNumber')).'</td><td>';
 	if ($action == 'edit' && $permwrite) {
 		print '<input type="text" name="serial_number" id="serial_number" class="minwidth200" value="'.dol_escape_htmltag($object->serial_number).'" list="serial_suggestions">';
-		$serials = $object->getCustomerSerials($object->fk_soc, $object->fk_product);
+		$serials = $object->getCustomerSerials((int) $object->fk_soc, (int) $object->fk_product);
 		if ($serials) {
 			print '<datalist id="serial_suggestions">';
 			foreach ($serials as $s) {
@@ -1453,6 +1480,10 @@ if ($action == 'create') {
 			// Guidance / Informational: nothing to dispatch — just resolve
 			if ($is_no_movement) {
 				print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=confirm_resolve&token='.newToken().'" class="butAction">'.$langs->trans('MarkResolved').'</a>';
+			}
+			// Return-expecting types: park the case until the faulty unit comes back
+			if ($has_return) {
+				print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=confirm_setawaitreturn&token='.newToken().'" class="butAction">'.$langs->trans('MarkAwaitingReturn').'</a>';
 			}
 			// Mark resolved available for all types once movement is done
 			if (!$is_no_movement) {
